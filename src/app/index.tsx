@@ -20,7 +20,6 @@ export default function HomeScreen() {
           <Text style={styles.greeting}>Good Morning 👋</Text>
           <Text style={styles.location}>📍 Pune, Maharashtra</Text>
         </View>
-
         <Text style={styles.notification}>🔔</Text>
       </View>
 

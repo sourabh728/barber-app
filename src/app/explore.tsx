@@ -1,15 +1,22 @@
-import { View, Text } from "react-native";
+import { useState } from "react";
+import { View, Text, TouchableOpacity } from "react-native";
+import LoginScreen from "@/app/auth/LoginScreen";
 
 export default function Explore() {
+  const [showLogin, setShowLogin] = useState(false);
+
   return (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <Text style={{ fontSize: 28 }}>Explore Screen ✂️</Text>
+    <View style={{ flex: 1 }}>
+      {!showLogin ? (
+        <>
+          <Text style={{ fontSize: 28 }}>Explore Screen ✂️</Text>
+          <TouchableOpacity onPress={() => setShowLogin(true)}>
+            <Text>Login</Text>
+          </TouchableOpacity>
+        </>
+      ) : (
+        <LoginScreen />
+      )}
     </View>
   );
 }
