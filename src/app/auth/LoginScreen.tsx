@@ -28,7 +28,7 @@ export default function LoginScreen() {
           BOOK<Text style={styles.logoOrange}>UR</Text>BARBER
         </Text>
 
-        <Text style={styles.heading}>Welcome Back 👋</Text>
+        <Text style={styles.heading}>Welcome Back👋</Text>
 
         <Text style={styles.subtitle}>
           Sign in to continue booking your favourite barber.
