@@ -9,7 +9,7 @@ export default function Explore() {
     <View style={{ flex: 1 }}>
       {!showLogin ? (
         <>
-          <Text style={{ fontSize: 28 }}>Explore Screen ✂️</Text>
+          <Text style={{ fontSize: 40 }}>Explore Screen ✂️</Text>
           <TouchableOpacity onPress={() => setShowLogin(true)}>
             <Text>Login</Text>
           </TouchableOpacity>

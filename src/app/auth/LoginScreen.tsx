@@ -1,21 +1,22 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import React, { useState } from "react";
 import {
-  SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import BarberLoginScreen from "./BarberLoginScreen";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function LoginScreen() {
   const router = useRouter();
+  const [showBarberLogin, setShowBarberLogin] = useState(false);
+
   const handleGoogleLogin = () => {
     console.log("Google Login");
-  };
-  const handleBarberLogin = () => {
-    console.log("Barber Login");
   };
 
   return (
@@ -52,11 +53,20 @@ export default function LoginScreen() {
 
           <View style={styles.line} />
         </View>
-        <TouchableOpacity  onPress={() => router.push("/auth/BarberLoginScreen")}>          
+
+        {!showBarberLogin ? (
+        <>
+          <TouchableOpacity
+          onPress={() => setShowBarberLogin(true)}
+        >
           <Text style={styles.barberLogin}>
-            Barber  Login →
+            Barber Login →
           </Text>
         </TouchableOpacity>
+        </>
+      ) : (
+        <BarberLoginScreen />
+      )}
 
         <Text style={styles.terms}>
           By continuing you agree to our{" "}
@@ -139,23 +149,6 @@ const styles = StyleSheet.create({
   or: {
     color: "#8B8BA7",
     marginHorizontal: 12,
-    fontWeight: "600",
-  },
-
-  guestButton: {
-    height: 55,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#2B2B40",
-    justifyContent: "center",
-    alignItems: "center",
-    flexDirection: "row",
-  },
-
-  guestText: {
-    color: "#fff",
-    marginLeft: 10,
-    fontSize: 16,
     fontWeight: "600",
   },
 
