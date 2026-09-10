@@ -17,6 +17,26 @@ model User {
   role      UserRole @default(CUSTOMER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  shops     Shop[]
+}
+
+model Shop {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  phone       String?
+  email       String?
+  address     String
+  city        String
+  state       String
+  pincode     String
+
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 enum UserRole {
