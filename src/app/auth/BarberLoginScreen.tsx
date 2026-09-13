@@ -10,6 +10,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { api } from "../../services/api";
 
 export default function BarberLoginScreen() {
   const router = useRouter();
@@ -18,14 +19,26 @@ export default function BarberLoginScreen() {
   const [password, setPassword] = useState("");
   const [hidePassword, setHidePassword] = useState(true);
 
-  const handleLogin = () => {
-    if (!email || !password) {
-      console.log("Please enter email and password");
-      return;
-    }
+  const handleLogin = async () => {
+  if (!email || !password) {
+    console.log("Please enter email and password");
+    return;
+  }
 
-    console.log("Barber Login:", { email, password });
-  };
+  try {
+    const response = await api.post("/auth/login", {
+      email,
+      password,
+    });
+
+    console.log("Login successful:", response.data);
+  } catch (error: any) {
+    console.log(
+      "Login failed:",
+      error.response?.data || error.message
+    );
+  }
+};
 
   const handleGoogleLogin = () => {
     console.log("Google Login");
