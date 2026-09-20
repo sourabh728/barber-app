@@ -19,6 +19,7 @@ import { useSession } from "@/context/session-provider";
 export default function Profile() {
   const router = useRouter();
   const { signOut, user } = useSession();
+  const isBarber = user?.role === "BARBER";
   const displayName = user?.name?.trim() || user?.email || "Account";
   const displayContact = user?.phone?.trim() || user?.email || "";
   const roleLabel =
@@ -82,36 +83,82 @@ export default function Profile() {
 
       {/* Menu */}
       <View style={styles.menu}>
-        <MenuItem
-          icon={<Ionicons name="person" size={22} color="#2563EB" />}
-          title="Edit Profile"
-          onPress={() => {
-            router.push("/edit-profile");
-          }}
-        />
+        {isBarber ? (
+          <>
+            <MenuItem
+              icon={<Ionicons name="storefront" size={22} color="#2563EB" />}
+              title="Edit Shop Profile"
+              onPress={() => {
+                router.push("/edit-profile");
+              }}
+            />
 
-        <MenuItem
-          icon={<Ionicons name="heart" size={22} color="#EF4444" />}
-          title="Favorite Shops"
-        />
+            <MenuItem
+              icon={<Ionicons name="calendar-outline" size={22} color="#0B5A47" />}
+              title="Shop Schedule"
+              onPress={() => {
+                router.push("/barber/schedule");
+              }}
+            />
 
-        <MenuItem
-          icon={<Ionicons name="wallet" size={22} color="#22C55E" />}
-          title="Payment Methods"
-        />
+            <MenuItem
+              icon={<Ionicons name="people" size={22} color="#7C3AED" />}
+              title="Manage Staff"
+              onPress={() => {
+                router.push("/barber/staff");
+              }}
+            />
 
-        <MenuItem
-          icon={<Feather name="help-circle" size={22} color="#475569" />}
-          title="Help & Support"
-        />
+            <MenuItem
+              icon={<Ionicons name="cut" size={22} color="#EA580C" />}
+              title="Appointments"
+              onPress={() => {
+                router.push("/barber/appointments");
+              }}
+            />
 
-        <MenuItem
-          icon={<MaterialIcons name="logout" size={22} color="#DC2626" />}
-          title="Logout"
-          onPress={() => {
-            void signOut();
-          }}
-        />
+            <MenuItem
+              icon={<MaterialIcons name="logout" size={22} color="#DC2626" />}
+              title="Logout"
+              onPress={() => {
+                void signOut();
+              }}
+            />
+          </>
+        ) : (
+          <>
+            <MenuItem
+              icon={<Ionicons name="person" size={22} color="#2563EB" />}
+              title="Edit Profile"
+              onPress={() => {
+                router.push("/edit-profile");
+              }}
+            />
+
+            <MenuItem
+              icon={<Ionicons name="heart" size={22} color="#EF4444" />}
+              title="Favorite Shops"
+            />
+
+            <MenuItem
+              icon={<Ionicons name="wallet" size={22} color="#22C55E" />}
+              title="Payment Methods"
+            />
+
+            <MenuItem
+              icon={<Feather name="help-circle" size={22} color="#475569" />}
+              title="Help & Support"
+            />
+
+            <MenuItem
+              icon={<MaterialIcons name="logout" size={22} color="#DC2626" />}
+              title="Logout"
+              onPress={() => {
+                void signOut();
+              }}
+            />
+          </>
+        )}
       </View>
     </ScrollView>
   );
