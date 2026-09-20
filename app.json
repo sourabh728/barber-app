@@ -5,12 +5,14 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "barberapp",
+    "scheme": ["barberapp", "com.barberapp1.app"],
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "com.barberapp1.app",
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.barberapp1.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -33,7 +35,8 @@
           "imageWidth": 76
         }
       ],
-      "expo-image"
+      "expo-image",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -10,11 +10,24 @@ import {
 import {
   Ionicons,
   MaterialIcons,
-  FontAwesome5,
   Feather,
 } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+
+import { useSession } from "@/context/session-provider";
 
 export default function Profile() {
+  const router = useRouter();
+  const { signOut, user } = useSession();
+  const displayName = user?.name?.trim() || user?.email || "Account";
+  const displayContact = user?.phone?.trim() || user?.email || "";
+  const roleLabel =
+    user?.role === "BARBER"
+      ? "Barber"
+      : user?.role === "ADMIN"
+        ? "Admin"
+        : null;
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
@@ -34,8 +47,13 @@ export default function Profile() {
           />
 
           <View>
-            <Text style={styles.name}>Peri Kumar</Text>
-            <Text style={styles.phone}>+91 9876543210</Text>
+            <Text style={styles.name}>{displayName}</Text>
+            {displayContact ? (
+              <Text style={styles.phone}>{displayContact}</Text>
+            ) : null}
+            {roleLabel ? (
+              <Text style={styles.role}>{roleLabel}</Text>
+            ) : null}
           </View>
         </View>
       </View>
@@ -67,6 +85,9 @@ export default function Profile() {
         <MenuItem
           icon={<Ionicons name="person" size={22} color="#2563EB" />}
           title="Edit Profile"
+          onPress={() => {
+            router.push("/edit-profile");
+          }}
         />
 
         <MenuItem
@@ -87,21 +108,25 @@ export default function Profile() {
         <MenuItem
           icon={<MaterialIcons name="logout" size={22} color="#DC2626" />}
           title="Logout"
+          onPress={() => {
+            void signOut();
+          }}
         />
       </View>
     </ScrollView>
   );
 }
-
 function MenuItem({
   icon,
   title,
+  onPress,
 }: {
   icon: React.ReactNode;
   title: string;
+  onPress?: () => void;
 }) {
   return (
-    <TouchableOpacity style={styles.menuItem}>
+    <TouchableOpacity style={styles.menuItem} onPress={onPress}>
       <View style={styles.iconCircle}>{icon}</View>
 
       <Text style={styles.menuTitle}>{title}</Text>
@@ -174,6 +199,14 @@ const styles = StyleSheet.create({
     fontSize: 17,
     marginTop: 6,
   },
+
+  role: {
+    color: "rgba(255,255,255,0.85)",
+    fontSize: 14,
+    marginTop: 4,
+    fontWeight: "600",
+  },
+
 
   statsContainer: {
     backgroundColor: "white",

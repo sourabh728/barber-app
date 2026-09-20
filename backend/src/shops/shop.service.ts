@@ -22,6 +22,22 @@ export class ShopService {
     });
   }
 
+  async updateMyShop(ownerId: string, updateShopDto: UpdateShopDto) {
+    const shop = await this.prisma.shop.findFirst({
+      where: { ownerId },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (!shop) {
+      throw new NotFoundException('Shop not found');
+    }
+
+    return this.prisma.shop.update({
+      where: { id: shop.id },
+      data: updateShopDto,
+    });
+  }
+
   async updateShop(
     shopId: string,
     updateShopDto: UpdateShopDto,
