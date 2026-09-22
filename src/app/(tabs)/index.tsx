@@ -39,7 +39,10 @@ export default function HomeScreen() {
           Premium barber appointments near you.
         </Text>
 
-        <TouchableOpacity style={styles.button} onPress={() => router.push("/bookings")}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => router.push("/explore")}
+        >
           <Text style={styles.buttonText}>Book Appointment</Text>
         </TouchableOpacity>
       </View>

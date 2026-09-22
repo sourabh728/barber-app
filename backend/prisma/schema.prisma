@@ -43,7 +43,9 @@ model Shop {
 
   ownerId     String
   owner       User     @relation(fields: [ownerId], references: [id])
-  holidays    ShopHoliday[]
+  holidays     ShopHoliday[]
+  staff        ShopStaff[]
+  appointments Appointment[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -62,8 +64,69 @@ model ShopHoliday {
   @@index([shopId])
 }
 
+model ShopStaff {
+  id              String      @id @default(uuid())
+  shopId          String
+  shop            Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name            String
+  title           String
+  phone           String
+  status          StaffStatus @default(ACTIVE)
+  /// Calendar date only (when status is ON_LEAVE)
+  leaveReturnDate DateTime?   @db.Date
+  appointments    Appointment[]
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([shopId])
+}
+
+model Appointment {
+  id            String            @id @default(uuid())
+  shopId        String
+  shop          Shop              @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  customerName  String
+  customerPhone String?
+  serviceName   String
+  /// Null means "Any Available"
+  staffId       String?
+  staff         ShopStaff?        @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  /// Price in INR rupees (whole units)
+  priceInr      Int
+  status        AppointmentStatus @default(PENDING)
+  /// Calendar date only
+  date          DateTime          @db.Date
+  /// 24h "HH:mm" start
+  startTime     String
+  /// 24h "HH:mm" end
+  endTime       String
+  isWalkIn      Boolean           @default(false)
+
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([shopId, date])
+  @@index([shopId, status])
+  @@index([staffId])
+}
+
 enum UserRole {
   CUSTOMER
   BARBER
   ADMIN
+}
+
+enum StaffStatus {
+  ACTIVE
+  ON_LEAVE
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  REJECTED
 }

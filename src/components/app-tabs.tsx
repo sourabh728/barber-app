@@ -2,10 +2,13 @@ import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { useColorScheme } from 'react-native';
 
 import { Colors } from '@/constants/theme';
+import { useSession } from '@/context/session-provider';
 
 export default function AppTabs() {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+  const { user } = useSession();
+  const isBarber = user?.role === 'BARBER';
 
   return (
     <NativeTabs
@@ -27,20 +30,23 @@ export default function AppTabs() {
           renderingMode="template"
         />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="bookings">
-        <NativeTabs.Trigger.Label>Bookings</NativeTabs.Trigger.Label>
+
+      {/* Report tab is barber/shop-owner only; customers never see Bookings or Report. */}
+      <NativeTabs.Trigger name="report" hidden={!isBarber}>
+        <NativeTabs.Trigger.Label>Report</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           src={require('@/assets/images/tabIcons/booking.png')}
           renderingMode="template"
         />
-      </NativeTabs.Trigger> 
+      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="profile">
         <NativeTabs.Trigger.Label>Profile</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           src={require('@/assets/images/tabIcons/profile.png')}
           renderingMode="template"
         />
-      </NativeTabs.Trigger> 
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
