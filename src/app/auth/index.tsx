@@ -1,7 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -48,7 +47,7 @@ export default function LoginScreen() {
         >
           <LinearGradient colors={["#12121C", "#0D0D15"]} style={styles.card}>
             <Text style={styles.logo}>
-              BOOK<Text style={styles.logoOrange}>UR</Text>BARBER
+              BOOK<Text style={styles.logoOrange}>UR</Text>LOOK
             </Text>
 
             <Text style={styles.heading}>Welcome Back👋</Text>
