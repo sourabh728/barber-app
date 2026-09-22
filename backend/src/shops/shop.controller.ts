@@ -111,6 +111,14 @@ export class ShopController {
     return this.shopService.deleteMyStaff(req.user.userId, staffId);
   }
 
+  /** Owner's shop profile stats. Declared before :id so "me" is not treated as an id. */
+  @Get('me/stats')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BARBER)
+  getMyStats(@Req() req: AuthenticatedRequest) {
+    return this.shopService.getMyStats(req.user.userId);
+  }
+
   /** Owner's shop daily report. Declared before :id so "me" is not treated as an id. */
   @Get('me/reports/daily')
   @UseGuards(JwtAuthGuard, RolesGuard)

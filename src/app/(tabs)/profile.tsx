@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -6,15 +6,20 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  ActivityIndicator,
 } from "react-native";
 import {
   Ionicons,
   MaterialIcons,
   Feather,
 } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 
 import { useSession } from "@/context/session-provider";
+import {
+  fetchMyShopStats,
+  getShopStatsErrorMessage,
+} from "@/services/shop-stats-api";
 
 export default function Profile() {
   const router = useRouter();
@@ -28,6 +33,57 @@ export default function Profile() {
       : user?.role === "ADMIN"
         ? "Admin"
         : null;
+
+  const [completedBookings, setCompletedBookings] = useState(0);
+  const [ratingAverage, setRatingAverage] = useState(0);
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isBarber) {
+        return;
+      }
+
+      let cancelled = false;
+
+      async function loadStats() {
+        setStatsLoading(true);
+        try {
+          const stats = await fetchMyShopStats();
+          if (cancelled) return;
+          setCompletedBookings(stats.completedBookings);
+          setRatingAverage(stats.ratingAverage);
+        } catch (error) {
+          if (cancelled) return;
+          // Keep last known values; surface only for debugging.
+          if (__DEV__) {
+            console.warn(getShopStatsErrorMessage(error));
+          }
+        } finally {
+          if (!cancelled) {
+            setStatsLoading(false);
+          }
+        }
+      }
+
+      void loadStats();
+
+      return () => {
+        cancelled = true;
+      };
+    }, [isBarber]),
+  );
+
+  const openShopStats = (focus: "bookings" | "reviews") => {
+    router.push({
+      pathname: "/barber/shop-stats",
+      params: { focus },
+    });
+  };
+
+  const bookingsDisplay = isBarber ? String(completedBookings) : "1";
+  const ratingDisplay = isBarber ? String(ratingAverage) : "45";
+  const ratingLabel = isBarber ? "Rating" : "Reviews";
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -61,17 +117,49 @@ export default function Profile() {
 
       {/* Stats */}
       <View style={styles.statsContainer}>
-        <View style={styles.stat}>
-          <Text style={styles.statNumber}>1</Text>
-          <Text style={styles.statLabel}>Bookings</Text>
-        </View>
+        {isBarber ? (
+          <TouchableOpacity
+            style={styles.stat}
+            onPress={() => openShopStats("bookings")}
+            accessibilityRole="button"
+            accessibilityLabel="View completed bookings"
+          >
+            {statsLoading ? (
+              <ActivityIndicator color="#0B5A47" />
+            ) : (
+              <Text style={styles.statNumber}>{bookingsDisplay}</Text>
+            )}
+            <Text style={styles.statLabel}>Bookings</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.stat}>
+            <Text style={styles.statNumber}>{bookingsDisplay}</Text>
+            <Text style={styles.statLabel}>Bookings</Text>
+          </View>
+        )}
 
         <View style={styles.divider} />
 
-        <View style={styles.stat}>
-          <Text style={styles.statNumber}>45</Text>
-          <Text style={styles.statLabel}>Reviews</Text>
-        </View>
+        {isBarber ? (
+          <TouchableOpacity
+            style={styles.stat}
+            onPress={() => openShopStats("reviews")}
+            accessibilityRole="button"
+            accessibilityLabel="View rating and reviews"
+          >
+            {statsLoading ? (
+              <ActivityIndicator color="#0B5A47" />
+            ) : (
+              <Text style={styles.statNumber}>{ratingDisplay}</Text>
+            )}
+            <Text style={styles.statLabel}>{ratingLabel}</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.stat}>
+            <Text style={styles.statNumber}>{ratingDisplay}</Text>
+            <Text style={styles.statLabel}>{ratingLabel}</Text>
+          </View>
+        )}
 
         <View style={styles.divider} />
 

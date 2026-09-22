@@ -494,6 +494,25 @@ export class ShopService {
    * - totalCollectionInr: sum of `priceInr` on COMPLETED rows only
    * - byBarber: same metrics grouped by assigned staff; null staff → "Any Available"
    */
+  async getMyStats(ownerId: string) {
+    const shop = await this.findOwnerShop(ownerId);
+
+    const completedBookings = await this.prisma.appointment.count({
+      where: {
+        shopId: shop.id,
+        status: AppointmentStatus.COMPLETED,
+      },
+    });
+
+    // Customer ratings/reviews are not modeled yet — keep placeholders at 0.
+    return {
+      shopId: shop.id,
+      completedBookings,
+      ratingAverage: 0,
+      reviewCount: 0,
+    };
+  }
+
   async getMyDailyReport(ownerId: string, date?: string) {
     const shop = await this.findOwnerShop(ownerId);
     const dateKey = date ?? todayUtcDateOnly();
