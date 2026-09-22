@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  Get,
   Param,
   Patch,
+  Put,
   Post,
   Req,
   UseGuards,
@@ -16,6 +18,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { CreateShopDto } from './dto/create-shop.dto';
 import { UpdateShopDto } from './dto/update-shop.dto';
+import { UpdateShopScheduleDto } from './dto/update-shop-schedule.dto';
 import { ShopService } from './shop.service';
 
 type AuthenticatedRequest = Request & {
@@ -34,6 +37,27 @@ export class ShopController {
     @Req() req: AuthenticatedRequest,
   ) {
     return this.shopService.createShop(createShopDto, req.user.userId);
+  }
+
+  /** Owner's shop schedule. Declared before :id so "me" is not treated as an id. */
+  @Get('me/schedule')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BARBER)
+  getMySchedule(@Req() req: AuthenticatedRequest) {
+    return this.shopService.getMySchedule(req.user.userId);
+  }
+
+  @Put('me/schedule')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BARBER)
+  updateMySchedule(
+    @Body() updateShopScheduleDto: UpdateShopScheduleDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.shopService.updateMySchedule(
+      req.user.userId,
+      updateShopScheduleDto,
+    );
   }
 
   /** Owner's shop (one shop per barber). Declared before :id so "me" is not treated as an id. */
