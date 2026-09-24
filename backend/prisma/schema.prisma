@@ -19,6 +19,7 @@ model User {
   updatedAt DateTime @updatedAt
 
   shops     Shop[]
+  appointments Appointment[]
 }
 
 model Shop {
@@ -86,6 +87,10 @@ model Appointment {
   id            String            @id @default(uuid())
   shopId        String
   shop          Shop              @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  /// Registered customer who owns this booking. Null for barber-created
+  /// walk-ins, where `customerName` is the only customer identity we have.
+  customerId    String?
+  customer      User?             @relation(fields: [customerId], references: [id], onDelete: SetNull)
   customerName  String
   customerPhone String?
   serviceName   String
@@ -109,6 +114,7 @@ model Appointment {
   @@index([shopId, date])
   @@index([shopId, status])
   @@index([staffId])
+  @@index([customerId, date])
 }
 
 enum UserRole {

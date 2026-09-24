@@ -17,6 +17,10 @@ import { useFocusEffect, useRouter } from "expo-router";
 
 import { useSession } from "@/context/session-provider";
 import {
+  fetchMyBookingStats,
+  getCustomerBookingErrorMessage,
+} from "@/services/customer-bookings-api";
+import {
   fetchMyShopStats,
   getShopStatsErrorMessage,
 } from "@/services/shop-stats-api";
@@ -40,24 +44,31 @@ export default function Profile() {
 
   useFocusEffect(
     useCallback(() => {
-      if (!isBarber) {
-        return;
-      }
-
       let cancelled = false;
 
       async function loadStats() {
         setStatsLoading(true);
         try {
-          const stats = await fetchMyShopStats();
-          if (cancelled) return;
-          setCompletedBookings(stats.completedBookings);
-          setRatingAverage(stats.ratingAverage);
+          // Barbers see their shop's completed bookings; customers see their own.
+          if (isBarber) {
+            const stats = await fetchMyShopStats();
+            if (cancelled) return;
+            setCompletedBookings(stats.completedBookings);
+            setRatingAverage(stats.ratingAverage);
+          } else {
+            const stats = await fetchMyBookingStats();
+            if (cancelled) return;
+            setCompletedBookings(stats.completedBookings);
+          }
         } catch (error) {
           if (cancelled) return;
           // Keep last known values; surface only for debugging.
           if (__DEV__) {
-            console.warn(getShopStatsErrorMessage(error));
+            console.warn(
+              isBarber
+                ? getShopStatsErrorMessage(error)
+                : getCustomerBookingErrorMessage(error),
+            );
           }
         } finally {
           if (!cancelled) {
@@ -81,7 +92,15 @@ export default function Profile() {
     });
   };
 
-  const bookingsDisplay = isBarber ? String(completedBookings) : "1";
+  const openBookings = () => {
+    if (isBarber) {
+      openShopStats("bookings");
+      return;
+    }
+    router.push("/history");
+  };
+
+  const bookingsDisplay = String(completedBookings);
   const ratingDisplay = isBarber ? String(ratingAverage) : "45";
   const ratingLabel = isBarber ? "Rating" : "Reviews";
 
@@ -117,26 +136,21 @@ export default function Profile() {
 
       {/* Stats */}
       <View style={styles.statsContainer}>
-        {isBarber ? (
-          <TouchableOpacity
-            style={styles.stat}
-            onPress={() => openShopStats("bookings")}
-            accessibilityRole="button"
-            accessibilityLabel="View completed bookings"
-          >
-            {statsLoading ? (
-              <ActivityIndicator color="#0B5A47" />
-            ) : (
-              <Text style={styles.statNumber}>{bookingsDisplay}</Text>
-            )}
-            <Text style={styles.statLabel}>Bookings</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.stat}>
+        <TouchableOpacity
+          style={styles.stat}
+          onPress={openBookings}
+          accessibilityRole="button"
+          accessibilityLabel={
+            isBarber ? "View completed bookings" : "View booking history"
+          }
+        >
+          {statsLoading ? (
+            <ActivityIndicator color="#0B5A47" />
+          ) : (
             <Text style={styles.statNumber}>{bookingsDisplay}</Text>
-            <Text style={styles.statLabel}>Bookings</Text>
-          </View>
-        )}
+          )}
+          <Text style={styles.statLabel}>Bookings</Text>
+        </TouchableOpacity>
 
         <View style={styles.divider} />
 
@@ -224,8 +238,11 @@ export default function Profile() {
             />
 
             <MenuItem
-              icon={<Ionicons name="heart" size={22} color="#EF4444" />}
-              title="Favorite Shops"
+              icon={<Ionicons name="time" size={22} color="#EA580C" />}
+              title="History"
+              onPress={() => {
+                router.push("/history");
+              }}
             />
 
             <MenuItem

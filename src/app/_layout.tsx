@@ -51,6 +51,7 @@ function RootNavigator() {
       <Stack.Protected guard={!!session}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="edit-profile" />
+        <Stack.Screen name="history" />
       </Stack.Protected>
       <Stack.Protected guard={!!session && isBarber}>
         <Stack.Screen name="barber" />
