@@ -36,7 +36,10 @@ export default function BarberLoginScreen() {
   } = useLoginActions({ role: "BARBER" });
 
   const handleForgotPassword = () => {
-    console.log("Forgot Password");
+    router.push({
+      pathname: "/auth/forgot-password",
+      params: { next: "barber" },
+    });
   };
 
   return (

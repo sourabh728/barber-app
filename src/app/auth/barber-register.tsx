@@ -109,7 +109,7 @@ export default function BarberRegisterScreen() {
     setErrorMessage("");
 
     try {
-      await registerBarber({
+      const result = await registerBarber({
         name: normalizedName,
         email: normalizedEmail,
         phone: normalizedPhone,
@@ -123,9 +123,19 @@ export default function BarberRegisterScreen() {
           : {}),
       });
 
+      if (result.otp?.deliveryMode === "console") {
+        setErrorMessage(
+          "Email SMTP is not configured yet. Use the OTP printed in the backend terminal for now.",
+        );
+      }
+
       router.replace({
-        pathname: "/auth/register-success",
-        params: { next: "barber" },
+        pathname: "/auth/verify-email",
+        params: {
+          email: normalizedEmail,
+          next: "barber",
+          delivery: result.otp?.deliveryMode ?? "smtp",
+        },
       });
     } catch (error: unknown) {
       setErrorMessage(getRegisterErrorMessage(error));

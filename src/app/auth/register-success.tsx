@@ -17,12 +17,12 @@ export default function RegisterSuccessScreen() {
           BOOK<Text style={styles.logoOrange}>UR</Text>BARBER
         </Text>
 
-        <Text style={styles.heading}>Account created</Text>
+        <Text style={styles.heading}>Email verified</Text>
 
         <Text style={styles.subtitle}>
           {isBarber
-            ? "Your barber partner account is ready. Sign in to continue and set up your shop."
-            : "Your account is ready. Sign in with your email and password to continue."}
+            ? "Your barber partner account is verified. Sign in to continue and manage your shop."
+            : "Your account is verified. Sign in with your email and password to continue."}
         </Text>
 
         <TouchableOpacity

@@ -18,6 +18,7 @@ import {
 import {
   // getGoogleAuthSessionErrorMessage,
   // getGoogleLoginErrorMessage,
+  getEmailNotVerifiedPayload,
   getLoginErrorMessage,
 } from "@/services/auth-errors";
 // import {
@@ -51,9 +52,6 @@ export function useLoginActions(options: UseLoginActionsOptions = {}) {
   // const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const isSubmitting = useRef(false);
-
-  // Silence unused until Google login is re-enabled.
-  void intendedRole;
 
   // Google auth request path kept for easy restore; unused from UI.
   // const googleConfigured = isGoogleAuthConfigured();
@@ -117,6 +115,17 @@ export function useLoginActions(options: UseLoginActionsOptions = {}) {
         data.user.role === "BARBER" ? "/profile" : "/",
       );
     } catch (error: unknown) {
+      const unverified = getEmailNotVerifiedPayload(error);
+      if (unverified) {
+        router.push({
+          pathname: "/auth/verify-email",
+          params: {
+            email: unverified.email,
+            next: intendedRole === "BARBER" ? "barber" : "customer",
+          },
+        });
+        return;
+      }
       setErrorMessage(getLoginErrorMessage(error));
     } finally {
       isSubmitting.current = false;

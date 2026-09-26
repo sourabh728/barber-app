@@ -25,6 +25,15 @@ function messageFromResponseData(data: unknown, fallback: string) {
   }
 
   if (
+    message &&
+    typeof message === "object" &&
+    typeof (message as { message?: unknown }).message === "string"
+  ) {
+    const nested = (message as { message: string }).message.trim();
+    if (nested) return nested;
+  }
+
+  if (
     Array.isArray(message) &&
     message.every((item) => typeof item === "string")
   ) {
@@ -56,7 +65,54 @@ export function getAuthErrorMessage(error: unknown, fallback: string) {
 }
 
 export function getLoginErrorMessage(error: unknown) {
+  if (isAxiosError(error) && error.response?.status === 403) {
+    return messageFromResponseData(
+      error.response.data,
+      "Please verify your email before signing in.",
+    );
+  }
+
   return getAuthErrorMessage(error, "Login failed. Please try again.");
+}
+
+export function getEmailNotVerifiedPayload(error: unknown): {
+  email: string;
+} | null {
+  if (!isAxiosError(error) || error.response?.status !== 403) {
+    return null;
+  }
+
+  const data = error.response.data as Record<string, unknown> | undefined;
+  if (!data) return null;
+
+  const nested =
+    data.message && typeof data.message === "object"
+      ? (data.message as Record<string, unknown>)
+      : data;
+
+  if (nested.code === "EMAIL_NOT_VERIFIED" && typeof nested.email === "string") {
+    return { email: nested.email };
+  }
+
+  return null;
+}
+
+export function getOtpErrorMessage(error: unknown) {
+  if (isAxiosError(error) && error.response?.status === 401) {
+    return messageFromResponseData(
+      error.response.data,
+      "Invalid or expired verification code.",
+    );
+  }
+
+  if (isAxiosError(error) && error.response?.status === 400) {
+    return messageFromResponseData(
+      error.response.data,
+      "Check the code and try again.",
+    );
+  }
+
+  return getAuthErrorMessage(error, "Could not complete verification.");
 }
 
 export function getRegisterErrorMessage(error: unknown) {

@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   ServiceUnavailableException,
@@ -11,16 +12,21 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { OAuth2Client } from 'google-auth-library';
 
-import { UserRole } from '../../generated/prisma/enums';
+import { OtpPurpose, UserRole } from '../../generated/prisma/enums';
+import { OtpService } from '../mail/otp.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { GoogleLoginDto } from './dto/google-login.dto';
 import { LoginDto } from './dto/login.dto';
 import {
   DEFAULT_SHOP_DESCRIPTION,
   RegisterBarberDto,
 } from './dto/register-barber.dto';
 import { RegisterDto } from './dto/register.dto';
-import { GoogleLoginDto } from './dto/google-login.dto';
+import { ResendOtpDto } from './dto/resend-otp.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
 
 const publicUserSelect = {
   id: true,
@@ -28,6 +34,7 @@ const publicUserSelect = {
   email: true,
   phone: true,
   role: true,
+  emailVerified: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -38,6 +45,7 @@ type PublicUser = {
   email: string;
   phone: string | null;
   role: string;
+  emailVerified: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -51,14 +59,16 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly otpService: OtpService,
   ) {}
 
   async register(registerDto: RegisterDto) {
     const { name, email, phone, password, role } = registerDto;
+    const normalizedEmail = email.trim().toLowerCase();
 
     const existingUser = await this.prisma.user.findFirst({
       where: {
-        OR: [{ email }, ...(phone ? [{ phone }] : [])],
+        OR: [{ email: normalizedEmail }, ...(phone ? [{ phone }] : [])],
       },
     });
 
@@ -75,15 +85,25 @@ export class AuthService {
     const user = await this.prisma.user.create({
       data: {
         name,
-        email,
+        email: normalizedEmail,
         phone,
         password: hashedPassword,
         role: assignedRole,
+        emailVerified: false,
       },
       select: publicUserSelect,
     });
 
-    return user;
+    const otp = await this.otpService.issueOtp(
+      normalizedEmail,
+      OtpPurpose.EMAIL_VERIFY,
+    );
+
+    return {
+      ...user,
+      requiresEmailVerification: true,
+      otp,
+    };
   }
 
   async registerBarber(registerBarberDto: RegisterBarberDto) {
@@ -98,10 +118,11 @@ export class AuthService {
       pincode,
       description,
     } = registerBarberDto;
+    const normalizedEmail = email.trim().toLowerCase();
 
     const existingUser = await this.prisma.user.findFirst({
       where: {
-        OR: [{ email }, { phone }],
+        OR: [{ email: normalizedEmail }, { phone }],
       },
     });
 
@@ -118,16 +139,17 @@ export class AuthService {
     const user = await this.prisma.user.create({
       data: {
         name,
-        email,
+        email: normalizedEmail,
         phone,
         password: hashedPassword,
         role: UserRole.BARBER,
+        emailVerified: false,
         shops: {
           create: {
             name,
             description: shopDescription,
             phone,
-            email,
+            email: normalizedEmail,
             address,
             city,
             state,
@@ -156,22 +178,148 @@ export class AuthService {
       },
     });
 
+    const otp = await this.otpService.issueOtp(
+      normalizedEmail,
+      OtpPurpose.EMAIL_VERIFY,
+    );
+
     const { shops, ...publicUser } = user;
     const shop = shops[0];
 
     return {
       ...publicUser,
       shop,
+      requiresEmailVerification: true,
+      otp,
+    };
+  }
+
+  async verifyEmail(dto: VerifyEmailDto) {
+    const { email } = await this.otpService.verifyOtp(
+      dto.email,
+      OtpPurpose.EMAIL_VERIFY,
+      dto.otp,
+    );
+
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: publicUserSelect,
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Account not found for this email.');
+    }
+
+    if (user.emailVerified) {
+      return {
+        message: 'Email is already verified. You can sign in.',
+        email: user.email,
+        role: user.role,
+      };
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true },
+    });
+
+    return {
+      message: 'Email verified successfully. You can sign in now.',
+      email: user.email,
+      role: user.role,
+    };
+  }
+
+  async resendEmailVerification(dto: ResendOtpDto) {
+    const email = dto.email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true, emailVerified: true },
+    });
+
+    if (!user) {
+      // Avoid account enumeration.
+      return {
+        message: 'If an account exists for this email, a code has been sent.',
+      };
+    }
+
+    if (user.emailVerified) {
+      return {
+        message: 'Email is already verified. You can sign in.',
+      };
+    }
+
+    const otp = await this.otpService.issueOtp(email, OtpPurpose.EMAIL_VERIFY);
+    return {
+      message: 'A new verification code has been sent.',
+      otp,
+    };
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const email = dto.email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+
+    if (!user) {
+      return {
+        message: 'If an account exists for this email, a code has been sent.',
+      };
+    }
+
+    const otp = await this.otpService.issueOtp(
+      email,
+      OtpPurpose.PASSWORD_RESET,
+    );
+
+    return {
+      message: 'If an account exists for this email, a code has been sent.',
+      otp,
+    };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const { email } = await this.otpService.verifyOtp(
+      dto.email,
+      OtpPurpose.PASSWORD_RESET,
+      dto.otp,
+    );
+
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Account not found for this email.');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        // Completing reset via verified email also confirms the address.
+        emailVerified: true,
+      },
+    });
+
+    return {
+      message: 'Password updated successfully. You can sign in now.',
+      email,
     };
   }
 
   async login(loginDto: LoginDto) {
-    const { email, password } = loginDto;
+    const email = loginDto.email.trim().toLowerCase();
+    const { password } = loginDto;
 
     const user = await this.prisma.user.findUnique({
-      where: {
-        email,
-      },
+      where: { email },
     });
 
     if (!user) {
@@ -182,6 +330,14 @@ export class AuthService {
 
     if (!passwordMatches) {
       throw new UnauthorizedException('Invalid email or password');
+    }
+
+    if (!user.emailVerified) {
+      throw new ForbiddenException({
+        message: 'Please verify your email before signing in.',
+        code: 'EMAIL_NOT_VERIFIED',
+        email: user.email,
+      });
     }
 
     return this.issueAuthResponse(user);
@@ -223,7 +379,7 @@ export class AuthService {
       );
     }
 
-    const email = payload?.email;
+    const email = payload?.email?.trim().toLowerCase();
     const emailVerified =
       payload?.email_verified === true || payload?.email_verified === 'true';
 
@@ -242,20 +398,19 @@ export class AuthService {
     });
 
     if (existingUser) {
-      if (
-        existingUser.role !== requestedRole &&
-        existingUser.role !== UserRole.ADMIN
-      ) {
-        const updatedUser = await this.prisma.user.update({
-          where: { email },
-          data: { role: requestedRole },
-          select: publicUserSelect,
-        });
+      const updatedUser = await this.prisma.user.update({
+        where: { email },
+        data: {
+          emailVerified: true,
+          ...(existingUser.role !== requestedRole &&
+          existingUser.role !== UserRole.ADMIN
+            ? { role: requestedRole }
+            : {}),
+        },
+        select: publicUserSelect,
+      });
 
-        return this.issueAuthResponse(updatedUser);
-      }
-
-      return this.issueAuthResponse(existingUser);
+      return this.issueAuthResponse(updatedUser);
     }
 
     const hashedPassword = await bcrypt.hash(
@@ -270,6 +425,7 @@ export class AuthService {
         email,
         password: hashedPassword,
         role: requestedRole,
+        emailVerified: true,
       },
       select: publicUserSelect,
     });
@@ -329,6 +485,7 @@ export class AuthService {
       email: publicUser.email,
       phone: publicUser.phone,
       role: publicUser.role,
+      emailVerified: publicUser.emailVerified,
       createdAt: publicUser.createdAt,
       updatedAt: publicUser.updatedAt,
       shop: shops[0] ?? null,
@@ -345,7 +502,7 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    const nextEmail = updateProfileDto.email?.trim();
+    const nextEmail = updateProfileDto.email?.trim().toLowerCase();
     const nextPhone = updateProfileDto.phone?.trim();
     const nextName = updateProfileDto.name?.trim();
 
@@ -382,6 +539,7 @@ export class AuthService {
       email?: string;
       phone?: string;
       password?: string;
+      emailVerified?: boolean;
     } = {};
 
     if (nextName) {
@@ -390,6 +548,9 @@ export class AuthService {
 
     if (nextEmail) {
       data.email = nextEmail;
+      if (nextEmail !== existing.email) {
+        data.emailVerified = false;
+      }
     }
 
     if (typeof updateProfileDto.phone === 'string' && nextPhone) {
@@ -409,6 +570,10 @@ export class AuthService {
       data,
     });
 
+    if (data.emailVerified === false && nextEmail) {
+      await this.otpService.issueOtp(nextEmail, OtpPurpose.EMAIL_VERIFY);
+    }
+
     return this.getProfile(userId);
   }
 
@@ -427,6 +592,7 @@ export class AuthService {
         email: user.email,
         phone: user.phone,
         role: user.role,
+        emailVerified: user.emailVerified,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },

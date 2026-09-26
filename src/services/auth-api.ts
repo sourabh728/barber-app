@@ -49,16 +49,6 @@ export type RegisterPayload = {
   role?: RegisterRole;
 };
 
-export type RegisterResponse = {
-  id: string;
-  name: string;
-  email: string;
-  phone: string | null;
-  role: AuthRole;
-  createdAt: string;
-  updatedAt: string;
-};
-
 export type RegisterBarberPayload = {
   name: string;
   email: string;
@@ -69,6 +59,22 @@ export type RegisterBarberPayload = {
   state: string;
   pincode: string;
   description?: string;
+};
+
+export type RegisterResponse = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  role: AuthRole;
+  createdAt: string;
+  updatedAt: string;
+  requiresEmailVerification?: boolean;
+  otp?: {
+    email: string;
+    expiresInSeconds: number;
+    deliveryMode: "smtp" | "console";
+  };
 };
 
 export type RegisterBarberShop = {
@@ -88,6 +94,18 @@ export type RegisterBarberShop = {
 
 export type RegisterBarberResponse = RegisterResponse & {
   shop: RegisterBarberShop;
+  requiresEmailVerification?: boolean;
+};
+
+export type OtpActionResponse = {
+  message: string;
+  email?: string;
+  role?: AuthRole;
+  otp?: {
+    email: string;
+    expiresInSeconds: number;
+    deliveryMode: "smtp" | "console";
+  };
 };
 
 export async function registerWithEmail(payload: RegisterPayload) {
@@ -98,6 +116,41 @@ export async function registerWithEmail(payload: RegisterPayload) {
 export async function registerBarber(payload: RegisterBarberPayload) {
   const response = await api.post<RegisterBarberResponse>(
     "/auth/register-barber",
+    payload,
+  );
+  return response.data;
+}
+
+export async function verifyEmailOtp(email: string, otp: string) {
+  const response = await api.post<OtpActionResponse>("/auth/verify-email", {
+    email,
+    otp,
+  });
+  return response.data;
+}
+
+export async function resendEmailVerification(email: string) {
+  const response = await api.post<OtpActionResponse>(
+    "/auth/resend-verification",
+    { email },
+  );
+  return response.data;
+}
+
+export async function forgotPassword(email: string) {
+  const response = await api.post<OtpActionResponse>("/auth/forgot-password", {
+    email,
+  });
+  return response.data;
+}
+
+export async function resetPassword(payload: {
+  email: string;
+  otp: string;
+  newPassword: string;
+}) {
+  const response = await api.post<OtpActionResponse>(
+    "/auth/reset-password",
     payload,
   );
   return response.data;

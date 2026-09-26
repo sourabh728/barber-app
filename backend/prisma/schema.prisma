@@ -9,17 +9,33 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
-  phone     String?  @unique
-  password  String
-  role      UserRole @default(CUSTOMER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(uuid())
+  name          String
+  email         String   @unique
+  phone         String?  @unique
+  password      String
+  role          UserRole @default(CUSTOMER)
+  /// Must verify email OTP after register before login is allowed.
+  emailVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   shops     Shop[]
   appointments Appointment[]
+}
+
+model EmailOtp {
+  id         String    @id @default(uuid())
+  email      String
+  purpose    OtpPurpose
+  /// bcrypt hash of the 6-digit code
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email, purpose])
 }
 
 model Shop {
@@ -121,6 +137,11 @@ enum UserRole {
   CUSTOMER
   BARBER
   ADMIN
+}
+
+enum OtpPurpose {
+  EMAIL_VERIFY
+  PASSWORD_RESET
 }
 
 enum StaffStatus {

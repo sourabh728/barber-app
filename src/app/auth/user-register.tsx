@@ -69,14 +69,27 @@ export default function UserRegisterScreen() {
     setErrorMessage("");
 
     try {
-      await registerWithEmail({
+      const result = await registerWithEmail({
         name: normalizedName,
         email: normalizedEmail,
         password,
         ...(normalizedPhone ? { phone: normalizedPhone } : {}),
       });
 
-      router.replace("/auth/register-success");
+      if (result.otp?.deliveryMode === "console") {
+        setErrorMessage(
+          "Email SMTP is not configured yet. Use the OTP printed in the backend terminal for now.",
+        );
+      }
+
+      router.replace({
+        pathname: "/auth/verify-email",
+        params: {
+          email: normalizedEmail,
+          next: "customer",
+          delivery: result.otp?.deliveryMode ?? "smtp",
+        },
+      });
     } catch (error: unknown) {
       setErrorMessage(getRegisterErrorMessage(error));
     } finally {
