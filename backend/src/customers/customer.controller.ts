@@ -1,4 +1,12 @@
-import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { Request } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -35,5 +43,18 @@ export class CustomerController {
   @UseGuards(JwtAuthGuard)
   getMyStats(@Req() req: AuthenticatedRequest) {
     return this.customerService.getMyStats(req.user.userId);
+  }
+
+  /** Customer cancels their booking → CANCELLED. */
+  @Patch('me/appointments/:id/cancel')
+  @UseGuards(JwtAuthGuard)
+  cancelMyAppointment(
+    @Param('id') appointmentId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.customerService.cancelMyAppointment(
+      req.user.userId,
+      appointmentId,
+    );
   }
 }

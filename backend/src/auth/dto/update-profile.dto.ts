@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import {
   IsEmail,
   IsNotEmpty,
@@ -5,6 +6,11 @@ import {
   IsString,
   MinLength,
 } from 'class-validator';
+
+import {
+  MatchesPhone10Digits,
+  normalizeOptionalPhone,
+} from '../../common/phone';
 
 /** Authenticated user may update profile fields only — never role. */
 export class UpdateProfileDto {
@@ -18,7 +24,8 @@ export class UpdateProfileDto {
   email?: string;
 
   @IsOptional()
-  @IsString()
+  @Transform(({ value }) => normalizeOptionalPhone(value))
+  @MatchesPhone10Digits()
   phone?: string;
 
   @IsOptional()

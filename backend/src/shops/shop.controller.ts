@@ -19,10 +19,12 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
+import { CreateCustomerAppointmentDto } from './dto/create-customer-appointment.dto';
 import { CreateShopDto } from './dto/create-shop.dto';
 import { CreateShopStaffDto } from './dto/create-shop-staff.dto';
 import { DailyReportQueryDto } from './dto/daily-report.query.dto';
 import { ListAppointmentsQueryDto } from './dto/list-appointments.query.dto';
+import { ListShopsQueryDto } from './dto/list-shops.query.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { UpdateShopDto } from './dto/update-shop.dto';
 import { UpdateShopScheduleDto } from './dto/update-shop-schedule.dto';
@@ -36,6 +38,14 @@ type AuthenticatedRequest = Request & {
 @Controller('shops')
 export class ShopController {
   constructor(private readonly shopService: ShopService) {}
+
+  /** Customer-facing shop catalog. Declared before :id / me routes. */
+  @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER, UserRole.BARBER, UserRole.ADMIN)
+  listShops(@Query() query: ListShopsQueryDto) {
+    return this.shopService.listShops(query);
+  }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -182,6 +192,30 @@ export class ShopController {
     @Req() req: AuthenticatedRequest,
   ) {
     return this.shopService.updateMyShop(req.user.userId, updateShopDto);
+  }
+
+  /** Customer-facing shop detail for booking. After all /me routes. */
+  @Get(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER, UserRole.BARBER, UserRole.ADMIN)
+  getShop(@Param('id') shopId: string) {
+    return this.shopService.getShopById(shopId);
+  }
+
+  /** Customer books an appointment — always created as PENDING (awaiting approval). */
+  @Post(':id/appointments')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER, UserRole.BARBER, UserRole.ADMIN)
+  createCustomerAppointment(
+    @Param('id') shopId: string,
+    @Body() dto: CreateCustomerAppointmentDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.shopService.createCustomerAppointment(
+      shopId,
+      req.user.userId,
+      dto,
+    );
   }
 
   @Patch(':id')

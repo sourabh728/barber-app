@@ -17,6 +17,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { registerWithEmail } from "@/services/auth-api";
 import { getRegisterErrorMessage } from "@/services/auth-errors";
+import {
+  phoneValidationError,
+  sanitizePhoneInput,
+} from "@/utils/phone";
 
 export default function UserRegisterScreen() {
   const router = useRouter();
@@ -37,7 +41,7 @@ export default function UserRegisterScreen() {
 
     const normalizedName = name.trim();
     const normalizedEmail = email.trim();
-    const normalizedPhone = phone.trim();
+    const normalizedPhone = sanitizePhoneInput(phone);
 
     if (!normalizedName) {
       setErrorMessage("Enter your name.");
@@ -51,6 +55,12 @@ export default function UserRegisterScreen() {
 
     if (password.length < 6) {
       setErrorMessage("Password must be at least 6 characters.");
+      return;
+    }
+
+    const phoneError = phoneValidationError(normalizedPhone);
+    if (phoneError) {
+      setErrorMessage(phoneError);
       return;
     }
 
@@ -130,13 +140,14 @@ export default function UserRegisterScreen() {
 
             <Text style={styles.label}>Phone (optional)</Text>
             <TextInput
-              placeholder="Phone number"
+              placeholder="10-digit mobile number"
               placeholderTextColor="#777"
               style={styles.input}
               value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
+              onChangeText={(value) => setPhone(sanitizePhoneInput(value))}
+              keyboardType="number-pad"
               textContentType="telephoneNumber"
+              maxLength={10}
               editable={!isLoading}
               returnKeyType="next"
               accessibilityLabel="Phone number, optional"

@@ -1,4 +1,10 @@
+import { Transform } from 'class-transformer';
 import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+
+import {
+  MatchesPhone10Digits,
+  normalizeOptionalPhone,
+} from '../../common/phone';
 
 export class CreateShopDto {
   @IsString()
@@ -10,7 +16,8 @@ export class CreateShopDto {
   description?: string;
 
   @IsOptional()
-  @IsString()
+  @Transform(({ value }) => normalizeOptionalPhone(value))
+  @MatchesPhone10Digits()
   phone?: string;
 
   @IsOptional()

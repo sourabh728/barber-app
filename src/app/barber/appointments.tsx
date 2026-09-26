@@ -28,10 +28,11 @@ import {
   type AppointmentTab,
   type ShopAppointment,
 } from "@/services/shop-appointments-api";
+import { fetchMyShopStaff, type ShopStaff } from "@/services/shop-staff-api";
 import {
-  fetchMyShopStaff,
-  type ShopStaff,
-} from "@/services/shop-staff-api";
+  phoneValidationError,
+  sanitizePhoneInput,
+} from "@/utils/phone";
 
 type AppointmentFormState = {
   customerName: string;
@@ -109,9 +110,9 @@ function formatTime12h(time24: string) {
 function statusMeta(status: AppointmentStatus) {
   switch (status) {
     case "PENDING":
-      return { label: "Pending", color: "#FBBF24" };
+      return { label: "Waiting for approval", color: "#FBBF24" };
     case "CONFIRMED":
-      return { label: "Confirmed", color: "#60A5FA" };
+      return { label: "Approved", color: "#60A5FA" };
     case "IN_PROGRESS":
       return { label: "In Progress", color: "#4ADE80" };
     case "COMPLETED":
@@ -257,7 +258,7 @@ export default function BarberAppointmentsScreen() {
 
   const handleCreate = async () => {
     const customerName = form.customerName.trim();
-    const customerPhone = form.customerPhone.trim();
+    const customerPhone = sanitizePhoneInput(form.customerPhone);
     const serviceName = form.serviceName.trim();
     const priceRaw = form.priceInr.trim();
     const startTime = form.startTime.trim();
@@ -265,6 +266,13 @@ export default function BarberAppointmentsScreen() {
 
     if (!customerName) {
       setFormError("Customer name is required.");
+      return;
+    }
+    const phoneError = phoneValidationError(customerPhone, {
+      label: "Customer phone",
+    });
+    if (phoneError) {
+      setFormError(phoneError);
       return;
     }
     if (!serviceName) {
@@ -409,7 +417,7 @@ export default function BarberAppointmentsScreen() {
             {busy ? (
               <ActivityIndicator color="#111" />
             ) : (
-              <Text style={styles.primaryActionText}>Accept</Text>
+              <Text style={styles.primaryActionText}>Approve</Text>
             )}
           </TouchableOpacity>
           <TouchableOpacity
@@ -693,10 +701,13 @@ export default function BarberAppointmentsScreen() {
                 <TextInput
                   style={styles.input}
                   value={form.customerPhone}
-                  onChangeText={(value) => setField("customerPhone", value)}
-                  placeholder="Phone number"
+                  onChangeText={(value) =>
+                    setField("customerPhone", sanitizePhoneInput(value))
+                  }
+                  placeholder="10-digit mobile number"
                   placeholderTextColor="#777"
-                  keyboardType="phone-pad"
+                  keyboardType="number-pad"
+                  maxLength={10}
                   editable={!isSaving}
                 />
 

@@ -40,6 +40,33 @@ export async function fetchMyBookingStats() {
   return response.data;
 }
 
+export type CreateCustomerBookingPayload = {
+  serviceName: string;
+  staffId: string;
+  priceInr: number;
+  date: string;
+  startTime: string;
+  endTime: string;
+};
+
+export async function createCustomerBooking(
+  shopId: string,
+  payload: CreateCustomerBookingPayload,
+) {
+  const response = await api.post<CustomerBooking>(
+    `/shops/${shopId}/appointments`,
+    payload,
+  );
+  return response.data;
+}
+
+export async function cancelMyBooking(appointmentId: string) {
+  const response = await api.patch<CustomerBooking>(
+    `/customers/me/appointments/${appointmentId}/cancel`,
+  );
+  return response.data;
+}
+
 function messageFromResponseData(data: unknown, fallback: string) {
   const message = (data as { message?: unknown } | undefined)?.message;
 
@@ -78,6 +105,20 @@ export function getCustomerBookingErrorMessage(error: unknown) {
     return messageFromResponseData(
       error.response.data,
       "Your account could not be found.",
+    );
+  }
+
+  if (error.response.status === 409) {
+    return messageFromResponseData(
+      error.response.data,
+      "This time slot is already booked for that barber.",
+    );
+  }
+
+  if (error.response.status === 400) {
+    return messageFromResponseData(
+      error.response.data,
+      "Check the booking details and try again.",
     );
   }
 

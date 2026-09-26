@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { AppointmentStatus } from '../../generated/prisma/enums';
 
 import { PrismaService } from '../prisma/prisma.service';
@@ -47,6 +51,11 @@ function serializeCustomerAppointment(appointment: CustomerAppointmentRecord) {
     updatedAt: appointment.updatedAt,
   };
 }
+
+const CUSTOMER_CANCELLABLE: AppointmentStatus[] = [
+  AppointmentStatus.PENDING,
+  AppointmentStatus.CONFIRMED,
+];
 
 @Injectable()
 export class CustomerService {
@@ -127,5 +136,45 @@ export class CustomerService {
     ]);
 
     return { completedBookings, totalBookings };
+  }
+
+  /** Customer cancels their own booking (PENDING or CONFIRMED only). */
+  async cancelMyAppointment(userId: string, appointmentId: string) {
+    const owned = await this.buildOwnedAppointmentsFilter(userId);
+
+    const existing = await this.prisma.appointment.findFirst({
+      where: {
+        id: appointmentId,
+        ...owned,
+      },
+      include: {
+        shop: { select: { id: true, name: true } },
+        staff: { select: { id: true, name: true } },
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    if (!CUSTOMER_CANCELLABLE.includes(existing.status)) {
+      throw new BadRequestException(
+        `Cannot cancel a booking with status ${existing.status}`,
+      );
+    }
+
+    const appointment = await this.prisma.appointment.update({
+      where: { id: existing.id },
+      data: {
+        status: AppointmentStatus.CANCELLED,
+        customerId: existing.customerId ?? userId,
+      },
+      include: {
+        shop: { select: { id: true, name: true } },
+        staff: { select: { id: true, name: true } },
+      },
+    });
+
+    return serializeCustomerAppointment(appointment);
   }
 }

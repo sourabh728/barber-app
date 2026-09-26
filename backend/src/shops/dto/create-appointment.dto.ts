@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsDateString,
@@ -10,6 +10,11 @@ import {
   Matches,
   Min,
 } from 'class-validator';
+
+import {
+  MatchesPhone10Digits,
+  normalizeOptionalPhone,
+} from '../../common/phone';
 
 export const APPOINTMENT_STATUSES = [
   'PENDING',
@@ -30,7 +35,8 @@ export class CreateAppointmentDto {
   customerName!: string;
 
   @IsOptional()
-  @IsString()
+  @Transform(({ value }) => normalizeOptionalPhone(value))
+  @MatchesPhone10Digits()
   customerPhone?: string;
 
   @IsString()

@@ -27,6 +27,10 @@ import {
   type ShopStaff,
   type StaffStatus,
 } from "@/services/shop-staff-api";
+import {
+  phoneValidationError,
+  sanitizePhoneInput,
+} from "@/utils/phone";
 
 type StaffFormState = {
   name: string;
@@ -166,7 +170,7 @@ export default function BarberStaffScreen() {
   const handleSave = async () => {
     const name = form.name.trim();
     const title = form.title.trim();
-    const phone = form.phone.trim();
+    const phone = sanitizePhoneInput(form.phone);
     const leaveReturnDate = form.leaveReturnDate.trim();
 
     if (!name) {
@@ -177,8 +181,9 @@ export default function BarberStaffScreen() {
       setFormError("Role / title is required.");
       return;
     }
-    if (!phone) {
-      setFormError("Phone is required.");
+    const phoneError = phoneValidationError(phone, { required: true });
+    if (phoneError) {
+      setFormError(phoneError);
       return;
     }
     if (form.status === "ON_LEAVE") {
@@ -416,10 +421,13 @@ export default function BarberStaffScreen() {
               <TextInput
                 style={styles.input}
                 value={form.phone}
-                onChangeText={(value) => setField("phone", value)}
-                placeholder="Phone number"
+                onChangeText={(value) =>
+                  setField("phone", sanitizePhoneInput(value))
+                }
+                placeholder="10-digit mobile number"
                 placeholderTextColor="#777"
-                keyboardType="phone-pad"
+                keyboardType="number-pad"
+                maxLength={10}
                 editable={!isSaving}
               />
 

@@ -17,6 +17,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { registerBarber } from "@/services/auth-api";
 import { getRegisterErrorMessage } from "@/services/auth-errors";
+import {
+  phoneValidationError,
+  sanitizePhoneInput,
+} from "@/utils/phone";
 
 export default function BarberRegisterScreen() {
   const router = useRouter();
@@ -43,7 +47,7 @@ export default function BarberRegisterScreen() {
     const normalizedName = name.trim();
     const normalizedDescription = description.trim();
     const normalizedEmail = email.trim();
-    const normalizedPhone = phone.trim();
+    const normalizedPhone = sanitizePhoneInput(phone);
     const normalizedAddress = address.trim();
     const normalizedCity = city.trim();
     const normalizedState = state.trim();
@@ -61,6 +65,12 @@ export default function BarberRegisterScreen() {
 
     if (!normalizedPhone) {
       setErrorMessage("Enter your phone number.");
+      return;
+    }
+
+    const phoneError = phoneValidationError(normalizedPhone, { required: true });
+    if (phoneError) {
+      setErrorMessage(phoneError);
       return;
     }
 
@@ -197,13 +207,14 @@ export default function BarberRegisterScreen() {
 
             <Text style={styles.label}>Phone</Text>
             <TextInput
-              placeholder="Phone number"
+              placeholder="10-digit mobile number"
               placeholderTextColor="#777"
               style={styles.input}
               value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
+              onChangeText={(value) => setPhone(sanitizePhoneInput(value))}
+              keyboardType="number-pad"
               textContentType="telephoneNumber"
+              maxLength={10}
               editable={!isLoading}
               returnKeyType="next"
               accessibilityLabel="Phone number"

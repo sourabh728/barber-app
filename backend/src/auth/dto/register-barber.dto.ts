@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import {
   IsEmail,
   IsNotEmpty,
@@ -5,6 +6,11 @@ import {
   IsString,
   MinLength,
 } from 'class-validator';
+
+import {
+  MatchesPhone10Digits,
+  normalizeRequiredPhone,
+} from '../../common/phone';
 
 export const DEFAULT_SHOP_DESCRIPTION = "Premium men's grooming";
 
@@ -18,8 +24,10 @@ export class RegisterBarberDto {
   @IsString()
   description?: string;
 
+  @Transform(({ value }) => normalizeRequiredPhone(value))
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'Phone is required' })
+  @MatchesPhone10Digits()
   phone!: string;
 
   @IsEmail()

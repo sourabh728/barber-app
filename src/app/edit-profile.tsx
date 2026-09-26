@@ -24,6 +24,10 @@ import {
   type CurrentUserResponse,
 } from "@/services/auth-api";
 import { getUpdateProfileErrorMessage } from "@/services/auth-errors";
+import {
+  phoneValidationError,
+  sanitizePhoneInput,
+} from "@/utils/phone";
 
 type FormState = {
   name: string;
@@ -127,7 +131,8 @@ export default function EditProfileScreen() {
 
     const name = form.name.trim();
     const email = form.email.trim();
-    const phone = form.phone.trim();
+    const phone = sanitizePhoneInput(form.phone);
+    const shopPhone = sanitizePhoneInput(form.shopPhone);
     const password = form.password;
 
     if (!name) {
@@ -140,12 +145,26 @@ export default function EditProfileScreen() {
       return;
     }
 
+    const phoneError = phoneValidationError(phone);
+    if (phoneError) {
+      setErrorMessage(phoneError);
+      return;
+    }
+
     if (password && password.length < 6) {
       setErrorMessage("Password must be at least 6 characters.");
       return;
     }
 
     if (isBarber) {
+      const shopPhoneError = phoneValidationError(shopPhone, {
+        label: "Shop phone",
+      });
+      if (shopPhoneError) {
+        setErrorMessage(shopPhoneError);
+        return;
+      }
+
       const requiredShop = [
         form.shopName.trim(),
         form.shopAddress.trim(),
@@ -176,7 +195,7 @@ export default function EditProfileScreen() {
         await updateMyShop({
           name: form.shopName.trim(),
           description: form.shopDescription.trim() || undefined,
-          phone: form.shopPhone.trim() || undefined,
+          phone: shopPhone || undefined,
           email: form.shopEmail.trim() || undefined,
           address: form.shopAddress.trim(),
           city: form.shopCity.trim(),
@@ -262,11 +281,14 @@ export default function EditProfileScreen() {
                 <TextInput
                   style={styles.input}
                   value={form.phone}
-                  onChangeText={(value) => setField("phone", value)}
-                  placeholder="Phone number"
+                  onChangeText={(value) =>
+                    setField("phone", sanitizePhoneInput(value))
+                  }
+                  placeholder="10-digit mobile number"
                   placeholderTextColor="#777"
                   editable={!isSaving}
-                  keyboardType="phone-pad"
+                  keyboardType="number-pad"
+                  maxLength={10}
                 />
 
                 <FieldLabel>New password (optional)</FieldLabel>
@@ -331,11 +353,14 @@ export default function EditProfileScreen() {
                     <TextInput
                       style={styles.input}
                       value={form.shopPhone}
-                      onChangeText={(value) => setField("shopPhone", value)}
-                      placeholder="Shop phone"
+                      onChangeText={(value) =>
+                        setField("shopPhone", sanitizePhoneInput(value))
+                      }
+                      placeholder="10-digit mobile number"
                       placeholderTextColor="#777"
                       editable={!isSaving}
-                      keyboardType="phone-pad"
+                      keyboardType="number-pad"
+                      maxLength={10}
                     />
 
                     <FieldLabel>Shop email</FieldLabel>

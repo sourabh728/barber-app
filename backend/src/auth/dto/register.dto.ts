@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import {
   IsEmail,
   IsIn,
@@ -6,6 +7,11 @@ import {
   IsString,
   MinLength,
 } from 'class-validator';
+
+import {
+  MatchesPhone10Digits,
+  normalizeOptionalPhone,
+} from '../../common/phone';
 
 export const REGISTER_ROLES = ['CUSTOMER', 'BARBER'] as const;
 export type RegisterRole = (typeof REGISTER_ROLES)[number];
@@ -20,7 +26,8 @@ export class RegisterDto {
   email!: string;
 
   @IsOptional()
-  @IsString()
+  @Transform(({ value }) => normalizeOptionalPhone(value))
+  @MatchesPhone10Digits()
   phone?: string;
 
   @IsString()

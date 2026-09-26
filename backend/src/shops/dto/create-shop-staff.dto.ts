@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import {
   IsDateString,
   IsIn,
@@ -5,6 +6,11 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
+
+import {
+  MatchesPhone10Digits,
+  normalizeRequiredPhone,
+} from '../../common/phone';
 
 export const STAFF_STATUSES = ['ACTIVE', 'ON_LEAVE'] as const;
 export type StaffStatusValue = (typeof STAFF_STATUSES)[number];
@@ -18,8 +24,10 @@ export class CreateShopStaffDto {
   @IsNotEmpty()
   title!: string;
 
+  @Transform(({ value }) => normalizeRequiredPhone(value))
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'Phone is required' })
+  @MatchesPhone10Digits()
   phone!: string;
 
   @IsIn(STAFF_STATUSES)

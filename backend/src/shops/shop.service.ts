@@ -13,11 +13,13 @@ import {
 
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
+import { CreateCustomerAppointmentDto } from './dto/create-customer-appointment.dto';
 import { CreateShopDto } from './dto/create-shop.dto';
 import { CreateShopStaffDto } from './dto/create-shop-staff.dto';
 import {
   AppointmentTabValue,
 } from './dto/list-appointments.query.dto';
+import { ListShopsQueryDto } from './dto/list-shops.query.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { UpdateShopDto } from './dto/update-shop.dto';
 import { UpdateShopScheduleDto } from './dto/update-shop-schedule.dto';
@@ -178,6 +180,36 @@ function assertScheduleOrder(dto: UpdateShopScheduleDto) {
   }
 }
 
+type PublicShopRecord = {
+  id: string;
+  name: string;
+  description: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+  openTime: string;
+  closeTime: string;
+};
+
+function serializePublicShop(shop: PublicShopRecord) {
+  return {
+    id: shop.id,
+    name: shop.name,
+    description: shop.description,
+    phone: shop.phone,
+    email: shop.email,
+    address: shop.address,
+    city: shop.city,
+    state: shop.state,
+    pincode: shop.pincode,
+    openTime: shop.openTime,
+    closeTime: shop.closeTime,
+  };
+}
+
 @Injectable()
 export class ShopService {
   constructor(private readonly prisma: PrismaService) {}
@@ -189,6 +221,140 @@ export class ShopService {
         ownerId,
       },
     });
+  }
+
+  /** Public catalog of shops for the customer home screen. */
+  async listShops(query: ListShopsQueryDto = {}) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const search = query.search?.trim();
+    const city = query.city?.trim();
+    const state = query.state?.trim();
+
+    const where = {
+      ...(city
+        ? { city: { equals: city, mode: 'insensitive' as const } }
+        : {}),
+      ...(state
+        ? { state: { equals: state, mode: 'insensitive' as const } }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' as const } },
+              { address: { contains: search, mode: 'insensitive' as const } },
+              { city: { contains: search, mode: 'insensitive' as const } },
+              { state: { contains: search, mode: 'insensitive' as const } },
+              { pincode: { contains: search, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    };
+
+    const [shops, total, cityRows, stateRows] = await Promise.all([
+      this.prisma.shop.findMany({
+        where,
+        orderBy: { name: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          phone: true,
+          email: true,
+          address: true,
+          city: true,
+          state: true,
+          pincode: true,
+          openTime: true,
+          closeTime: true,
+        },
+      }),
+      this.prisma.shop.count({ where }),
+      this.prisma.shop.findMany({
+        distinct: ['city'],
+        orderBy: { city: 'asc' },
+        select: { city: true },
+      }),
+      this.prisma.shop.findMany({
+        distinct: ['state'],
+        orderBy: { state: 'asc' },
+        select: { state: true },
+      }),
+    ]);
+
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+
+    return {
+      items: shops.map(serializePublicShop),
+      page,
+      limit,
+      total,
+      totalPages,
+      cities: cityRows.map((row) => row.city).filter(Boolean),
+      states: stateRows.map((row) => row.state).filter(Boolean),
+    };
+  }
+
+  /** Shop detail for the customer Book Appointment screen. */
+  async getShopById(shopId: string) {
+    const shop = await this.prisma.shop.findUnique({
+      where: { id: shopId },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        phone: true,
+        email: true,
+        address: true,
+        city: true,
+        state: true,
+        pincode: true,
+        openTime: true,
+        closeTime: true,
+        lunchStart: true,
+        lunchEnd: true,
+        holidays: {
+          orderBy: { date: 'asc' },
+          select: { date: true },
+        },
+        staff: {
+          where: { status: StaffStatus.ACTIVE },
+          orderBy: { name: 'asc' },
+          select: {
+            id: true,
+            name: true,
+            title: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    if (!shop) {
+      throw new NotFoundException('Shop not found');
+    }
+
+    const { holidays, staff, lunchStart, lunchEnd, ...shopFields } = shop;
+
+    return {
+      ...serializePublicShop(shopFields),
+      lunchStart,
+      lunchEnd,
+      holidays: holidays.map((h) => formatDateOnly(h.date)),
+      staff,
+      // Reviews are not modeled yet — keep zeros until a Review table exists.
+      ratingAverage: 0,
+      reviewCount: 0,
+      reviews: [] as Array<{
+        id: string;
+        rating: number;
+        comment: string;
+        customerName: string;
+        createdAt: string;
+      }>,
+    };
   }
 
   private async findOwnerShop(ownerId: string) {
@@ -647,6 +813,91 @@ export class ShopService {
     });
 
     return serializeAppointment(appointment);
+  }
+
+  /**
+   * Customer self-service booking.
+   * Always PENDING until the shop owner Accepts (CONFIRMED) or Rejects (REJECTED).
+   */
+  async createCustomerAppointment(
+    shopId: string,
+    customerUserId: string,
+    dto: CreateCustomerAppointmentDto,
+  ) {
+    assertTimeOrder(dto.startTime, dto.endTime);
+
+    const [shop, customer] = await Promise.all([
+      this.prisma.shop.findUnique({
+        where: { id: shopId },
+        select: { id: true, name: true },
+      }),
+      this.prisma.user.findUnique({
+        where: { id: customerUserId },
+        select: { id: true, name: true, phone: true },
+      }),
+    ]);
+
+    if (!shop) {
+      throw new NotFoundException('Shop not found');
+    }
+
+    if (!customer) {
+      throw new NotFoundException('User not found');
+    }
+
+    const staff = await this.prisma.shopStaff.findFirst({
+      where: {
+        id: dto.staffId,
+        shopId: shop.id,
+        status: StaffStatus.ACTIVE,
+      },
+      select: { id: true },
+    });
+
+    if (!staff) {
+      throw new BadRequestException(
+        'Selected barber is not available for this shop',
+      );
+    }
+
+    const status = AppointmentStatus.PENDING;
+    const date = toDateOnlyUtc(dto.date);
+
+    await this.assertNoStaffSlotClash({
+      shopId: shop.id,
+      staffId: staff.id,
+      date,
+      startTime: dto.startTime,
+      endTime: dto.endTime,
+      status,
+    });
+
+    const appointment = await this.prisma.appointment.create({
+      data: {
+        shopId: shop.id,
+        customerId: customer.id,
+        customerName: customer.name.trim(),
+        customerPhone: customer.phone?.trim() || null,
+        serviceName: dto.serviceName.trim(),
+        staffId: staff.id,
+        priceInr: dto.priceInr,
+        status,
+        date,
+        startTime: dto.startTime,
+        endTime: dto.endTime,
+        isWalkIn: false,
+      },
+      include: {
+        staff: { select: { id: true, name: true } },
+        shop: { select: { id: true, name: true } },
+      },
+    });
+
+    return {
+      ...serializeAppointment(appointment),
+      shopName: appointment.shop.name,
+      customerId: customer.id,
+    };
   }
 
   async updateMyAppointment(

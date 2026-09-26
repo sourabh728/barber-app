@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,6 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
+  cancelMyBooking,
   fetchMyBookings,
   getCustomerBookingErrorMessage,
   type CustomerBooking,
@@ -59,9 +61,9 @@ function formatTime12h(time24: string) {
 function statusMeta(status: AppointmentStatus) {
   switch (status) {
     case "PENDING":
-      return { label: "Pending", color: "#FBBF24" };
+      return { label: "Waiting for approval", color: "#FBBF24" };
     case "CONFIRMED":
-      return { label: "Confirmed", color: "#60A5FA" };
+      return { label: "Approved", color: "#60A5FA" };
     case "IN_PROGRESS":
       return { label: "In Progress", color: "#4ADE80" };
     case "COMPLETED":
@@ -85,6 +87,7 @@ export default function CustomerHistoryScreen() {
   const [bookings, setBookings] = useState<CustomerBooking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   const loadBookings = useCallback(async () => {
     setErrorMessage("");
@@ -106,6 +109,40 @@ export default function CustomerHistoryScreen() {
       void loadBookings();
     }, [loadBookings]),
   );
+
+  const confirmCancel = (booking: CustomerBooking) => {
+    Alert.alert(
+      "Cancel booking?",
+      "This will cancel your appointment request.",
+      [
+        { text: "Keep", style: "cancel" },
+        {
+          text: "Cancel booking",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              setCancellingId(booking.id);
+              try {
+                const updated = await cancelMyBooking(booking.id);
+                setBookings((current) =>
+                  current.map((item) =>
+                    item.id === updated.id ? updated : item,
+                  ),
+                );
+              } catch (error) {
+                Alert.alert(
+                  "Could not cancel",
+                  getCustomerBookingErrorMessage(error),
+                );
+              } finally {
+                setCancellingId(null);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -202,6 +239,25 @@ export default function CustomerHistoryScreen() {
                         </Text>
                       </View>
                     </View>
+
+                    {booking.status === "PENDING" ||
+                    booking.status === "CONFIRMED" ? (
+                      <TouchableOpacity
+                        style={styles.cancelButton}
+                        disabled={cancellingId === booking.id}
+                        onPress={() => confirmCancel(booking)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Cancel booking"
+                      >
+                        {cancellingId === booking.id ? (
+                          <ActivityIndicator color="#F87171" />
+                        ) : (
+                          <Text style={styles.cancelButtonText}>
+                            Cancel booking
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    ) : null}
                   </View>
                 );
               })}
@@ -357,5 +413,21 @@ const styles = StyleSheet.create({
   statusValue: {
     fontSize: 13,
     fontWeight: "700",
+  },
+
+  cancelButton: {
+    marginTop: 12,
+    alignSelf: "flex-start",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(248,113,113,0.45)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+
+  cancelButtonText: {
+    color: "#F87171",
+    fontWeight: "700",
+    fontSize: 13,
   },
 });
