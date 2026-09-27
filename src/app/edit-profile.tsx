@@ -1,9 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -21,6 +24,8 @@ import {
   sessionUserFromMe,
   updateCurrentUser,
   updateMyShop,
+  uploadProfilePhoto,
+  uploadShopPhoto,
   type CurrentUserResponse,
 } from "@/services/auth-api";
 import { getUpdateProfileErrorMessage } from "@/services/auth-errors";
@@ -28,12 +33,14 @@ import {
   phoneValidationError,
   sanitizePhoneInput,
 } from "@/utils/phone";
+import { profileImageSource, shopImageSource } from "@/utils/media";
 
 type FormState = {
   name: string;
   email: string;
   phone: string;
   password: string;
+  photoUrl: string | null;
   shopName: string;
   shopDescription: string;
   shopPhone: string;
@@ -42,6 +49,7 @@ type FormState = {
   shopCity: string;
   shopState: string;
   shopPincode: string;
+  shopPhotoUrl: string | null;
 };
 
 const emptyForm: FormState = {
@@ -49,6 +57,7 @@ const emptyForm: FormState = {
   email: "",
   phone: "",
   password: "",
+  photoUrl: null,
   shopName: "",
   shopDescription: "",
   shopPhone: "",
@@ -57,6 +66,7 @@ const emptyForm: FormState = {
   shopCity: "",
   shopState: "",
   shopPincode: "",
+  shopPhotoUrl: null,
 };
 
 function formFromProfile(profile: CurrentUserResponse): FormState {
@@ -66,6 +76,7 @@ function formFromProfile(profile: CurrentUserResponse): FormState {
     email: profile.email ?? "",
     phone: profile.phone ?? "",
     password: "",
+    photoUrl: profile.photoUrl ?? null,
     shopName: shop?.name ?? "",
     shopDescription: shop?.description ?? "",
     shopPhone: shop?.phone ?? "",
@@ -74,7 +85,32 @@ function formFromProfile(profile: CurrentUserResponse): FormState {
     shopCity: shop?.city ?? "",
     shopState: shop?.state ?? "",
     shopPincode: shop?.pincode ?? "",
+    shopPhotoUrl: shop?.photoUrl ?? null,
   };
+}
+
+async function pickImage(aspect: [number, number]) {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!permission.granted) {
+    Alert.alert(
+      "Permission needed",
+      "Allow photo library access to upload a picture.",
+    );
+    return null;
+  }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ["images"],
+    allowsEditing: true,
+    aspect,
+    quality: 0.85,
+  });
+
+  if (result.canceled || !result.assets[0]?.uri) {
+    return null;
+  }
+
+  return result.assets[0].uri;
 }
 
 export default function EditProfileScreen() {
@@ -85,6 +121,8 @@ export default function EditProfileScreen() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isUploadingShopPhoto, setIsUploadingShopPhoto] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [hidePassword, setHidePassword] = useState(true);
@@ -106,6 +144,7 @@ export default function EditProfileScreen() {
         const profile = await fetchCurrentUser();
         if (!cancelled) {
           setForm(formFromProfile(profile));
+          updateUser(sessionUserFromMe(profile));
         }
       } catch (error) {
         if (!cancelled) {
@@ -123,7 +162,44 @@ export default function EditProfileScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [updateUser]);
+
+  const handlePickProfilePhoto = async () => {
+    setErrorMessage("");
+    setSuccessMessage("");
+    const uri = await pickImage([1, 1]);
+    if (!uri) return;
+
+    setIsUploadingPhoto(true);
+    try {
+      const profile = await uploadProfilePhoto(uri);
+      setForm(formFromProfile(profile));
+      updateUser(sessionUserFromMe(profile));
+      setSuccessMessage("Profile photo updated.");
+    } catch (error) {
+      setErrorMessage(getUpdateProfileErrorMessage(error));
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  const handlePickShopPhoto = async () => {
+    setErrorMessage("");
+    setSuccessMessage("");
+    const uri = await pickImage([4, 3]);
+    if (!uri) return;
+
+    setIsUploadingShopPhoto(true);
+    try {
+      const shop = await uploadShopPhoto(uri);
+      setForm((prev) => ({ ...prev, shopPhotoUrl: shop.photoUrl }));
+      setSuccessMessage("Shop photo updated.");
+    } catch (error) {
+      setErrorMessage(getUpdateProfileErrorMessage(error));
+    } finally {
+      setIsUploadingShopPhoto(false);
+    }
+  };
 
   const handleUpdate = async () => {
     setErrorMessage("");
@@ -174,7 +250,9 @@ export default function EditProfileScreen() {
       ];
 
       if (requiredShop.some((value) => !value)) {
-        setErrorMessage("Shop name, address, city, state, and pincode are required.");
+        setErrorMessage(
+          "Shop name, address, city, state, and pincode are required.",
+        );
         return;
       }
     }
@@ -215,6 +293,8 @@ export default function EditProfileScreen() {
     }
   };
 
+  const busy = isSaving || isUploadingPhoto || isUploadingShopPhoto;
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
@@ -233,7 +313,7 @@ export default function EditProfileScreen() {
                 onPress={() => router.back()}
                 accessibilityRole="button"
                 accessibilityLabel="Go back"
-                disabled={isSaving}
+                disabled={busy}
               >
                 <Ionicons name="chevron-back" size={22} color="#fff" />
               </TouchableOpacity>
@@ -253,6 +333,36 @@ export default function EditProfileScreen() {
               <>
                 <Text style={styles.sectionTitle}>Account</Text>
 
+                <View style={styles.photoBlock}>
+                  <Image
+                    source={profileImageSource(form.photoUrl)}
+                    style={styles.profilePhoto}
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.photoButton,
+                      isUploadingPhoto && styles.buttonDisabled,
+                    ]}
+                    onPress={() => {
+                      void handlePickProfilePhoto();
+                    }}
+                    disabled={busy}
+                    accessibilityRole="button"
+                    accessibilityLabel="Change profile photo"
+                  >
+                    {isUploadingPhoto ? (
+                      <ActivityIndicator color="#111" />
+                    ) : (
+                      <>
+                        <Ionicons name="camera-outline" size={16} color="#111" />
+                        <Text style={styles.photoButtonText}>
+                          {form.photoUrl ? "Change photo" : "Upload photo"}
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+
                 <FieldLabel>Name</FieldLabel>
                 <TextInput
                   style={styles.input}
@@ -260,7 +370,7 @@ export default function EditProfileScreen() {
                   onChangeText={(value) => setField("name", value)}
                   placeholder="Your name"
                   placeholderTextColor="#777"
-                  editable={!isSaving}
+                  editable={!busy}
                   autoCapitalize="words"
                 />
 
@@ -271,7 +381,7 @@ export default function EditProfileScreen() {
                   onChangeText={(value) => setField("email", value)}
                   placeholder="you@example.com"
                   placeholderTextColor="#777"
-                  editable={!isSaving}
+                  editable={!busy}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -286,7 +396,7 @@ export default function EditProfileScreen() {
                   }
                   placeholder="10-digit mobile number"
                   placeholderTextColor="#777"
-                  editable={!isSaving}
+                  editable={!busy}
                   keyboardType="number-pad"
                   maxLength={10}
                 />
@@ -299,7 +409,7 @@ export default function EditProfileScreen() {
                     onChangeText={(value) => setField("password", value)}
                     placeholder="Leave blank to keep current"
                     placeholderTextColor="#777"
-                    editable={!isSaving}
+                    editable={!busy}
                     secureTextEntry={hidePassword}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -325,6 +435,42 @@ export default function EditProfileScreen() {
                       Shop
                     </Text>
 
+                    <View style={styles.photoBlock}>
+                      <Image
+                        source={shopImageSource(form.shopPhotoUrl)}
+                        style={styles.shopPhoto}
+                      />
+                      <TouchableOpacity
+                        style={[
+                          styles.photoButton,
+                          isUploadingShopPhoto && styles.buttonDisabled,
+                        ]}
+                        onPress={() => {
+                          void handlePickShopPhoto();
+                        }}
+                        disabled={busy}
+                        accessibilityRole="button"
+                        accessibilityLabel="Change shop photo"
+                      >
+                        {isUploadingShopPhoto ? (
+                          <ActivityIndicator color="#111" />
+                        ) : (
+                          <>
+                            <Ionicons
+                              name="image-outline"
+                              size={16}
+                              color="#111"
+                            />
+                            <Text style={styles.photoButtonText}>
+                              {form.shopPhotoUrl
+                                ? "Change shop photo"
+                                : "Upload shop photo"}
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+
                     <FieldLabel>Shop name</FieldLabel>
                     <TextInput
                       style={styles.input}
@@ -332,7 +478,7 @@ export default function EditProfileScreen() {
                       onChangeText={(value) => setField("shopName", value)}
                       placeholder="Shop name"
                       placeholderTextColor="#777"
-                      editable={!isSaving}
+                      editable={!busy}
                     />
 
                     <FieldLabel>Description</FieldLabel>
@@ -344,7 +490,7 @@ export default function EditProfileScreen() {
                       }
                       placeholder="Shop description"
                       placeholderTextColor="#777"
-                      editable={!isSaving}
+                      editable={!busy}
                       multiline
                       textAlignVertical="top"
                     />
@@ -358,7 +504,7 @@ export default function EditProfileScreen() {
                       }
                       placeholder="10-digit mobile number"
                       placeholderTextColor="#777"
-                      editable={!isSaving}
+                      editable={!busy}
                       keyboardType="number-pad"
                       maxLength={10}
                     />
@@ -370,7 +516,7 @@ export default function EditProfileScreen() {
                       onChangeText={(value) => setField("shopEmail", value)}
                       placeholder="shop@example.com"
                       placeholderTextColor="#777"
-                      editable={!isSaving}
+                      editable={!busy}
                       keyboardType="email-address"
                       autoCapitalize="none"
                       autoCorrect={false}
@@ -383,7 +529,7 @@ export default function EditProfileScreen() {
                       onChangeText={(value) => setField("shopAddress", value)}
                       placeholder="Street address"
                       placeholderTextColor="#777"
-                      editable={!isSaving}
+                      editable={!busy}
                     />
 
                     <FieldLabel>City</FieldLabel>
@@ -393,7 +539,7 @@ export default function EditProfileScreen() {
                       onChangeText={(value) => setField("shopCity", value)}
                       placeholder="City"
                       placeholderTextColor="#777"
-                      editable={!isSaving}
+                      editable={!busy}
                     />
 
                     <FieldLabel>State</FieldLabel>
@@ -403,7 +549,7 @@ export default function EditProfileScreen() {
                       onChangeText={(value) => setField("shopState", value)}
                       placeholder="State"
                       placeholderTextColor="#777"
-                      editable={!isSaving}
+                      editable={!busy}
                     />
 
                     <FieldLabel>Pincode</FieldLabel>
@@ -413,7 +559,7 @@ export default function EditProfileScreen() {
                       onChangeText={(value) => setField("shopPincode", value)}
                       placeholder="Pincode"
                       placeholderTextColor="#777"
-                      editable={!isSaving}
+                      editable={!busy}
                       keyboardType="number-pad"
                     />
                   </>
@@ -427,13 +573,13 @@ export default function EditProfileScreen() {
                 ) : null}
 
                 <TouchableOpacity
-                  style={[styles.updateButton, isSaving && styles.buttonDisabled]}
+                  style={[styles.updateButton, busy && styles.buttonDisabled]}
                   onPress={() => {
                     void handleUpdate();
                   }}
-                  disabled={isSaving}
+                  disabled={busy}
                   accessibilityRole="button"
-                  accessibilityState={{ disabled: isSaving, busy: isSaving }}
+                  accessibilityState={{ disabled: busy, busy }}
                 >
                   {isSaving ? (
                     <ActivityIndicator color="#111" />
@@ -525,6 +671,44 @@ const styles = StyleSheet.create({
 
   sectionSpacing: {
     marginTop: 28,
+  },
+
+  photoBlock: {
+    alignItems: "center",
+    gap: 12,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+
+  profilePhoto: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: "#1A1A26",
+  },
+
+  shopPhoto: {
+    width: "100%",
+    height: 140,
+    borderRadius: 16,
+    backgroundColor: "#1A1A26",
+  },
+
+  photoButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#F97316",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    minHeight: 40,
+  },
+
+  photoButtonText: {
+    color: "#111",
+    fontSize: 14,
+    fontWeight: "700",
   },
 
   label: {

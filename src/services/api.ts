@@ -52,6 +52,7 @@ export type LoginResponse = {
     email: string;
     phone: string | null;
     role: string;
+    photoUrl?: string | null;
     createdAt: string;
     updatedAt: string;
   };

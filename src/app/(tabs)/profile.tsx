@@ -24,6 +24,7 @@ import {
   fetchMyShopStats,
   getShopStatsErrorMessage,
 } from "@/services/shop-stats-api";
+import { profileImageSource } from "@/utils/media";
 
 export default function Profile() {
   const router = useRouter();
@@ -118,7 +119,7 @@ export default function Profile() {
 
         <View style={styles.userRow}>
           <Image
-            source={require("@/assets/images/profile.png")}
+            source={profileImageSource(user?.photoUrl)}
             style={styles.avatar}
           />
 

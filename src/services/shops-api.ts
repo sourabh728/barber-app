@@ -11,6 +11,7 @@ export type PublicShop = {
   city: string;
   state: string;
   pincode: string;
+  photoUrl: string | null;
   openTime: string;
   closeTime: string;
 };

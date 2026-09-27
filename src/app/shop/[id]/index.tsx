@@ -28,8 +28,8 @@ import {
   staffFirstName,
   type ShopDetail,
 } from "@/services/shops-api";
+import { shopImageSource } from "@/utils/media";
 
-const SHOP_PLACEHOLDER = require("@/assets/images/hero.jpg");
 const STEPS = ["Services", "Barber", "Review"] as const;
 type StepIndex = 0 | 1 | 2;
 const SLOT_MINUTES = 30;
@@ -355,7 +355,10 @@ export default function ShopBookAppointmentScreen() {
           <View style={styles.backButtonPlaceholder} />
         </View>
 
-        <Image source={SHOP_PLACEHOLDER} style={styles.heroImage} />
+        <Image
+          source={shopImageSource(shop?.photoUrl)}
+          style={styles.heroImage}
+        />
 
         <View style={styles.nameRow}>
           <Text style={styles.shopName} numberOfLines={2}>

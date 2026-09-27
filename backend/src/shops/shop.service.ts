@@ -12,6 +12,10 @@ import {
 } from '../../generated/prisma/enums';
 
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  publicUploadPath,
+  tryDeleteUpload,
+} from '../common/upload';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { CreateCustomerAppointmentDto } from './dto/create-customer-appointment.dto';
 import { CreateShopDto } from './dto/create-shop.dto';
@@ -190,6 +194,7 @@ type PublicShopRecord = {
   city: string;
   state: string;
   pincode: string;
+  photoUrl: string | null;
   openTime: string;
   closeTime: string;
 };
@@ -205,6 +210,7 @@ function serializePublicShop(shop: PublicShopRecord) {
     city: shop.city,
     state: shop.state,
     pincode: shop.pincode,
+    photoUrl: shop.photoUrl,
     openTime: shop.openTime,
     closeTime: shop.closeTime,
   };
@@ -267,6 +273,7 @@ export class ShopService {
           city: true,
           state: true,
           pincode: true,
+          photoUrl: true,
           openTime: true,
           closeTime: true,
         },
@@ -311,6 +318,7 @@ export class ShopService {
         city: true,
         state: true,
         pincode: true,
+        photoUrl: true,
         openTime: true,
         closeTime: true,
         lunchStart: true,
@@ -428,6 +436,17 @@ export class ShopService {
     return this.prisma.shop.update({
       where: { id: shop.id },
       data: updateShopDto,
+    });
+  }
+
+  async updateMyShopPhoto(ownerId: string, filename: string) {
+    const shop = await this.findOwnerShop(ownerId);
+    const photoUrl = publicUploadPath('shops', filename);
+    tryDeleteUpload(shop.photoUrl);
+
+    return this.prisma.shop.update({
+      where: { id: shop.id },
+      data: { photoUrl },
     });
   }
 

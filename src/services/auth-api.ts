@@ -9,6 +9,7 @@ export type SessionUser = {
   role: AuthRole;
   name?: string;
   phone?: string | null;
+  photoUrl?: string | null;
 };
 
 export type ProfileShop = {
@@ -21,6 +22,7 @@ export type ProfileShop = {
   city: string;
   state: string;
   pincode: string;
+  photoUrl: string | null;
   ownerId: string;
   createdAt: string;
   updatedAt: string;
@@ -33,6 +35,7 @@ export type CurrentUserResponse = {
   email: string;
   phone: string | null;
   role: AuthRole;
+  photoUrl: string | null;
   createdAt: string;
   updatedAt: string;
   shop: ProfileShop | null;
@@ -210,6 +213,48 @@ export async function updateMyShop(payload: UpdateShopPayload) {
   return response.data;
 }
 
+export async function uploadProfilePhoto(localUri: string) {
+  const formData = new FormData();
+  const name = localUri.split("/").pop() || "profile.jpg";
+  const type = guessImageMime(name);
+  formData.append("photo", {
+    uri: localUri,
+    name,
+    type,
+  } as unknown as Blob);
+
+  const response = await api.post<CurrentUserResponse>("/auth/me/photo", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 60_000,
+  });
+  return response.data;
+}
+
+export async function uploadShopPhoto(localUri: string) {
+  const formData = new FormData();
+  const name = localUri.split("/").pop() || "shop.jpg";
+  const type = guessImageMime(name);
+  formData.append("photo", {
+    uri: localUri,
+    name,
+    type,
+  } as unknown as Blob);
+
+  const response = await api.post<ProfileShop>("/shops/me/photo", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 60_000,
+  });
+  return response.data;
+}
+
+function guessImageMime(filename: string) {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".gif")) return "image/gif";
+  return "image/jpeg";
+}
+
 export function sessionUserFromLogin(user: LoginResponse["user"]): SessionUser {
   return {
     id: user.id,
@@ -217,6 +262,7 @@ export function sessionUserFromLogin(user: LoginResponse["user"]): SessionUser {
     role: user.role as AuthRole,
     name: user.name,
     phone: user.phone,
+    photoUrl: user.photoUrl ?? null,
   };
 }
 
@@ -227,5 +273,6 @@ export function sessionUserFromMe(user: CurrentUserResponse): SessionUser {
     role: user.role,
     name: user.name,
     phone: user.phone,
+    photoUrl: user.photoUrl,
   };
 }

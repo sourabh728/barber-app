@@ -1,14 +1,19 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
   Patch,
   Post,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Request } from 'express';
 
+import { createImageUploadOptions } from '../common/upload';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -83,5 +88,18 @@ export class AuthController {
     @Body() updateProfileDto: UpdateProfileDto,
   ) {
     return this.authService.updateProfile(req.user.userId, updateProfileDto);
+  }
+
+  @Post('me/photo')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('photo', createImageUploadOptions('profiles')))
+  uploadMyPhoto(
+    @Req() req: AuthenticatedRequest,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Photo file is required');
+    }
+    return this.authService.updateProfilePhoto(req.user.userId, file.filename);
   }
 }

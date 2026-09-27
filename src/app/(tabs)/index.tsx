@@ -23,8 +23,8 @@ import {
   getShopsErrorMessage,
   type PublicShop,
 } from "@/services/shops-api";
+import { shopImageSource } from "@/utils/media";
 
-const SHOP_PLACEHOLDER = require("@/assets/images/hero.jpg");
 const PAGE_SIZE = 20;
 
 function greetingWord(now = new Date()) {
@@ -129,7 +129,10 @@ export default function HomeScreen() {
 
     return (
       <View style={styles.shopCard}>
-        <Image source={SHOP_PLACEHOLDER} style={styles.shopImage} />
+        <Image
+          source={shopImageSource(item.photoUrl)}
+          style={styles.shopImage}
+        />
         <View style={styles.shopBody}>
           <Text style={styles.shopName} numberOfLines={1}>
             {item.name}

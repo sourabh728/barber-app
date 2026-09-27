@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -9,8 +10,11 @@ import {
   Post,
   Query,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Request } from 'express';
 import { UserRole } from '../../generated/prisma/enums';
 
@@ -18,6 +22,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { createImageUploadOptions } from '../common/upload';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { CreateCustomerAppointmentDto } from './dto/create-customer-appointment.dto';
 import { CreateShopDto } from './dto/create-shop.dto';
@@ -192,6 +197,20 @@ export class ShopController {
     @Req() req: AuthenticatedRequest,
   ) {
     return this.shopService.updateMyShop(req.user.userId, updateShopDto);
+  }
+
+  @Post('me/photo')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BARBER)
+  @UseInterceptors(FileInterceptor('photo', createImageUploadOptions('shops')))
+  uploadMyShopPhoto(
+    @Req() req: AuthenticatedRequest,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Photo file is required');
+    }
+    return this.shopService.updateMyShopPhoto(req.user.userId, file.filename);
   }
 
   /** Customer-facing shop detail for booking. After all /me routes. */

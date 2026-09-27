@@ -34,6 +34,9 @@ yarn-error.*
 .env
 .env*.local
 
+# uploaded profile / shop photos
+backend/uploads/
+
 # typescript
 *.tsbuildinfo
 

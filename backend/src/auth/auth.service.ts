@@ -13,6 +13,10 @@ import * as bcrypt from 'bcrypt';
 import { OAuth2Client } from 'google-auth-library';
 
 import { OtpPurpose, UserRole } from '../../generated/prisma/enums';
+import {
+  publicUploadPath,
+  tryDeleteUpload,
+} from '../common/upload';
 import { OtpService } from '../mail/otp.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -34,6 +38,7 @@ const publicUserSelect = {
   email: true,
   phone: true,
   role: true,
+  photoUrl: true,
   emailVerified: true,
   createdAt: true,
   updatedAt: true,
@@ -45,6 +50,7 @@ type PublicUser = {
   email: string;
   phone: string | null;
   role: string;
+  photoUrl: string | null;
   emailVerified: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -462,6 +468,7 @@ export class AuthService {
             city: true,
             state: true,
             pincode: true,
+            photoUrl: true,
             ownerId: true,
             createdAt: true,
             updatedAt: true,
@@ -485,11 +492,33 @@ export class AuthService {
       email: publicUser.email,
       phone: publicUser.phone,
       role: publicUser.role,
+      photoUrl: publicUser.photoUrl,
       emailVerified: publicUser.emailVerified,
       createdAt: publicUser.createdAt,
       updatedAt: publicUser.updatedAt,
       shop: shops[0] ?? null,
     };
+  }
+
+  async updateProfilePhoto(userId: string, filename: string) {
+    const existing = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, photoUrl: true },
+    });
+
+    if (!existing) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const photoUrl = publicUploadPath('profiles', filename);
+    tryDeleteUpload(existing.photoUrl);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { photoUrl },
+    });
+
+    return this.getProfile(userId);
   }
 
   async updateProfile(userId: string, updateProfileDto: UpdateProfileDto) {
@@ -592,6 +621,7 @@ export class AuthService {
         email: user.email,
         phone: user.phone,
         role: user.role,
+        photoUrl: user.photoUrl,
         emailVerified: user.emailVerified,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
