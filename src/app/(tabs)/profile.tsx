@@ -221,6 +221,14 @@ export default function Profile() {
             />
 
             <MenuItem
+              icon={<Feather name="help-circle" size={22} color="#475569" />}
+              title="Help & Support"
+              onPress={() => {
+                router.push("/help-support");
+              }}
+            />
+
+            <MenuItem
               icon={<MaterialIcons name="logout" size={22} color="#DC2626" />}
               title="Logout"
               onPress={() => {
@@ -254,6 +262,9 @@ export default function Profile() {
             <MenuItem
               icon={<Feather name="help-circle" size={22} color="#475569" />}
               title="Help & Support"
+              onPress={() => {
+                router.push("/help-support");
+              }}
             />
 
             <MenuItem
