@@ -21,6 +21,7 @@ import {
   phoneValidationError,
   sanitizePhoneInput,
 } from "@/utils/phone";
+import { LegalAgreementText } from "@/components/legal-agreement-text";
 
 export default function BarberRegisterScreen() {
   const router = useRouter();
@@ -352,11 +353,10 @@ export default function BarberRegisterScreen() {
               <Text style={styles.backToLogin}>← Back to Barber Sign In</Text>
             </TouchableOpacity>
 
-            <Text style={styles.terms}>
-              By continuing you agree to our{" "}
-              <Text style={styles.link}>Terms</Text> &{" "}
-              <Text style={styles.link}>Privacy Policy</Text>
-            </Text>
+            <LegalAgreementText
+              style={styles.terms}
+              linkStyle={styles.link}
+            />
           </LinearGradient>
         </ScrollView>
       </KeyboardAvoidingView>

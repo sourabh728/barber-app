@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useLoginActions } from "@/hooks/use-login-actions";
+import { LegalAgreementText } from "@/components/legal-agreement-text";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -196,11 +197,10 @@ export default function LoginScreen() {
               <Text style={styles.barberLogin}>Barber Login →</Text>
             </TouchableOpacity>
 
-            <Text style={styles.terms}>
-              By continuing you agree to our{" "}
-              <Text style={styles.link}>Terms</Text> &{" "}
-              <Text style={styles.link}>Privacy Policy</Text>
-            </Text>
+            <LegalAgreementText
+              style={styles.terms}
+              linkStyle={styles.link}
+            />
           </LinearGradient>
         </ScrollView>
       </KeyboardAvoidingView>

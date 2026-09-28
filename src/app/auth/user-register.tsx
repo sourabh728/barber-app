@@ -21,6 +21,7 @@ import {
   phoneValidationError,
   sanitizePhoneInput,
 } from "@/utils/phone";
+import { LegalAgreementText } from "@/components/legal-agreement-text";
 
 export default function UserRegisterScreen() {
   const router = useRouter();
@@ -232,11 +233,10 @@ export default function UserRegisterScreen() {
               <Text style={styles.backToLogin}>← Back to Sign In</Text>
             </TouchableOpacity>
 
-            <Text style={styles.terms}>
-              By continuing you agree to our{" "}
-              <Text style={styles.link}>Terms</Text> &{" "}
-              <Text style={styles.link}>Privacy Policy</Text>
-            </Text>
+            <LegalAgreementText
+              style={styles.terms}
+              linkStyle={styles.link}
+            />
           </LinearGradient>
         </ScrollView>
       </KeyboardAvoidingView>

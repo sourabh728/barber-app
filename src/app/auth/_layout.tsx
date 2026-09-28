@@ -15,6 +15,7 @@ export default function AuthLayout() {
       <Stack.Screen name="reset-password" />
       <Stack.Screen name="barber-login" />
       <Stack.Screen name="barber-register" />
+      <Stack.Screen name="terms" />
     </Stack>
   );
 }

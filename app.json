@@ -5,7 +5,10 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": ["barberapp", "com.barberapp1.app"],
+    "scheme": [
+      "barberapp",
+      "com.barberapp1.app"
+    ],
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.barberapp1.app",
@@ -50,6 +53,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ed101d7a-416f-4d0f-b68d-e446fb941307"
+      }
+    },
+    "owner": "psourabh728s-team"
   }
 }

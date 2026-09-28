@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useLoginActions } from "@/hooks/use-login-actions";
+import { LegalAgreementText } from "@/components/legal-agreement-text";
 
 export default function BarberLoginScreen() {
   const router = useRouter();
@@ -201,11 +202,10 @@ export default function BarberLoginScreen() {
               <Text style={styles.back}>← Back to Customer Login</Text>
             </TouchableOpacity>
 
-            <Text style={styles.terms}>
-              By continuing you agree to our{" "}
-              <Text style={styles.link}>Terms</Text> &{" "}
-              <Text style={styles.link}>Privacy Policy</Text>
-            </Text>
+            <LegalAgreementText
+              style={styles.terms}
+              linkStyle={styles.link}
+            />
           </LinearGradient>
         </ScrollView>
       </KeyboardAvoidingView>
