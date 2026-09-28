@@ -1,0 +1,32 @@
+# Keep EAS upload lean and avoid Windows symlink/junction errors
+.agents/
+.claude/
+.windsurf/
+**/.agents/
+**/.claude/
+**/.windsurf/
+.cursor/
+**/.cursor/
+
+# Local / generated
+node_modules/
+**/node_modules/
+.expo/
+dist/
+**/dist/
+web-build/
+backend/uploads/
+backend/coverage/
+ios/
+android/
+
+# Secrets & env
+.env
+.env.*
+backend/.env
+**/.env
+
+# Git / IDE
+.git/
+.vscode/
+example/

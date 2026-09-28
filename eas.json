@@ -15,12 +15,22 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://barber-app-hmy9.onrender.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "1027190803077-peqsfh8ohgejdvre9981e6ulev6q8ogu.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "1027190803077-d4jo52678urbje0api4k2shl8gr797aq.apps.googleusercontent.com"
       }
     },
     "production": {
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://barber-app-hmy9.onrender.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "1027190803077-peqsfh8ohgejdvre9981e6ulev6q8ogu.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "1027190803077-d4jo52678urbje0api4k2shl8gr797aq.apps.googleusercontent.com"
       }
     }
   },

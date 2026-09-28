@@ -45,3 +45,11 @@ example
 # generated native folders
 /ios
 /android
+
+# AI agent skill copies (junctions break EAS upload on Windows)
+backend/.agents/
+backend/.claude/
+backend/.windsurf/
+.agents/
+.claude/
+.windsurf/
