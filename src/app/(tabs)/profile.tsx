@@ -257,6 +257,9 @@ export default function Profile() {
             <MenuItem
               icon={<Ionicons name="wallet" size={22} color="#22C55E" />}
               title="Payment Methods"
+              onPress={() => {
+                router.push("/payment-methods");
+              }}
             />
 
             <MenuItem
