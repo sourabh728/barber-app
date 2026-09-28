@@ -12,11 +12,13 @@ async function bootstrap() {
   const configuredOrigins = process.env.CORS_ORIGINS?.split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
+  const allowAllOrigins =
+    !configuredOrigins?.length || configuredOrigins.includes('*');
 
   app.enableCors({
-    origin: configuredOrigins?.length
-      ? configuredOrigins
-      : [/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/],
+    // Mobile apps do not send Origin; allow all when unset or CORS_ORIGINS=*
+    origin: allowAllOrigins ? true : configuredOrigins,
+    credentials: true,
   });
 
   const uploadDir = uploadsRoot();

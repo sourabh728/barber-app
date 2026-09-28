@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "barber-app1",
+    "name": "BookUrBarber",
     "slug": "barber-app1",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,6 +13,7 @@
     },
     "android": {
       "package": "com.barberapp1.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
