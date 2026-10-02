@@ -1,14 +1,31 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { promises as dnsPromises, setDefaultResultOrder } from 'node:dns';
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
+
+// Prefer A records globally; Render free outbound often has no working IPv6.
+try {
+  setDefaultResultOrder('ipv4first');
+} catch {
+  // Older Node builds may not expose this helper.
+}
 
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
-  private readonly transporter: Transporter | null;
+  private transporterPromise: Promise<Transporter | null> | null = null;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(private readonly configService: ConfigService) {}
+
+  private getTransporter() {
+    if (!this.transporterPromise) {
+      this.transporterPromise = this.createTransporter();
+    }
+    return this.transporterPromise;
+  }
+
+  private async createTransporter(): Promise<Transporter | null> {
     const host = this.configService.get<string>('SMTP_HOST')?.trim();
     const port = Number(this.configService.get<string>('SMTP_PORT') ?? '587');
     const user = this.configService.get<string>('SMTP_USER')?.trim();
@@ -18,18 +35,7 @@ export class MailService {
       ?.replace(/\s+/g, '')
       .trim();
 
-    if (host && user && pass) {
-      this.transporter = nodemailer.createTransport({
-        host,
-        port,
-        secure: port === 465,
-        auth: { user, pass },
-        // Render has no outbound IPv6; force IPv4 (nodemailer types omit `family`).
-        family: 4,
-      } as Parameters<typeof nodemailer.createTransport>[0]);
-      this.logger.log(`SMTP ready: host=${host} port=${port} user=${user}`);
-    } else {
-      this.transporter = null;
+    if (!host || !user || !pass) {
       const missing = [
         !host ? 'SMTP_HOST' : null,
         !user ? 'SMTP_USER' : null,
@@ -38,7 +44,42 @@ export class MailService {
       this.logger.warn(
         `SMTP is not configured (missing ${missing.join(', ')}). OTPs will be logged to the server console only.`,
       );
+      return null;
     }
+
+    // Resolve to IPv4 up front. Nodemailer may still pick Gmail AAAA on Render,
+    // which fails with ENETUNREACH (no outbound IPv6).
+    let connectHost = host;
+    try {
+      const ipv4 = await dnsPromises.resolve4(host);
+      if (ipv4[0]) {
+        connectHost = ipv4[0];
+        this.logger.log(`SMTP DNS IPv4: ${host} -> ${connectHost}`);
+      }
+    } catch (error) {
+      const details = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `SMTP IPv4 lookup failed for ${host} (${details}); using hostname as-is`,
+      );
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: connectHost,
+      port,
+      secure: port === 465,
+      auth: { user, pass },
+      // Keep TLS SNI / cert validation against the real hostname.
+      tls: { servername: host },
+      name: host,
+      connectionTimeout: 15_000,
+      greetingTimeout: 15_000,
+      socketTimeout: 30_000,
+    });
+
+    this.logger.log(
+      `SMTP ready: host=${host} connect=${connectHost} port=${port} user=${user}`,
+    );
+    return transporter;
   }
 
   async sendOtpEmail(params: {
@@ -75,7 +116,8 @@ export class MailService {
       <p>If you did not request this, you can ignore this email.</p>
     `;
 
-    if (!this.transporter) {
+    const transporter = await this.getTransporter();
+    if (!transporter) {
       this.logger.log(
         `[DEV OTP] purpose=${params.purpose} to=${params.to} code=${params.code}`,
       );
@@ -83,7 +125,7 @@ export class MailService {
     }
 
     try {
-      await this.transporter.sendMail({
+      await transporter.sendMail({
         from,
         to: params.to,
         subject,
