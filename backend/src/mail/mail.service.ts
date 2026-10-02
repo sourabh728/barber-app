@@ -4,7 +4,7 @@ import { promises as dnsPromises, setDefaultResultOrder } from 'node:dns';
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 
-// Prefer A records globally; Render free outbound often has no working IPv6.
+// Prefer A records; some hosts have no working outbound IPv6.
 try {
   setDefaultResultOrder('ipv4first');
 } catch {
@@ -47,8 +47,7 @@ export class MailService {
       return null;
     }
 
-    // Resolve to IPv4 up front. Nodemailer may still pick Gmail AAAA on Render,
-    // which fails with ENETUNREACH (no outbound IPv6).
+    // Resolve to IPv4 up front (avoids ENETUNREACH on IPv6-only paths).
     let connectHost = host;
     try {
       const ipv4 = await dnsPromises.resolve4(host);
@@ -68,7 +67,6 @@ export class MailService {
       port,
       secure: port === 465,
       auth: { user, pass },
-      // Keep TLS SNI / cert validation against the real hostname.
       tls: { servername: host },
       name: host,
       connectionTimeout: 15_000,
