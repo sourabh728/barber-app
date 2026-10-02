@@ -24,6 +24,8 @@ export class MailService {
         port,
         secure: port === 465,
         auth: { user, pass },
+        // Render (and many hosts) have no outbound IPv6; Gmail AAAA would fail with ENETUNREACH.
+        family: 4,
       });
       this.logger.log(`SMTP ready: host=${host} port=${port} user=${user}`);
     } else {
