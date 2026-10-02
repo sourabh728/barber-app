@@ -2,43 +2,40 @@ import { create } from "axios";
 import { Platform } from "react-native";
 
 /**
- * Android emulator cannot reach the host via localhost/127.0.0.1 — use 10.0.2.2.
- * Do not use String.replace("$110.0.2.2"): some JS engines treat $11 as capture
- * group 11 and produce a broken URL (e.g. "0.0.2.2:3000"), which axios surfaces
- * as a network error → "Unable to reach the server".
- * Physical devices still need a LAN IP in EXPO_PUBLIC_API_URL (adb reverse also works).
+ * Production API is hosted on Render. Local Nest is optional for developers.
+ * Android emulator cannot reach a host Nest via localhost/127.0.0.1 — use 10.0.2.2.
  */
+const RENDER_API_URL = "https://barber-app-hmy9.onrender.com";
+
 function resolveApiBaseUrl() {
   const configured = process.env.EXPO_PUBLIC_API_URL?.trim();
-  const fallback =
-    Platform.OS === "android"
-      ? "http://10.0.2.2:3000"
-      : "http://localhost:3000";
-  const url = configured || fallback;
+  const url = configured || RENDER_API_URL;
 
   if (Platform.OS !== "android") {
-    return url;
+    return url.replace(/\/$/, "");
   }
 
   try {
     const parsed = new URL(url);
     if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
       parsed.hostname = "10.0.2.2";
-      // URL#toString keeps a trailing slash for origin-only URLs; axios joins paths better without it.
       return parsed.toString().replace(/\/$/, "");
     }
   } catch {
-    // Fall through with the configured/fallback string.
+    // Fall through with the configured string.
   }
 
-  return url;
+  return url.replace(/\/$/, "");
 }
 
 export const apiBaseUrl = resolveApiBaseUrl();
 
+/** Render free tier can take 30–60s to wake; keep client timeout above that. */
+const isRemoteApi = /^https?:\/\//i.test(apiBaseUrl) && !/localhost|127\.0\.0\.1|10\.0\.2\.2/i.test(apiBaseUrl);
+
 export const api = create({
   baseURL: apiBaseUrl,
-  timeout: 10_000,
+  timeout: isRemoteApi ? 60_000 : 15_000,
   headers: {
     "Content-Type": "application/json",
   },
