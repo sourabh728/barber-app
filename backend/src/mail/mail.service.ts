@@ -24,9 +24,9 @@ export class MailService {
         port,
         secure: port === 465,
         auth: { user, pass },
-        // Render (and many hosts) have no outbound IPv6; Gmail AAAA would fail with ENETUNREACH.
+        // Render has no outbound IPv6; force IPv4 (nodemailer types omit `family`).
         family: 4,
-      });
+      } as Parameters<typeof nodemailer.createTransport>[0]);
       this.logger.log(`SMTP ready: host=${host} port=${port} user=${user}`);
     } else {
       this.transporter = null;
