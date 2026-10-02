@@ -50,8 +50,6 @@ export function useStorageState(
   const restore = options?.restore !== false;
 
   useEffect(() => {
-    // Intentionally skip restore so each app launch requires login again.
-    // Helpers remain for in-session signIn/signOut persistence and future use.
     if (!restore) {
       setState(null);
       return;
