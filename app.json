@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "BookUrBarber",
+    "name": "Trimshim",
     "slug": "barber-app1",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -16,6 +16,7 @@
     },
     "android": {
       "package": "com.barberapp1.app",
+      "label": "Trimshim",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -44,7 +45,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow BookUrBarber to access your photos so you can set a profile or shop picture.",
+          "photosPermission": "Allow Trimshim to access your photos so you can set a profile or shop picture.",
           "cameraPermission": false,
           "microphonePermission": false
         }

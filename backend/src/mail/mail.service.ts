@@ -51,8 +51,8 @@ export class MailService {
 
     const subject =
       params.purpose === 'EMAIL_VERIFY'
-        ? 'Verify your BookUrBarber email'
-        : 'Reset your BookUrBarber password';
+        ? 'Verify your Trimshim email'
+        : 'Reset your Trimshim password';
 
     const action =
       params.purpose === 'EMAIL_VERIFY'
@@ -60,14 +60,14 @@ export class MailService {
         : 'reset your password';
 
     const text = [
-      `Your BookUrBarber verification code is ${params.code}.`,
+      `Your Trimshim verification code is ${params.code}.`,
       `Use this code to ${action}.`,
       'This code expires in 10 minutes.',
       'If you did not request this, you can ignore this email.',
     ].join('\n');
 
     const html = `
-      <p>Your BookUrBarber verification code is:</p>
+      <p>Your Trimshim verification code is:</p>
       <p style="font-size:28px;font-weight:700;letter-spacing:4px;">${params.code}</p>
       <p>Use this code to ${action}. It expires in <strong>10 minutes</strong>.</p>
       <p>If you did not request this, you can ignore this email.</p>

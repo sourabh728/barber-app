@@ -112,7 +112,7 @@ export default function UserRegisterScreen() {
         >
           <LinearGradient colors={["#12121C", "#0D0D15"]} style={styles.card}>
             <Text style={styles.logo}>
-              BOOK<Text style={styles.logoOrange}>UR</Text>BARBER
+              Trim<Text style={styles.logoOrange}>shim</Text>
             </Text>
 
             <Text style={styles.heading}>Create Account</Text>

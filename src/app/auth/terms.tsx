@@ -25,17 +25,17 @@ export default function TermsOfServiceScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.brand}>BookUrBarber</Text>
+        <Text style={styles.brand}>Trimshim</Text>
         <Text style={styles.updated}>Last updated: 28 September 2026</Text>
 
         <Text style={styles.paragraph}>
-          By using BookUrBarber, you agree to these Terms of Service. If you do
+          By using Trimshim, you agree to these Terms of Service. If you do
           not agree, please do not use the app.
         </Text>
 
         <Text style={styles.heading}>1. The service</Text>
         <Text style={styles.paragraph}>
-          BookUrBarber helps customers discover barber shops and book
+          Trimshim helps customers discover barber shops and book
           appointments, and helps barbers manage shop profiles, staff,
           schedules, and bookings.
         </Text>
@@ -91,7 +91,7 @@ export default function TermsOfServiceScreen() {
 
         <Text style={styles.heading}>7. Limitation of liability</Text>
         <Text style={styles.paragraph}>
-          To the fullest extent allowed by law, BookUrBarber is not liable for
+          To the fullest extent allowed by law, Trimshim is not liable for
           indirect, incidental, or consequential damages arising from your use
           of the app or shop services.
         </Text>
