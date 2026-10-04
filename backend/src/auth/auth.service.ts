@@ -12,25 +12,26 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { OAuth2Client } from 'google-auth-library';
 
-import { OtpPurpose, UserRole } from '../../generated/prisma/enums';
+import { UserRole } from '../../generated/prisma/enums';
+// import { OtpPurpose, UserRole } from '../../generated/prisma/enums';
 import {
   publicUploadPath,
   tryDeleteUpload,
 } from '../common/upload';
 import { OtpService } from '../mail/otp.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { ForgotPasswordDto } from './dto/forgot-password.dto';
+// import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { GoogleLoginDto } from './dto/google-login.dto';
-import { LoginDto } from './dto/login.dto';
+// import { LoginDto } from './dto/login.dto';
 import {
   DEFAULT_SHOP_DESCRIPTION,
   RegisterBarberDto,
 } from './dto/register-barber.dto';
 import { RegisterDto } from './dto/register.dto';
-import { ResendOtpDto } from './dto/resend-otp.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';
+// import { ResendOtpDto } from './dto/resend-otp.dto';
+// import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { VerifyEmailDto } from './dto/verify-email.dto';
+// import { VerifyEmailDto } from './dto/verify-email.dto';
 
 const publicUserSelect = {
   id: true,
@@ -95,20 +96,22 @@ export class AuthService {
         phone,
         password: hashedPassword,
         role: assignedRole,
-        emailVerified: false,
+        // OTP disabled — mark verified for Google-only era.
+        emailVerified: true,
       },
       select: publicUserSelect,
     });
 
-    const otp = await this.otpService.issueOtp(
-      normalizedEmail,
-      OtpPurpose.EMAIL_VERIFY,
-    );
+    // OTP email verification disabled — Google-only auth.
+    // const otp = await this.otpService.issueOtp(
+    //   normalizedEmail,
+    //   OtpPurpose.EMAIL_VERIFY,
+    // );
 
     return {
       ...user,
-      requiresEmailVerification: true,
-      otp,
+      requiresEmailVerification: false,
+      // otp,
     };
   }
 
@@ -149,7 +152,8 @@ export class AuthService {
         phone,
         password: hashedPassword,
         role: UserRole.BARBER,
-        emailVerified: false,
+        // OTP disabled — mark verified for Google-only era.
+        emailVerified: true,
         shops: {
           create: {
             name,
@@ -184,10 +188,11 @@ export class AuthService {
       },
     });
 
-    const otp = await this.otpService.issueOtp(
-      normalizedEmail,
-      OtpPurpose.EMAIL_VERIFY,
-    );
+    // OTP email verification disabled — Google-only auth.
+    // const otp = await this.otpService.issueOtp(
+    //   normalizedEmail,
+    //   OtpPurpose.EMAIL_VERIFY,
+    // );
 
     const { shops, ...publicUser } = user;
     const shop = shops[0];
@@ -195,12 +200,13 @@ export class AuthService {
     return {
       ...publicUser,
       shop,
-      requiresEmailVerification: true,
-      otp,
+      requiresEmailVerification: false,
+      // otp,
     };
   }
 
-  async verifyEmail(dto: VerifyEmailDto) {
+  // OTP flow disabled — kept for easy restore.
+  /* async verifyEmail(dto: VerifyEmailDto) {
     const { email } = await this.otpService.verifyOtp(
       dto.email,
       OtpPurpose.EMAIL_VERIFY,
@@ -348,6 +354,7 @@ export class AuthService {
 
     return this.issueAuthResponse(user);
   }
+  */
 
   async loginWithGoogle(googleLoginDto: GoogleLoginDto) {
     const audiences = this.getGoogleAudiences();
@@ -599,9 +606,10 @@ export class AuthService {
       data,
     });
 
-    if (data.emailVerified === false && nextEmail) {
-      await this.otpService.issueOtp(nextEmail, OtpPurpose.EMAIL_VERIFY);
-    }
+    // OTP disabled — do not send verification codes on email change.
+    // if (data.emailVerified === false && nextEmail) {
+    //   await this.otpService.issueOtp(nextEmail, OtpPurpose.EMAIL_VERIFY);
+    // }
 
     return this.getProfile(userId);
   }

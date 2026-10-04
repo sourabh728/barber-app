@@ -47,6 +47,22 @@ export async function fetchShops(params: ShopListParams = {}) {
   return response.data;
 }
 
+export type CreateShopPayload = {
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+  phone?: string;
+  email?: string;
+  description?: string;
+};
+
+export async function createMyShop(payload: CreateShopPayload) {
+  const response = await api.post<PublicShop>("/shops", payload);
+  return response.data;
+}
+
 function messageFromResponseData(data: unknown, fallback: string) {
   const message = (data as { message?: unknown } | undefined)?.message;
 
@@ -65,7 +81,7 @@ function messageFromResponseData(data: unknown, fallback: string) {
   return fallback;
 }
 
-export function getShopsErrorMessage(error: unknown) {
+export function getShopsErrorMessage(error: unknown, fallback?: string) {
   if (!isAxiosError(error)) {
     return "Something went wrong. Please try again.";
   }
@@ -76,7 +92,7 @@ export function getShopsErrorMessage(error: unknown) {
 
   return messageFromResponseData(
     error.response.data,
-    "Could not load shops. Please try again.",
+    fallback ?? "Could not load shops. Please try again.",
   );
 }
 

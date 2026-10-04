@@ -124,49 +124,50 @@ export async function registerBarber(payload: RegisterBarberPayload) {
   return response.data;
 }
 
-export async function verifyEmailOtp(email: string, otp: string) {
-  const response = await api.post<OtpActionResponse>("/auth/verify-email", {
-    email,
-    otp,
-  });
-  return response.data;
-}
-
-export async function resendEmailVerification(email: string) {
-  const response = await api.post<OtpActionResponse>(
-    "/auth/resend-verification",
-    { email },
-  );
-  return response.data;
-}
-
-export async function forgotPassword(email: string) {
-  const response = await api.post<OtpActionResponse>("/auth/forgot-password", {
-    email,
-  });
-  return response.data;
-}
-
-export async function resetPassword(payload: {
-  email: string;
-  otp: string;
-  newPassword: string;
-}) {
-  const response = await api.post<OtpActionResponse>(
-    "/auth/reset-password",
-    payload,
-  );
-  return response.data;
-}
-
-export async function loginWithEmail(email: string, password: string) {
-  const response = await api.post<LoginResponse>("/auth/login", {
-    email,
-    password,
-  });
-
-  return response.data;
-}
+// OTP / email-password auth disabled — Google-only.
+// export async function verifyEmailOtp(email: string, otp: string) {
+//   const response = await api.post<OtpActionResponse>("/auth/verify-email", {
+//     email,
+//     otp,
+//   });
+//   return response.data;
+// }
+//
+// export async function resendEmailVerification(email: string) {
+//   const response = await api.post<OtpActionResponse>(
+//     "/auth/resend-verification",
+//     { email },
+//   );
+//   return response.data;
+// }
+//
+// export async function forgotPassword(email: string) {
+//   const response = await api.post<OtpActionResponse>("/auth/forgot-password", {
+//     email,
+//   });
+//   return response.data;
+// }
+//
+// export async function resetPassword(payload: {
+//   email: string;
+//   otp: string;
+//   newPassword: string;
+// }) {
+//   const response = await api.post<OtpActionResponse>(
+//     "/auth/reset-password",
+//     payload,
+//   );
+//   return response.data;
+// }
+//
+// export async function loginWithEmail(email: string, password: string) {
+//   const response = await api.post<LoginResponse>("/auth/login", {
+//     email,
+//     password,
+//   });
+//
+//   return response.data;
+// }
 
 export async function loginWithGoogleIdToken(
   idToken: string,
