@@ -124,50 +124,45 @@ export async function registerBarber(payload: RegisterBarberPayload) {
   return response.data;
 }
 
-// OTP / email-password auth disabled — Google-only.
-// export async function verifyEmailOtp(email: string, otp: string) {
-//   const response = await api.post<OtpActionResponse>("/auth/verify-email", {
-//     email,
-//     otp,
-//   });
-//   return response.data;
-// }
-//
-// export async function resendEmailVerification(email: string) {
-//   const response = await api.post<OtpActionResponse>(
-//     "/auth/resend-verification",
-//     { email },
-//   );
-//   return response.data;
-// }
-//
-// export async function forgotPassword(email: string) {
-//   const response = await api.post<OtpActionResponse>("/auth/forgot-password", {
-//     email,
-//   });
-//   return response.data;
-// }
-//
-// export async function resetPassword(payload: {
-//   email: string;
-//   otp: string;
-//   newPassword: string;
-// }) {
-//   const response = await api.post<OtpActionResponse>(
-//     "/auth/reset-password",
-//     payload,
-//   );
-//   return response.data;
-// }
-//
-// export async function loginWithEmail(email: string, password: string) {
-//   const response = await api.post<LoginResponse>("/auth/login", {
-//     email,
-//     password,
-//   });
-//
-//   return response.data;
-// }
+export async function loginWithEmail(email: string, password: string) {
+  const response = await api.post<LoginResponse>("/auth/login", {
+    email,
+    password,
+  });
+
+  return response.data;
+}
+
+export type GoogleAccountLookupResponse =
+  | {
+      exists: false;
+      email: string;
+      message: string;
+    }
+  | {
+      exists: true;
+      email: string;
+      role: AuthRole;
+    };
+
+export async function lookupAccountByGoogle(idToken: string) {
+  const response = await api.post<GoogleAccountLookupResponse>(
+    "/auth/forgot-password/google",
+    { idToken },
+  );
+  return response.data;
+}
+
+export async function resetPasswordWithGoogle(
+  idToken: string,
+  newPassword: string,
+) {
+  const response = await api.post<{ message: string; email: string }>(
+    "/auth/reset-password/google",
+    { idToken, newPassword },
+  );
+  return response.data;
+}
 
 export async function loginWithGoogleIdToken(
   idToken: string,

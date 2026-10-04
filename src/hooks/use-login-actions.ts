@@ -7,6 +7,7 @@ import * as WebBrowser from "expo-web-browser";
 import { useSession } from "@/context/session-provider";
 import {
   fetchCurrentUser,
+  loginWithEmail,
   loginWithGoogleIdToken,
   sessionUserFromLogin,
   type GoogleLoginRole,
@@ -14,6 +15,7 @@ import {
 import {
   getGoogleAuthSessionErrorMessage,
   getGoogleLoginErrorMessage,
+  getLoginErrorMessage,
 } from "@/services/auth-errors";
 import {
   canPromptGoogleAuth,
@@ -38,6 +40,10 @@ export function useLoginActions(options: UseLoginActionsOptions = {}) {
   const { signIn } = useSession();
   const intendedRole = options.role ?? "CUSTOMER";
 
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [hidePassword, setHidePassword] = useState(true);
+  const [isEmailLoading, setIsEmailLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const isSubmitting = useRef(false);
@@ -60,7 +66,7 @@ export function useLoginActions(options: UseLoginActionsOptions = {}) {
       : {}),
   });
 
-  const isLoading = isGoogleLoading;
+  const isLoading = isEmailLoading || isGoogleLoading;
 
   useEffect(() => {
     if (Platform.OS !== "android" || expoGo) {
@@ -73,6 +79,53 @@ export function useLoginActions(options: UseLoginActionsOptions = {}) {
       void WebBrowser.coolDownAsync();
     };
   }, [expoGo]);
+
+  async function completeLogin(accessToken: string, user: Parameters<typeof sessionUserFromLogin>[0]) {
+    await signIn(accessToken, sessionUserFromLogin(user));
+
+    if (user.role === "BARBER") {
+      try {
+        const profile = await fetchCurrentUser();
+        if (!profile.shop) {
+          router.replace("/barber/shop-setup");
+          return;
+        }
+      } catch {
+        // Continue to barber home if profile check fails.
+      }
+      router.replace("/profile");
+      return;
+    }
+
+    router.replace("/");
+  }
+
+  async function handleEmailLogin() {
+    if (isSubmitting.current || isLoading) {
+      return;
+    }
+
+    const normalizedEmail = email.trim();
+
+    if (!normalizedEmail || !password) {
+      setErrorMessage("Enter your email address and password.");
+      return;
+    }
+
+    isSubmitting.current = true;
+    setIsEmailLoading(true);
+    setErrorMessage("");
+
+    try {
+      const data = await loginWithEmail(normalizedEmail, password);
+      await completeLogin(data.accessToken, data.user);
+    } catch (error: unknown) {
+      setErrorMessage(getLoginErrorMessage(error));
+    } finally {
+      isSubmitting.current = false;
+      setIsEmailLoading(false);
+    }
+  }
 
   async function handleGoogleLogin() {
     if (isSubmitting.current || isLoading) {
@@ -131,23 +184,7 @@ export function useLoginActions(options: UseLoginActionsOptions = {}) {
       }
 
       const data = await loginWithGoogleIdToken(idToken, intendedRole);
-      await signIn(data.accessToken, sessionUserFromLogin(data.user));
-
-      if (data.user.role === "BARBER") {
-        try {
-          const profile = await fetchCurrentUser();
-          if (!profile.shop) {
-            router.replace("/barber/shop-setup");
-            return;
-          }
-        } catch {
-          // Continue to barber home if profile check fails.
-        }
-        router.replace("/profile");
-        return;
-      }
-
-      router.replace("/");
+      await completeLogin(data.accessToken, data.user);
     } catch (error: unknown) {
       const message = getGoogleLoginErrorMessage(error);
 
@@ -161,11 +198,19 @@ export function useLoginActions(options: UseLoginActionsOptions = {}) {
   }
 
   return {
+    email,
+    setEmail,
+    password,
+    setPassword,
+    hidePassword,
+    setHidePassword,
     isLoading,
+    isEmailLoading,
     isGoogleLoading,
     errorMessage,
     googleRequestReady:
       !googleConfigured || !googlePromptAllowed || Boolean(request),
+    handleEmailLogin,
     handleGoogleLogin,
   };
 }

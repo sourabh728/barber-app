@@ -17,8 +17,12 @@ import { createImageUploadOptions } from '../common/upload';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 // import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import {
+  GoogleIdTokenDto,
+  ResetPasswordWithGoogleDto,
+} from './dto/google-id-token.dto';
 import { GoogleLoginDto } from './dto/google-login.dto';
-// import { LoginDto } from './dto/login.dto';
+import { LoginDto } from './dto/login.dto';
 import { RegisterBarberDto } from './dto/register-barber.dto';
 import { RegisterDto } from './dto/register.dto';
 // import { ResendOtpDto } from './dto/resend-otp.dto';
@@ -45,7 +49,7 @@ export class AuthController {
     return this.authService.registerBarber(registerBarberDto);
   }
 
-  // OTP / email-password recovery disabled — Google-only auth.
+  // OTP email recovery disabled — Google-verified reset is used instead.
   // @Post('verify-email')
   // verifyEmail(@Body() dto: VerifyEmailDto) {
   //   return this.authService.verifyEmail(dto);
@@ -66,11 +70,20 @@ export class AuthController {
   //   return this.authService.resetPassword(dto);
   // }
 
-  // Email/password login disabled — Google-only auth.
-  // @Post('login')
-  // login(@Body() loginDto: LoginDto) {
-  //   return this.authService.login(loginDto);
-  // }
+  @Post('forgot-password/google')
+  lookupAccountByGoogle(@Body() dto: GoogleIdTokenDto) {
+    return this.authService.lookupAccountByGoogle(dto);
+  }
+
+  @Post('reset-password/google')
+  resetPasswordWithGoogle(@Body() dto: ResetPasswordWithGoogleDto) {
+    return this.authService.resetPasswordWithGoogle(dto);
+  }
+
+  @Post('login')
+  login(@Body() loginDto: LoginDto) {
+    return this.authService.login(loginDto);
+  }
 
   @Post('google')
   loginWithGoogle(@Body() googleLoginDto: GoogleLoginDto) {

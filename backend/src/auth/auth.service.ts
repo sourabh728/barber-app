@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   Logger,
+  NotFoundException,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -21,8 +22,12 @@ import {
 import { OtpService } from '../mail/otp.service';
 import { PrismaService } from '../prisma/prisma.service';
 // import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import {
+  GoogleIdTokenDto,
+  ResetPasswordWithGoogleDto,
+} from './dto/google-id-token.dto';
 import { GoogleLoginDto } from './dto/google-login.dto';
-// import { LoginDto } from './dto/login.dto';
+import { LoginDto } from './dto/login.dto';
 import {
   DEFAULT_SHOP_DESCRIPTION,
   RegisterBarberDto,
@@ -325,6 +330,7 @@ export class AuthService {
       email,
     };
   }
+  */
 
   async login(loginDto: LoginDto) {
     const email = loginDto.email.trim().toLowerCase();
@@ -354,51 +360,63 @@ export class AuthService {
 
     return this.issueAuthResponse(user);
   }
-  */
+
+  async lookupAccountByGoogle(dto: GoogleIdTokenDto) {
+    const { email } = await this.verifyGoogleIdToken(dto.idToken);
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: { email: true, role: true },
+    });
+
+    if (!user) {
+      return {
+        exists: false as const,
+        email,
+        message:
+          'Email not found. Please register as a new customer or barber.',
+      };
+    }
+
+    return {
+      exists: true as const,
+      email: user.email,
+      role: user.role,
+    };
+  }
+
+  async resetPasswordWithGoogle(dto: ResetPasswordWithGoogleDto) {
+    const { email } = await this.verifyGoogleIdToken(dto.idToken);
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true, email: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException(
+        'Email not found. Please register as a new customer or barber.',
+      );
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        emailVerified: true,
+      },
+    });
+
+    return {
+      message: 'Password updated successfully. You can sign in now.',
+      email: user.email,
+    };
+  }
 
   async loginWithGoogle(googleLoginDto: GoogleLoginDto) {
-    const audiences = this.getGoogleAudiences();
-
-    if (audiences.length === 0) {
-      throw new ServiceUnavailableException(
-        'Google Sign-In is not configured on the server.',
-      );
-    }
-
-    let payload:
-      | { email?: string; email_verified?: boolean | string; name?: string }
-      | undefined;
-
-    try {
-      const ticket = await this.googleClient.verifyIdToken({
-        idToken: googleLoginDto.idToken,
-        audience: audiences,
-      });
-      payload = ticket.getPayload();
-    } catch (error) {
-      const details = error instanceof Error ? error.message : '';
-      this.logger.warn(
-        `Google ID token verification failed${details ? `: ${details}` : ''}`,
-      );
-
-      if (/audience|recipient/i.test(details)) {
-        throw new UnauthorizedException(
-          'Google token was issued for a different client ID.',
-        );
-      }
-
-      throw new UnauthorizedException(
-        'Google could not verify this sign-in. Please try again.',
-      );
-    }
-
-    const email = payload?.email?.trim().toLowerCase();
-    const emailVerified =
-      payload?.email_verified === true || payload?.email_verified === 'true';
-
-    if (!email || !emailVerified) {
-      throw new UnauthorizedException('Google account email is not verified.');
-    }
+    const { email, name: googleName } = await this.verifyGoogleIdToken(
+      googleLoginDto.idToken,
+    );
 
     const requestedRole =
       googleLoginDto.role === UserRole.BARBER
@@ -430,7 +448,7 @@ export class AuthService {
       randomBytes(32).toString('hex'),
       10,
     );
-    const name = payload?.name?.trim() || email.split('@')[0];
+    const name = googleName || email.split('@')[0];
 
     const user = await this.prisma.user.create({
       data: {
@@ -444,6 +462,56 @@ export class AuthService {
     });
 
     return this.issueAuthResponse(user);
+  }
+
+  private async verifyGoogleIdToken(idToken: string) {
+    const audiences = this.getGoogleAudiences();
+
+    if (audiences.length === 0) {
+      throw new ServiceUnavailableException(
+        'Google Sign-In is not configured on the server.',
+      );
+    }
+
+    let payload:
+      | { email?: string; email_verified?: boolean | string; name?: string }
+      | undefined;
+
+    try {
+      const ticket = await this.googleClient.verifyIdToken({
+        idToken,
+        audience: audiences,
+      });
+      payload = ticket.getPayload();
+    } catch (error) {
+      const details = error instanceof Error ? error.message : '';
+      this.logger.warn(
+        `Google ID token verification failed${details ? `: ${details}` : ''}`,
+      );
+
+      if (/audience|recipient/i.test(details)) {
+        throw new UnauthorizedException(
+          'Google token was issued for a different client ID.',
+        );
+      }
+
+      throw new UnauthorizedException(
+        'Google could not verify this sign-in. Please try again.',
+      );
+    }
+
+    const email = payload?.email?.trim().toLowerCase();
+    const emailVerified =
+      payload?.email_verified === true || payload?.email_verified === 'true';
+
+    if (!email || !emailVerified) {
+      throw new UnauthorizedException('Google account email is not verified.');
+    }
+
+    return {
+      email,
+      name: payload?.name?.trim() || undefined,
+    };
   }
 
   private getGoogleAudiences(): string[] {
