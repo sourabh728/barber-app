@@ -32,8 +32,6 @@ function appointmentStatusLabel(status: AppointmentStatus): string {
       return 'cancelled';
     case AppointmentStatus.REJECTED:
       return 'rejected';
-    default:
-      return status.toLowerCase();
   }
 }
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
