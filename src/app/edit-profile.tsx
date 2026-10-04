@@ -162,7 +162,10 @@ export default function EditProfileScreen() {
     return () => {
       cancelled = true;
     };
-  }, [updateUser]);
+    // Load once on mount. updateUser is stable; including it would be fine,
+    // but we intentionally avoid refetch loops if session identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only fetch
+  }, []);
 
   const handlePickProfilePhoto = async () => {
     setErrorMessage("");

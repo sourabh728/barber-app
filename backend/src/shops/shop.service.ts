@@ -11,11 +11,31 @@ import {
   UserRole,
 } from '../../generated/prisma/enums';
 
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   publicUploadPath,
   tryDeleteUpload,
 } from '../common/upload';
+
+function appointmentStatusLabel(status: AppointmentStatus): string {
+  switch (status) {
+    case AppointmentStatus.PENDING:
+      return 'pending approval';
+    case AppointmentStatus.CONFIRMED:
+      return 'approved';
+    case AppointmentStatus.IN_PROGRESS:
+      return 'in progress';
+    case AppointmentStatus.COMPLETED:
+      return 'completed';
+    case AppointmentStatus.CANCELLED:
+      return 'cancelled';
+    case AppointmentStatus.REJECTED:
+      return 'rejected';
+    default:
+      return status.toLowerCase();
+  }
+}
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { CreateCustomerAppointmentDto } from './dto/create-customer-appointment.dto';
 import { CreateShopDto } from './dto/create-shop.dto';
@@ -218,7 +238,10 @@ function serializePublicShop(shop: PublicShopRecord) {
 
 @Injectable()
 export class ShopService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   createShop(createShopDto: CreateShopDto, ownerId: string) {
     return this.prisma.shop.create({
@@ -848,7 +871,7 @@ export class ShopService {
     const [shop, customer] = await Promise.all([
       this.prisma.shop.findUnique({
         where: { id: shopId },
-        select: { id: true, name: true },
+        select: { id: true, name: true, ownerId: true },
       }),
       this.prisma.user.findUnique({
         where: { id: customerUserId },
@@ -912,6 +935,14 @@ export class ShopService {
       },
     });
 
+    await this.notificationsService.create({
+      userId: shop.ownerId,
+      title: 'New booking request',
+      body: `${customer.name.trim()} booked ${appointment.serviceName} at ${appointment.shop.name} on ${formatDateOnly(appointment.date)} (${appointment.startTime}).`,
+      href: '/barber/appointments',
+      appointmentId: appointment.id,
+    });
+
     return {
       ...serializeAppointment(appointment),
       shopName: appointment.shop.name,
@@ -929,6 +960,7 @@ export class ShopService {
       where: { id: appointmentId, shopId: shop.id },
       include: {
         staff: { select: { id: true, name: true } },
+        shop: { select: { id: true, name: true } },
       },
     });
 
@@ -952,6 +984,8 @@ export class ShopService {
     const nextDate =
       dto.date !== undefined ? toDateOnlyUtc(dto.date) : existing.date;
     const nextStatus = dto.status ?? existing.status;
+    const statusChanged =
+      dto.status !== undefined && dto.status !== existing.status;
 
     await this.assertNoStaffSlotClash({
       shopId: shop.id,
@@ -987,6 +1021,17 @@ export class ShopService {
         staff: { select: { id: true, name: true } },
       },
     });
+
+    if (statusChanged && existing.customerId) {
+      const label = appointmentStatusLabel(appointment.status);
+      await this.notificationsService.create({
+        userId: existing.customerId,
+        title: `Booking ${label}`,
+        body: `Your booking at ${existing.shop.name} for ${appointment.serviceName} is now ${label}.`,
+        href: '/history',
+        appointmentId: appointment.id,
+      });
+    }
 
     return serializeAppointment(appointment);
   }

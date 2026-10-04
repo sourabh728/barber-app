@@ -54,6 +54,7 @@ function RootNavigator() {
         <Stack.Screen name="help-support" />
         <Stack.Screen name="payment-methods" />
         <Stack.Screen name="history" />
+        <Stack.Screen name="notifications" />
         <Stack.Screen name="shop/[id]/index" />
         <Stack.Screen name="shop/[id]/reviews" />
       </Stack.Protected>

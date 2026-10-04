@@ -24,6 +24,7 @@ import {
   fetchMyShopStats,
   getShopStatsErrorMessage,
 } from "@/services/shop-stats-api";
+import { fetchUnreadNotificationCount } from "@/services/notifications-api";
 import { profileImageSource } from "@/utils/media";
 
 export default function Profile() {
@@ -42,6 +43,7 @@ export default function Profile() {
   const [completedBookings, setCompletedBookings] = useState(0);
   const [ratingAverage, setRatingAverage] = useState(0);
   const [statsLoading, setStatsLoading] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -78,7 +80,19 @@ export default function Profile() {
         }
       }
 
+      async function loadUnread() {
+        try {
+          const count = await fetchUnreadNotificationCount();
+          if (!cancelled) {
+            setUnreadNotifications(count);
+          }
+        } catch {
+          // Keep last known count.
+        }
+      }
+
       void loadStats();
+      void loadUnread();
 
       return () => {
         cancelled = true;
@@ -221,6 +235,18 @@ export default function Profile() {
             />
 
             <MenuItem
+              icon={<Ionicons name="notifications" size={22} color="#F59E0B" />}
+              title={
+                unreadNotifications > 0
+                  ? `Notifications (${unreadNotifications})`
+                  : "Notifications"
+              }
+              onPress={() => {
+                router.push("/notifications");
+              }}
+            />
+
+            <MenuItem
               icon={<Feather name="help-circle" size={22} color="#475569" />}
               title="Help & Support"
               onPress={() => {
@@ -251,6 +277,18 @@ export default function Profile() {
               title="History"
               onPress={() => {
                 router.push("/history");
+              }}
+            />
+
+            <MenuItem
+              icon={<Ionicons name="notifications" size={22} color="#F59E0B" />}
+              title={
+                unreadNotifications > 0
+                  ? `Notifications (${unreadNotifications})`
+                  : "Notifications"
+              }
+              onPress={() => {
+                router.push("/notifications");
               }}
             />
 

@@ -3,7 +3,6 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   ScrollView,
   StyleSheet,
@@ -18,6 +17,7 @@ import {
   createCustomerBooking,
   getCustomerBookingErrorMessage,
 } from "@/services/customer-bookings-api";
+import { showAppAlert } from "@/utils/app-alert";
 import {
   DEFAULT_SHOP_SERVICES,
   fetchShopById,
@@ -238,7 +238,7 @@ export default function ShopBookAppointmentScreen() {
 
   const goNextFromServices = () => {
     if (selectedServiceIds.length === 0) {
-      Alert.alert("Select services", "Choose at least one service to continue.");
+      showAppAlert("Select services", "Choose at least one service to continue.");
       return;
     }
     setStep(1);
@@ -246,15 +246,15 @@ export default function ShopBookAppointmentScreen() {
 
   const goNextFromBarber = () => {
     if (!selectedStaffId) {
-      Alert.alert("Select barber", "Choose a barber to continue.");
+      showAppAlert("Select barber", "Choose a barber to continue.");
       return;
     }
     if (!selectedDate) {
-      Alert.alert("Select date", "Choose an appointment date to continue.");
+      showAppAlert("Select date", "Choose an appointment date to continue.");
       return;
     }
     if (!selectedStartTime || !endTime) {
-      Alert.alert("Select time", "Choose a time slot to continue.");
+      showAppAlert("Select time", "Choose a time slot to continue.");
       return;
     }
     setStep(2);
@@ -269,7 +269,7 @@ export default function ShopBookAppointmentScreen() {
       !selectedStartTime ||
       !endTime
     ) {
-      Alert.alert("Incomplete booking", "Please complete all steps first.");
+      showAppAlert("Incomplete booking", "Please complete all steps first.");
       return;
     }
 
@@ -284,7 +284,7 @@ export default function ShopBookAppointmentScreen() {
         endTime,
       });
 
-      Alert.alert(
+      showAppAlert(
         "Request sent",
         "Your booking is waiting for approval. The shop will confirm or reject it soon.",
         [
@@ -294,12 +294,13 @@ export default function ShopBookAppointmentScreen() {
           },
           {
             text: "OK",
+            style: "cancel",
             onPress: () => router.back(),
           },
         ],
       );
     } catch (err) {
-      Alert.alert("Booking failed", getCustomerBookingErrorMessage(err));
+      showAppAlert("Booking failed", getCustomerBookingErrorMessage(err));
     } finally {
       setConfirming(false);
     }

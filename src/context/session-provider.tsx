@@ -1,6 +1,7 @@
 import {
   createContext,
   use,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -156,35 +157,48 @@ export function SessionProvider({ children }: PropsWithChildren) {
     };
   }, [session, setSession, setStoredUserJson]);
 
+  const signIn = useCallback(
+    async (accessToken: string, nextUser: SessionUser) => {
+      setApiAccessToken(accessToken);
+      setUser(nextUser);
+      setSession(accessToken);
+      setStoredUserJson(JSON.stringify(nextUser));
+    },
+    [setSession, setStoredUserJson],
+  );
+
+  const signOut = useCallback(async () => {
+    clearApiAccessToken();
+    setUser(null);
+    setSession(null);
+    setStoredUserJson(null);
+  }, [setSession, setStoredUserJson]);
+
+  const updateUser = useCallback(
+    (nextUser: SessionUser) => {
+      setUser(nextUser);
+      setStoredUserJson(JSON.stringify(nextUser));
+    },
+    [setStoredUserJson],
+  );
+
   const value = useMemo(
     () => ({
       session,
       user,
       isLoading: isLoadingStorage || isLoadingUser || isValidating,
-      signIn: async (accessToken: string, nextUser: SessionUser) => {
-        setApiAccessToken(accessToken);
-        setUser(nextUser);
-        setSession(accessToken);
-        setStoredUserJson(JSON.stringify(nextUser));
-      },
-      signOut: async () => {
-        clearApiAccessToken();
-        setUser(null);
-        setSession(null);
-        setStoredUserJson(null);
-      },
-      updateUser: (nextUser: SessionUser) => {
-        setUser(nextUser);
-        setStoredUserJson(JSON.stringify(nextUser));
-      },
+      signIn,
+      signOut,
+      updateUser,
     }),
     [
       isLoadingStorage,
       isLoadingUser,
       isValidating,
       session,
-      setSession,
-      setStoredUserJson,
+      signIn,
+      signOut,
+      updateUser,
       user,
     ],
   );

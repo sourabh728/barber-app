@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { AppointmentStatus } from '../../generated/prisma/enums';
 
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 function formatDateOnly(date: Date): string {
@@ -59,7 +60,10 @@ const CUSTOMER_CANCELLABLE: AppointmentStatus[] = [
 
 @Injectable()
 export class CustomerService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   /**
    * Which appointments belong to the signed-in customer.
@@ -148,7 +152,7 @@ export class CustomerService {
         ...owned,
       },
       include: {
-        shop: { select: { id: true, name: true } },
+        shop: { select: { id: true, name: true, ownerId: true } },
         staff: { select: { id: true, name: true } },
       },
     });
@@ -173,6 +177,14 @@ export class CustomerService {
         shop: { select: { id: true, name: true } },
         staff: { select: { id: true, name: true } },
       },
+    });
+
+    await this.notificationsService.create({
+      userId: existing.shop.ownerId,
+      title: 'Booking cancelled',
+      body: `${appointment.customerName} cancelled their booking for ${appointment.serviceName} on ${formatDateOnly(appointment.date)}.`,
+      href: '/barber/appointments',
+      appointmentId: appointment.id,
     });
 
     return serializeCustomerAppointment(appointment);

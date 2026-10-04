@@ -22,8 +22,26 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  shops     Shop[]
-  appointments Appointment[]
+  shops         Shop[]
+  appointments  Appointment[]
+  notifications Notification[]
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  /// Optional deep-link hint for the app (e.g. /history, /barber/appointments)
+  href      String?
+  /// Related appointment id when applicable
+  appointmentId String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
 }
 
 model EmailOtp {
