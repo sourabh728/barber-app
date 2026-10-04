@@ -25,6 +25,11 @@ import {
   isExpoGoRuntime,
   isGoogleAuthConfigured,
 } from "@/services/google-auth-config";
+import {
+  getNativeGoogleSignInErrorMessage,
+  promptNativeGoogleIdToken,
+  supportsNativeGoogleSignIn,
+} from "@/services/google-native-sign-in";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -54,6 +59,7 @@ export function useLoginActions(options: UseLoginActionsOptions = {}) {
   const googleRedirectUri = getGoogleAuthRedirectUri();
   const googlePromptAllowed = canPromptGoogleAuth();
   const expoGo = isExpoGoRuntime();
+  const useNativeGoogle = supportsNativeGoogleSignIn() && !expoGo;
 
   const [request, , promptAsync] = Google.useIdTokenAuthRequest({
     clientId: webClientId || iosClientId || androidClientId,
@@ -61,15 +67,17 @@ export function useLoginActions(options: UseLoginActionsOptions = {}) {
     iosClientId: iosClientId || undefined,
     androidClientId: androidClientId || undefined,
     selectAccount: true,
-    ...(googlePromptAllowed && Platform.OS !== "web"
-      ? { redirectUri: googleRedirectUri }
-      : {}),
+    ...(googlePromptAllowed && Platform.OS === "web"
+      ? {}
+      : !useNativeGoogle && googlePromptAllowed
+        ? { redirectUri: googleRedirectUri }
+        : {}),
   });
 
   const isLoading = isEmailLoading || isGoogleLoading;
 
   useEffect(() => {
-    if (Platform.OS !== "android" || expoGo) {
+    if (useNativeGoogle || Platform.OS !== "android" || expoGo) {
       return;
     }
 
@@ -78,9 +86,12 @@ export function useLoginActions(options: UseLoginActionsOptions = {}) {
     return () => {
       void WebBrowser.coolDownAsync();
     };
-  }, [expoGo]);
+  }, [expoGo, useNativeGoogle]);
 
-  async function completeLogin(accessToken: string, user: Parameters<typeof sessionUserFromLogin>[0]) {
+  async function completeLogin(
+    accessToken: string,
+    user: Parameters<typeof sessionUserFromLogin>[0],
+  ) {
     await signIn(accessToken, sessionUserFromLogin(user));
 
     if (user.role === "BARBER") {
@@ -144,49 +155,57 @@ export function useLoginActions(options: UseLoginActionsOptions = {}) {
       return;
     }
 
-    if (!request) {
-      setErrorMessage(
-        "Google Sign-In is still starting. Try again in a moment.",
-      );
-      return;
-    }
-
     isSubmitting.current = true;
     setIsGoogleLoading(true);
 
     try {
-      const result = await promptAsync();
+      let idToken: string | null = null;
 
-      if (!result || result.type === "cancel" || result.type === "dismiss") {
-        return;
-      }
+      if (useNativeGoogle) {
+        idToken = await promptNativeGoogleIdToken();
+        if (!idToken) {
+          return;
+        }
+      } else {
+        if (!request) {
+          setErrorMessage(
+            "Google Sign-In is still starting. Try again in a moment.",
+          );
+          return;
+        }
 
-      const redirectUri = request.redirectUri || googleRedirectUri;
+        const result = await promptAsync();
 
-      if (result.type !== "success") {
-        setErrorMessage(
-          getGoogleAuthSessionErrorMessage(result, redirectUri) ??
-            "Google sign-in failed. Please try again.",
-        );
-        return;
-      }
+        if (!result || result.type === "cancel" || result.type === "dismiss") {
+          return;
+        }
 
-      const idToken =
-        result.params.id_token ?? result.authentication?.idToken;
+        const redirectUri = request.redirectUri || googleRedirectUri;
 
-      if (!idToken) {
-        setErrorMessage(
-          Platform.OS === "web"
-            ? `Google sign-in did not return an ID token. Confirm this redirect URI is on the Web client in Google Cloud Console: ${redirectUri}`
-            : `Google sign-in did not return an ID token. Confirm the ${Platform.OS === "ios" ? "iOS" : "Android"} OAuth client uses package/bundle ${redirectUri.split(":")[0] || "com.barberapp1.app"} and that client ID is in the backend GOOGLE_CLIENT_IDS list.`,
-        );
-        return;
+        if (result.type !== "success") {
+          setErrorMessage(
+            getGoogleAuthSessionErrorMessage(result, redirectUri) ??
+              "Google sign-in failed. Please try again.",
+          );
+          return;
+        }
+
+        idToken =
+          result.params.id_token ?? result.authentication?.idToken ?? null;
+
+        if (!idToken) {
+          setErrorMessage(
+            `Google sign-in did not return an ID token. Confirm this redirect URI is on the Web client in Google Cloud Console: ${redirectUri}`,
+          );
+          return;
+        }
       }
 
       const data = await loginWithGoogleIdToken(idToken, intendedRole);
       await completeLogin(data.accessToken, data.user);
     } catch (error: unknown) {
-      const message = getGoogleLoginErrorMessage(error);
+      const nativeMessage = getNativeGoogleSignInErrorMessage(error);
+      const message = nativeMessage ?? getGoogleLoginErrorMessage(error);
 
       if (message) {
         setErrorMessage(message);
@@ -209,7 +228,10 @@ export function useLoginActions(options: UseLoginActionsOptions = {}) {
     isGoogleLoading,
     errorMessage,
     googleRequestReady:
-      !googleConfigured || !googlePromptAllowed || Boolean(request),
+      !googleConfigured ||
+      !googlePromptAllowed ||
+      useNativeGoogle ||
+      Boolean(request),
     handleEmailLogin,
     handleGoogleLogin,
   };

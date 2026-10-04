@@ -45,6 +45,12 @@ export function canPromptGoogleAuth() {
     return false;
   }
 
+  // Native Google Sign-In on Android needs the Web client ID to return an
+  // ID token, plus an Android OAuth client (package + SHA-1) in Cloud Console.
+  if (Platform.OS === "android") {
+    return Boolean(getGoogleAuthClientIds().webClientId);
+  }
+
   return hasNativeGoogleClientId();
 }
 

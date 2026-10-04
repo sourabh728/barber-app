@@ -15,6 +15,12 @@ import {
   isExpoGoRuntime,
   isGoogleAuthConfigured,
 } from "@/services/google-auth-config";
+import { emailFromIdToken } from "@/services/google-id-token";
+import {
+  getNativeGoogleSignInErrorMessage,
+  promptNativeGoogleIdToken,
+  supportsNativeGoogleSignIn,
+} from "@/services/google-native-sign-in";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -23,47 +29,6 @@ export type GoogleIdentity = {
   email: string;
   name?: string;
 };
-
-function emailFromIdToken(idToken: string): { email?: string; name?: string } {
-  try {
-    const payloadPart = idToken.split(".")[1];
-    if (!payloadPart) {
-      return {};
-    }
-
-    const normalized = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized.padEnd(
-      normalized.length + ((4 - (normalized.length % 4)) % 4),
-      "=",
-    );
-
-    if (typeof globalThis.atob !== "function") {
-      return {};
-    }
-
-    const json = globalThis.atob(padded);
-
-    const payload = JSON.parse(json) as {
-      email?: string;
-      name?: string;
-      email_verified?: boolean | string;
-    };
-
-    const verified =
-      payload.email_verified === true || payload.email_verified === "true";
-
-    if (!payload.email || !verified) {
-      return {};
-    }
-
-    return {
-      email: payload.email.trim().toLowerCase(),
-      name: payload.name?.trim() || undefined,
-    };
-  } catch {
-    return {};
-  }
-}
 
 export function useGoogleIdentity() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -77,6 +42,7 @@ export function useGoogleIdentity() {
   const googleRedirectUri = getGoogleAuthRedirectUri();
   const googlePromptAllowed = canPromptGoogleAuth();
   const expoGo = isExpoGoRuntime();
+  const useNativeGoogle = supportsNativeGoogleSignIn() && !expoGo;
 
   const [request, , promptAsync] = Google.useIdTokenAuthRequest({
     clientId: webClientId || iosClientId || androidClientId,
@@ -84,13 +50,13 @@ export function useGoogleIdentity() {
     iosClientId: iosClientId || undefined,
     androidClientId: androidClientId || undefined,
     selectAccount: true,
-    ...(googlePromptAllowed && Platform.OS !== "web"
+    ...(!useNativeGoogle && googlePromptAllowed && Platform.OS !== "web"
       ? { redirectUri: googleRedirectUri }
       : {}),
   });
 
   useEffect(() => {
-    if (Platform.OS !== "android" || expoGo) {
+    if (useNativeGoogle || Platform.OS !== "android" || expoGo) {
       return;
     }
 
@@ -99,7 +65,7 @@ export function useGoogleIdentity() {
     return () => {
       void WebBrowser.coolDownAsync();
     };
-  }, [expoGo]);
+  }, [expoGo, useNativeGoogle]);
 
   async function continueWithGoogle(): Promise<GoogleIdentity | null> {
     if (isSubmitting.current || isGoogleLoading) {
@@ -120,41 +86,50 @@ export function useGoogleIdentity() {
       return null;
     }
 
-    if (!request) {
-      setErrorMessage(
-        "Google Sign-In is still starting. Try again in a moment.",
-      );
-      return null;
-    }
-
     isSubmitting.current = true;
     setIsGoogleLoading(true);
 
     try {
-      const result = await promptAsync();
+      let idToken: string | null = null;
 
-      if (!result || result.type === "cancel" || result.type === "dismiss") {
-        return null;
-      }
+      if (useNativeGoogle) {
+        idToken = await promptNativeGoogleIdToken();
+        if (!idToken) {
+          return null;
+        }
+      } else {
+        if (!request) {
+          setErrorMessage(
+            "Google Sign-In is still starting. Try again in a moment.",
+          );
+          return null;
+        }
 
-      const redirectUri = request.redirectUri || googleRedirectUri;
+        const result = await promptAsync();
 
-      if (result.type !== "success") {
-        setErrorMessage(
-          getGoogleAuthSessionErrorMessage(result, redirectUri) ??
-            "Google sign-in failed. Please try again.",
-        );
-        return null;
-      }
+        if (!result || result.type === "cancel" || result.type === "dismiss") {
+          return null;
+        }
 
-      const idToken =
-        result.params.id_token ?? result.authentication?.idToken;
+        const redirectUri = request.redirectUri || googleRedirectUri;
 
-      if (!idToken) {
-        setErrorMessage(
-          "Google sign-in did not return an ID token. Please try again.",
-        );
-        return null;
+        if (result.type !== "success") {
+          setErrorMessage(
+            getGoogleAuthSessionErrorMessage(result, redirectUri) ??
+              "Google sign-in failed. Please try again.",
+          );
+          return null;
+        }
+
+        idToken =
+          result.params.id_token ?? result.authentication?.idToken ?? null;
+
+        if (!idToken) {
+          setErrorMessage(
+            "Google sign-in did not return an ID token. Please try again.",
+          );
+          return null;
+        }
       }
 
       const { email, name } = emailFromIdToken(idToken);
@@ -170,7 +145,8 @@ export function useGoogleIdentity() {
       setIdentity(nextIdentity);
       return nextIdentity;
     } catch (error: unknown) {
-      const message = getGoogleLoginErrorMessage(error);
+      const nativeMessage = getNativeGoogleSignInErrorMessage(error);
+      const message = nativeMessage ?? getGoogleLoginErrorMessage(error);
       if (message) {
         setErrorMessage(message);
       }
@@ -188,7 +164,10 @@ export function useGoogleIdentity() {
     errorMessage,
     setErrorMessage,
     googleRequestReady:
-      !googleConfigured || !googlePromptAllowed || Boolean(request),
+      !googleConfigured ||
+      !googlePromptAllowed ||
+      useNativeGoogle ||
+      Boolean(request),
     continueWithGoogle,
   };
 }
