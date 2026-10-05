@@ -42,7 +42,8 @@ export async function fetchMyBookingStats() {
 
 export type CreateCustomerBookingPayload = {
   serviceName: string;
-  staffId: string;
+  /** Omit / null = Any available barber. */
+  staffId?: string | null;
   priceInr: number;
   date: string;
   startTime: string;

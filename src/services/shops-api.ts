@@ -14,6 +14,8 @@ export type PublicShop = {
   photoUrl: string | null;
   openTime: string;
   closeTime: string;
+  /** Completed appointments / services served so far. */
+  servicesServed: number;
 };
 
 export type ShopListParams = {
@@ -140,6 +142,35 @@ export const DEFAULT_SHOP_SERVICES = [
 
 export async function fetchShopById(shopId: string) {
   const response = await api.get<ShopDetail>(`/shops/${shopId}`);
+  return response.data;
+}
+
+export type OccupiedSlotInterval = {
+  startTime: string;
+  endTime: string;
+};
+
+export type ShopAvailabilityResponse = {
+  occupied: OccupiedSlotInterval[];
+  /** How many barbers can take bookings at once for this query. */
+  activeStaffCount: number;
+};
+
+export async function fetchShopAvailability(
+  shopId: string,
+  params: { date: string; staffId?: string | null },
+) {
+  const response = await api.get<ShopAvailabilityResponse>(
+    `/shops/${shopId}/availability`,
+    {
+      params: {
+        date: params.date,
+        ...(params.staffId && params.staffId !== "any"
+          ? { staffId: params.staffId }
+          : {}),
+      },
+    },
+  );
   return response.data;
 }
 

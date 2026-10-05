@@ -26,9 +26,11 @@ export default function AppTabs() {
           <TabTrigger name="home" href="/" asChild>
             <TabButton>Home</TabButton>
           </TabTrigger>
-          <TabTrigger name="explore" href="/explore" asChild>
-            <TabButton>Explore</TabButton>
-          </TabTrigger>
+          {!isBarber ? (
+            <TabTrigger name="explore" href="/explore" asChild>
+              <TabButton>Explore</TabButton>
+            </TabTrigger>
+          ) : null}
           {isBarber ? (
             <TabTrigger name="report" href="/report" asChild>
               <TabButton>Report</TabButton>

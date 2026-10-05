@@ -30,6 +30,7 @@ import { CreateShopStaffDto } from './dto/create-shop-staff.dto';
 import { DailyReportQueryDto } from './dto/daily-report.query.dto';
 import { ListAppointmentsQueryDto } from './dto/list-appointments.query.dto';
 import { ListShopsQueryDto } from './dto/list-shops.query.dto';
+import { ShopAvailabilityQueryDto } from './dto/shop-availability.query.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { UpdateShopDto } from './dto/update-shop.dto';
 import { UpdateShopScheduleDto } from './dto/update-shop-schedule.dto';
@@ -211,6 +212,21 @@ export class ShopController {
       throw new BadRequestException('Photo file is required');
     }
     return this.shopService.updateMyShopPhoto(req.user.userId, file.filename);
+  }
+
+  /** Occupied slots for a barber on a date (customer booking UI). */
+  @Get(':id/availability')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER, UserRole.BARBER, UserRole.ADMIN)
+  getShopAvailability(
+    @Param('id') shopId: string,
+    @Query() query: ShopAvailabilityQueryDto,
+  ) {
+    return this.shopService.getStaffOccupiedSlots(
+      shopId,
+      query.date,
+      query.staffId,
+    );
   }
 
   /** Customer-facing shop detail for booking. After all /me routes. */

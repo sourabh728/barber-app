@@ -17,9 +17,10 @@ export class CreateCustomerAppointmentDto {
   @IsNotEmpty()
   serviceName!: string;
 
+  /** Omit / null = Any available barber at the shop. */
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  staffId!: string;
+  staffId?: string | null;
 
   @Type(() => Number)
   @IsInt()

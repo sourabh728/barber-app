@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -20,8 +20,10 @@ import {
 import { showAppAlert } from "@/utils/app-alert";
 import {
   DEFAULT_SHOP_SERVICES,
+  fetchShopAvailability,
   fetchShopById,
   formatRatingSummary,
+  type OccupiedSlotInterval,
   formatShopAddress,
   getShopsErrorMessage,
   isShopOpenNow,
@@ -34,6 +36,8 @@ const STEPS = ["Services", "Barber", "Review"] as const;
 type StepIndex = 0 | 1 | 2;
 const SLOT_MINUTES = 30;
 const DAYS_AHEAD = 14;
+/** Sentinel for "Any available" barber preference. */
+const ANY_STAFF_ID = "any";
 
 type ShopService = (typeof DEFAULT_SHOP_SERVICES)[number];
 
@@ -139,6 +143,21 @@ function buildTimeSlots(
   return slots;
 }
 
+function slotOverlapsOccupied(
+  slotStart: string,
+  durationMinutes: number,
+  occupied: OccupiedSlotInterval[],
+  activeStaffCount = 1,
+) {
+  const start = toMinutes(slotStart);
+  if (start === null) return false;
+  const slotEnd = fromMinutes(start + durationMinutes);
+  const overlapping = occupied.filter(
+    (other) => slotStart < other.endTime && other.startTime < slotEnd,
+  ).length;
+  return overlapping >= Math.max(1, activeStaffCount);
+}
+
 export default function ShopBookAppointmentScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -157,6 +176,12 @@ export default function ShopBookAppointmentScreen() {
     null,
   );
   const [confirming, setConfirming] = useState(false);
+  const [occupiedSlots, setOccupiedSlots] = useState<OccupiedSlotInterval[]>(
+    [],
+  );
+  const [activeStaffCount, setActiveStaffCount] = useState(1);
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
+  const [availabilityNonce, setAvailabilityNonce] = useState(0);
 
   const loadShop = useCallback(async () => {
     if (!shopId) {
@@ -175,8 +200,45 @@ export default function ShopBookAppointmentScreen() {
       setError(getShopsErrorMessage(err));
     } finally {
       setLoading(false);
+      setAvailabilityNonce((n) => n + 1);
     }
   }, [shopId]);
+
+  useEffect(() => {
+    if (!shopId || !selectedStaffId || !selectedDate) {
+      setOccupiedSlots([]);
+      setActiveStaffCount(1);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingAvailability(true);
+    void fetchShopAvailability(shopId, {
+      staffId: selectedStaffId === ANY_STAFF_ID ? null : selectedStaffId,
+      date: selectedDate,
+    })
+      .then((data) => {
+        if (!cancelled) {
+          setOccupiedSlots(data.occupied);
+          setActiveStaffCount(Math.max(1, data.activeStaffCount ?? 1));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOccupiedSlots([]);
+          setActiveStaffCount(1);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingAvailability(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [availabilityNonce, selectedDate, selectedStaffId, shopId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -204,6 +266,21 @@ export default function ShopBookAppointmentScreen() {
     selectedServices.length * SLOT_MINUTES,
   );
 
+  useEffect(() => {
+    if (
+      !selectedStartTime ||
+      !slotOverlapsOccupied(
+        selectedStartTime,
+        durationMinutes,
+        occupiedSlots,
+        activeStaffCount,
+      )
+    ) {
+      return;
+    }
+    setSelectedStartTime(null);
+  }, [activeStaffCount, durationMinutes, occupiedSlots, selectedStartTime]);
+
   const availableDates = useMemo(
     () => (shop ? buildUpcomingDates(DAYS_AHEAD, shop.holidays) : []),
     [shop],
@@ -214,9 +291,14 @@ export default function ShopBookAppointmentScreen() {
     return buildTimeSlots(shop, selectedDate, durationMinutes);
   }, [durationMinutes, selectedDate, shop]);
 
+  const prefersAnyStaff = selectedStaffId === ANY_STAFF_ID;
+
   const selectedStaff = useMemo(
-    () => shop?.staff.find((member) => member.id === selectedStaffId) ?? null,
-    [selectedStaffId, shop],
+    () =>
+      prefersAnyStaff
+        ? null
+        : (shop?.staff.find((member) => member.id === selectedStaffId) ?? null),
+    [prefersAnyStaff, selectedStaffId, shop],
   );
 
   const endTime = useMemo(() => {
@@ -246,7 +328,10 @@ export default function ShopBookAppointmentScreen() {
 
   const goNextFromBarber = () => {
     if (!selectedStaffId) {
-      showAppAlert("Select barber", "Choose a barber to continue.");
+      showAppAlert(
+        "Select barber",
+        "Choose a barber, or Any available, to continue.",
+      );
       return;
     }
     if (!selectedDate) {
@@ -264,7 +349,7 @@ export default function ShopBookAppointmentScreen() {
     if (
       !shop ||
       selectedServices.length === 0 ||
-      !selectedStaff ||
+      !selectedStaffId ||
       !selectedDate ||
       !selectedStartTime ||
       !endTime
@@ -277,7 +362,7 @@ export default function ShopBookAppointmentScreen() {
     try {
       await createCustomerBooking(shop.id, {
         serviceName: selectedServices.map((service) => service.name).join(" + "),
-        staffId: selectedStaff.id,
+        staffId: prefersAnyStaff ? null : selectedStaffId,
         priceInr: totalAmount,
         date: selectedDate,
         startTime: selectedStartTime,
@@ -356,51 +441,51 @@ export default function ShopBookAppointmentScreen() {
           <View style={styles.backButtonPlaceholder} />
         </View>
 
-        <Image
-          source={shopImageSource(shop?.photoUrl)}
-          style={styles.heroImage}
-        />
+        <View style={styles.shopHeaderCard}>
+          <Image
+            source={shopImageSource(shop?.photoUrl)}
+            style={styles.shopThumb}
+          />
+          <View style={styles.shopHeaderCopy}>
+            <View style={styles.nameRow}>
+              <Text style={styles.shopName} numberOfLines={1}>
+                {shop.name}
+              </Text>
+              <View
+                style={[
+                  styles.statusBadge,
+                  isOpen ? styles.statusOpen : styles.statusClosed,
+                ]}
+              >
+                <Text style={styles.statusText}>
+                  {isOpen ? "Open" : "Closed"}
+                </Text>
+              </View>
+            </View>
 
-        <View style={styles.nameRow}>
-          <Text style={styles.shopName} numberOfLines={2}>
-            {shop.name}
-          </Text>
-          <View
-            style={[
-              styles.statusBadge,
-              isOpen ? styles.statusOpen : styles.statusClosed,
-            ]}
-          >
-            <Text style={styles.statusText}>{isOpen ? "Open" : "Closed"}</Text>
+            <TouchableOpacity
+              style={styles.ratingRow}
+              onPress={() =>
+                router.push({
+                  pathname: "/shop/[id]/reviews",
+                  params: { id: shop.id },
+                })
+              }
+              accessibilityRole="button"
+              accessibilityLabel="Read reviews"
+            >
+              <Ionicons name="star" size={14} color="#F59E0B" />
+              <Text style={styles.ratingText}>{ratingLabel}</Text>
+              <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
+            </TouchableOpacity>
+
+            <Text style={styles.infoText} numberOfLines={2}>
+              {address}
+            </Text>
+            <Text style={styles.phoneText} numberOfLines={1}>
+              {shop.phone?.trim() || "Phone not available"}
+            </Text>
           </View>
-        </View>
-
-        <TouchableOpacity
-          style={styles.ratingRow}
-          onPress={() =>
-            router.push({
-              pathname: "/shop/[id]/reviews",
-              params: { id: shop.id },
-            })
-          }
-          accessibilityRole="button"
-          accessibilityLabel="Read reviews"
-        >
-          <Ionicons name="star" size={16} color="#F59E0B" />
-          <Text style={styles.ratingText}>{ratingLabel}</Text>
-          <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
-        </TouchableOpacity>
-
-        <View style={styles.infoRow}>
-          <Ionicons name="location-outline" size={20} color="#0B5A47" />
-          <Text style={styles.infoText}>{address}</Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Ionicons name="call-outline" size={20} color="#0B5A47" />
-          <Text style={styles.infoText}>
-            {shop.phone?.trim() || "Phone not available"}
-          </Text>
         </View>
 
         <View style={styles.stepper}>
@@ -425,233 +510,325 @@ export default function ShopBookAppointmentScreen() {
                   </Text>
                 </View>
                 <Text
-                  style={[styles.stepLabel, active ? styles.stepLabelActive : null]}
+                  style={[
+                    styles.stepLabel,
+                    active ? styles.stepLabelActive : null,
+                  ]}
                 >
                   {label}
                 </Text>
+                {index < STEPS.length - 1 ? (
+                  <View
+                    style={[
+                      styles.stepConnector,
+                      done ? styles.stepConnectorDone : null,
+                    ]}
+                  />
+                ) : null}
               </View>
             );
           })}
         </View>
 
-        {step === 0 ? (
-          <>
-            <Text style={styles.sectionTitle}>Services</Text>
-            <Text style={styles.sectionHint}>
-              Select one or more services for this visit.
-            </Text>
-            <View style={styles.optionList}>
-              {DEFAULT_SHOP_SERVICES.map((service: ShopService) => {
-                const selected = selectedServiceIds.includes(service.id);
-                return (
-                  <TouchableOpacity
-                    key={service.id}
-                    style={[
-                      styles.optionCard,
-                      selected ? styles.optionSelected : null,
-                    ]}
-                    onPress={() => toggleService(service.id)}
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: selected }}
-                  >
-                    <View style={styles.optionCopy}>
-                      <Text style={styles.optionTitle}>{service.name}</Text>
-                      <Text style={styles.optionMeta}>₹{service.priceInr}</Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.checkbox,
-                        selected ? styles.checkboxSelected : null,
-                      ]}
-                    >
-                      {selected ? (
-                        <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-                      ) : null}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </>
-        ) : null}
-
-        {step === 1 ? (
-          <>
-            <Text style={styles.sectionTitle}>Select barber</Text>
-            {shop.staff.length === 0 ? (
-              <Text style={styles.emptyStaff}>
-                No barbers available right now.
+        <View style={styles.stepPanel}>
+          {step === 0 ? (
+            <>
+              <Text style={styles.sectionTitle}>Services</Text>
+              <Text style={styles.sectionHint}>
+                Select one or more services for this visit.
               </Text>
-            ) : (
-              <View style={styles.barberRow}>
-                {shop.staff.map((member) => {
-                  const selected = selectedStaffId === member.id;
+              <View style={styles.optionList}>
+                {DEFAULT_SHOP_SERVICES.map((service: ShopService) => {
+                  const selected = selectedServiceIds.includes(service.id);
                   return (
                     <TouchableOpacity
-                      key={member.id}
+                      key={service.id}
                       style={[
-                        styles.barberChip,
-                        selected ? styles.barberChipSelected : null,
+                        styles.optionCard,
+                        selected ? styles.optionSelected : null,
                       ]}
-                      onPress={() => setSelectedStaffId(member.id)}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected }}
+                      onPress={() => toggleService(service.id)}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: selected }}
                     >
-                      <View
-                        style={[
-                          styles.barberAvatar,
-                          selected ? styles.barberAvatarSelected : null,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.barberInitial,
-                            selected ? styles.barberInitialSelected : null,
-                          ]}
-                        >
-                          {staffFirstName(member.name).charAt(0).toUpperCase()}
+                      <View style={styles.optionCopy}>
+                        <Text style={styles.optionTitle}>{service.name}</Text>
+                        <Text style={styles.optionMeta}>
+                          ₹{service.priceInr}
                         </Text>
                       </View>
-                      <Text
+                      <View
                         style={[
-                          styles.barberName,
-                          selected ? styles.barberNameSelected : null,
+                          styles.checkbox,
+                          selected ? styles.checkboxSelected : null,
                         ]}
-                        numberOfLines={1}
                       >
-                        {staffFirstName(member.name)}
-                      </Text>
-                      <Text style={styles.barberTitle} numberOfLines={1}>
-                        {member.title}
-                      </Text>
+                        {selected ? (
+                          <Ionicons
+                            name="checkmark"
+                            size={14}
+                            color="#FFFFFF"
+                          />
+                        ) : null}
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
               </View>
-            )}
+            </>
+          ) : null}
 
-            <Text style={styles.sectionTitle}>Appointment date</Text>
-            <Text style={styles.sectionHint}>
-              Choose a day in the next two weeks (shop holidays are skipped).
-            </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.chipRow}
-            >
-              {availableDates.map((dateKey) => {
-                const selected = selectedDate === dateKey;
-                return (
+          {step === 1 ? (
+            <>
+              <Text style={styles.sectionTitle}>Select barber</Text>
+              <Text style={styles.sectionHint}>
+                No preference? Choose Any available.
+              </Text>
+              {shop.staff.length === 0 ? (
+                <Text style={styles.emptyStaff}>
+                  No barbers available right now.
+                </Text>
+              ) : (
+                <View style={styles.barberRow}>
                   <TouchableOpacity
-                    key={dateKey}
-                    style={[styles.dateChip, selected ? styles.chipSelected : null]}
+                    style={[
+                      styles.barberChip,
+                      prefersAnyStaff ? styles.barberChipSelected : null,
+                    ]}
                     onPress={() => {
-                      setSelectedDate(dateKey);
+                      setSelectedStaffId(ANY_STAFF_ID);
                       setSelectedStartTime(null);
                     }}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: prefersAnyStaff }}
                   >
-                    <Text
+                    <View
                       style={[
-                        styles.dateChipText,
-                        selected ? styles.chipTextSelected : null,
+                        styles.barberAvatar,
+                        prefersAnyStaff ? styles.barberAvatarSelected : null,
                       ]}
                     >
-                      {formatDateChip(dateKey)}
+                      <Ionicons
+                        name="people-outline"
+                        size={18}
+                        color={prefersAnyStaff ? "#FFFFFF" : "#0B5A47"}
+                      />
+                    </View>
+                    <Text
+                      style={[
+                        styles.barberName,
+                        prefersAnyStaff ? styles.barberNameSelected : null,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      Any available
+                    </Text>
+                    <Text style={styles.barberTitle} numberOfLines={1}>
+                      No preference
                     </Text>
                   </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+                  {shop.staff.map((member) => {
+                    const selected = selectedStaffId === member.id;
+                    return (
+                      <TouchableOpacity
+                        key={member.id}
+                        style={[
+                          styles.barberChip,
+                          selected ? styles.barberChipSelected : null,
+                        ]}
+                        onPress={() => {
+                          setSelectedStaffId(member.id);
+                          setSelectedStartTime(null);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                      >
+                        <View
+                          style={[
+                            styles.barberAvatar,
+                            selected ? styles.barberAvatarSelected : null,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.barberInitial,
+                              selected ? styles.barberInitialSelected : null,
+                            ]}
+                          >
+                            {staffFirstName(member.name)
+                              .charAt(0)
+                              .toUpperCase()}
+                          </Text>
+                        </View>
+                        <Text
+                          style={[
+                            styles.barberName,
+                            selected ? styles.barberNameSelected : null,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {staffFirstName(member.name)}
+                        </Text>
+                        <Text style={styles.barberTitle} numberOfLines={1}>
+                          {member.title}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
 
-            <Text style={styles.sectionTitle}>Time slot</Text>
-            <Text style={styles.sectionHint}>
-              Based on shop hours. Duration grows with the services you picked.
-            </Text>
-            {!selectedDate ? (
-              <Text style={styles.emptyStaff}>Pick a date to see slots.</Text>
-            ) : timeSlots.length === 0 ? (
-              <Text style={styles.emptyStaff}>
-                No slots left for this date. Try another day.
+              <Text style={styles.sectionTitle}>Appointment date</Text>
+              <Text style={styles.sectionHint}>
+                Next two weeks — shop holidays are skipped.
               </Text>
-            ) : (
-              <View style={styles.slotGrid}>
-                {timeSlots.map((slot) => {
-                  const selected = selectedStartTime === slot;
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chipRow}
+              >
+                {availableDates.map((dateKey) => {
+                  const selected = selectedDate === dateKey;
                   return (
                     <TouchableOpacity
-                      key={slot}
+                      key={dateKey}
                       style={[
-                        styles.slotChip,
+                        styles.dateChip,
                         selected ? styles.chipSelected : null,
                       ]}
-                      onPress={() => setSelectedStartTime(slot)}
+                      onPress={() => {
+                        setSelectedDate(dateKey);
+                        setSelectedStartTime(null);
+                      }}
                     >
                       <Text
                         style={[
-                          styles.slotChipText,
+                          styles.dateChipText,
                           selected ? styles.chipTextSelected : null,
                         ]}
                       >
-                        {formatTime12h(slot)}
+                        {formatDateChip(dateKey)}
                       </Text>
                     </TouchableOpacity>
                   );
                 })}
-              </View>
-            )}
-          </>
-        ) : null}
+              </ScrollView>
 
-        {step === 2 ? (
-          <>
-            <Text style={styles.sectionTitle}>Review</Text>
-            <View style={styles.reviewCard}>
-              <Text style={styles.reviewLabel}>Services</Text>
-              {selectedServices.map((service) => (
-                <View key={service.id} style={styles.reviewLine}>
-                  <Text style={styles.reviewValue}>{service.name}</Text>
-                  <Text style={styles.reviewValue}>₹{service.priceInr}</Text>
-                </View>
-              ))}
-
-              <View style={styles.reviewDivider} />
-
-              <Text style={styles.reviewLabel}>Barber</Text>
-              <Text style={styles.reviewValue}>
-                {selectedStaff
-                  ? staffFirstName(selectedStaff.name)
-                  : "Not selected"}
+              <Text style={styles.sectionTitle}>Time slot</Text>
+              <Text style={styles.sectionHint}>
+                {prefersAnyStaff
+                  ? "Grey slots are full — all barbers are booked then."
+                  : "Grey slots are already booked for this barber."}
               </Text>
-
-              <Text style={[styles.reviewLabel, styles.reviewSpacer]}>Date</Text>
-              <Text style={styles.reviewValue}>
-                {selectedDate ? formatDateLong(selectedDate) : "Not selected"}
-              </Text>
-
-              <Text style={[styles.reviewLabel, styles.reviewSpacer]}>
-                Time slot
-              </Text>
-              <Text style={styles.reviewValue}>
-                {selectedStartTime && endTime
-                  ? `${formatTime12h(selectedStartTime)} – ${formatTime12h(endTime)}`
-                  : "Not selected"}
-              </Text>
-
-              <View style={styles.reviewDivider} />
-
-              <View style={styles.reviewLine}>
-                <Text style={styles.totalLabel}>Total</Text>
-                <Text style={styles.totalValue}>
-                  ₹{totalAmount.toLocaleString("en-IN")}
+              {!selectedStaffId ? (
+                <Text style={styles.emptyStaff}>
+                  Pick a barber to see available times.
                 </Text>
-              </View>
+              ) : !selectedDate ? (
+                <Text style={styles.emptyStaff}>Pick a date to see slots.</Text>
+              ) : loadingAvailability ? (
+                <ActivityIndicator
+                  color="#0B5A47"
+                  style={styles.availabilityLoader}
+                />
+              ) : timeSlots.length === 0 ? (
+                <Text style={styles.emptyStaff}>
+                  No slots left for this date. Try another day.
+                </Text>
+              ) : (
+                <View style={styles.slotGrid}>
+                  {timeSlots.map((slot) => {
+                  const booked = slotOverlapsOccupied(
+                    slot,
+                    durationMinutes,
+                    occupiedSlots,
+                    activeStaffCount,
+                  );
+                    const selected = !booked && selectedStartTime === slot;
+                    return (
+                      <TouchableOpacity
+                        key={slot}
+                        style={[
+                          styles.slotChip,
+                          booked ? styles.slotChipBooked : null,
+                          selected ? styles.chipSelected : null,
+                        ]}
+                        disabled={booked}
+                        onPress={() => setSelectedStartTime(slot)}
+                        accessibilityState={{ disabled: booked, selected }}
+                      >
+                        <Text
+                          style={[
+                            styles.slotChipText,
+                            booked ? styles.slotChipTextBooked : null,
+                            selected ? styles.chipTextSelected : null,
+                          ]}
+                        >
+                          {formatTime12h(slot)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </>
+          ) : null}
 
-              {user?.name ? (
-                <Text style={styles.bookedAs}>Booking as {user.name}</Text>
-              ) : null}
-            </View>
-          </>
-        ) : null}
+          {step === 2 ? (
+            <>
+              <Text style={styles.sectionTitle}>Review</Text>
+              <View style={styles.reviewCard}>
+                <Text style={styles.reviewLabel}>Services</Text>
+                {selectedServices.map((service) => (
+                  <View key={service.id} style={styles.reviewLine}>
+                    <Text style={styles.reviewValue}>{service.name}</Text>
+                    <Text style={styles.reviewValue}>₹{service.priceInr}</Text>
+                  </View>
+                ))}
+
+                <View style={styles.reviewDivider} />
+
+                <Text style={styles.reviewLabel}>Barber</Text>
+                <Text style={styles.reviewValue}>
+                  {prefersAnyStaff
+                    ? "Any available"
+                    : selectedStaff
+                      ? staffFirstName(selectedStaff.name)
+                      : "Not selected"}
+                </Text>
+
+                <Text style={[styles.reviewLabel, styles.reviewSpacer]}>
+                  Date
+                </Text>
+                <Text style={styles.reviewValue}>
+                  {selectedDate ? formatDateLong(selectedDate) : "Not selected"}
+                </Text>
+
+                <Text style={[styles.reviewLabel, styles.reviewSpacer]}>
+                  Time slot
+                </Text>
+                <Text style={styles.reviewValue}>
+                  {selectedStartTime && endTime
+                    ? `${formatTime12h(selectedStartTime)} – ${formatTime12h(endTime)}`
+                    : "Not selected"}
+                </Text>
+
+                <View style={styles.reviewDivider} />
+
+                <View style={styles.reviewLine}>
+                  <Text style={styles.totalLabel}>Total</Text>
+                  <Text style={styles.totalValue}>
+                    ₹{totalAmount.toLocaleString("en-IN")}
+                  </Text>
+                </View>
+
+                {user?.name ? (
+                  <Text style={styles.bookedAs}>Booking as {user.name}</Text>
+                ) : null}
+              </View>
+            </>
+          ) : null}
+        </View>
       </ScrollView>
 
       <View
@@ -729,21 +906,21 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
 
   topBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 14,
-    marginTop: 8,
+    marginBottom: 10,
+    marginTop: 6,
   },
 
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#E2E8F0",
@@ -752,7 +929,7 @@ const styles = StyleSheet.create({
   },
 
   backButtonPlaceholder: {
-    width: 40,
+    width: 36,
   },
 
   topTitle: {
@@ -761,31 +938,46 @@ const styles = StyleSheet.create({
     color: "#0F172A",
   },
 
-  heroImage: {
-    width: "100%",
-    height: 210,
-    borderRadius: 18,
+  shopHeaderCard: {
+    flexDirection: "row",
+    gap: 12,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    padding: 12,
+  },
+
+  shopThumb: {
+    width: 72,
+    height: 72,
+    borderRadius: 12,
     backgroundColor: "#E2E8F0",
+  },
+
+  shopHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
   },
 
   nameRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    marginTop: 16,
+    gap: 8,
   },
 
   shopName: {
     flex: 1,
-    fontSize: 26,
-    fontWeight: "700",
+    fontSize: 17,
+    fontWeight: "800",
     color: "#0F172A",
   },
 
   statusBadge: {
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
 
   statusOpen: {
@@ -797,7 +989,7 @@ const styles = StyleSheet.create({
   },
 
   statusText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "800",
     color: "#FFFFFF",
   },
@@ -805,48 +997,46 @@ const styles = StyleSheet.create({
   ratingRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginTop: 10,
+    gap: 4,
   },
 
   ratingText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "600",
     color: "#334155",
   },
 
-  infoRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    marginTop: 14,
+  infoText: {
+    fontSize: 12,
+    lineHeight: 16,
+    color: "#64748B",
   },
 
-  infoText: {
-    flex: 1,
-    fontSize: 15,
-    lineHeight: 22,
+  phoneText: {
+    fontSize: 12,
     color: "#475569",
+    fontWeight: "600",
   },
 
   stepper: {
-    marginTop: 22,
+    marginTop: 16,
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 8,
+    gap: 4,
   },
 
   stepItem: {
     flex: 1,
     alignItems: "center",
-    gap: 6,
+    gap: 4,
+    position: "relative",
   },
 
   stepDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     borderWidth: 1,
     borderColor: "#CBD5E1",
     backgroundColor: "#FFFFFF",
@@ -860,7 +1050,7 @@ const styles = StyleSheet.create({
   },
 
   stepDotText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "700",
     color: "#64748B",
   },
@@ -870,7 +1060,7 @@ const styles = StyleSheet.create({
   },
 
   stepLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "600",
     color: "#94A3B8",
   },
@@ -879,19 +1069,43 @@ const styles = StyleSheet.create({
     color: "#0B5A47",
   },
 
+  stepConnector: {
+    position: "absolute",
+    top: 12,
+    left: "60%",
+    width: "80%",
+    height: 2,
+    backgroundColor: "#E2E8F0",
+  },
+
+  stepConnectorDone: {
+    backgroundColor: "#0B5A47",
+  },
+
+  stepPanel: {
+    marginTop: 12,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 14,
+    paddingBottom: 16,
+    paddingTop: 4,
+  },
+
   sectionTitle: {
-    marginTop: 26,
-    marginBottom: 6,
-    fontSize: 18,
+    marginTop: 14,
+    marginBottom: 4,
+    fontSize: 16,
     fontWeight: "700",
     color: "#0F172A",
   },
 
   sectionHint: {
-    marginBottom: 12,
-    fontSize: 13,
+    marginBottom: 10,
+    fontSize: 12,
     color: "#64748B",
-    lineHeight: 18,
+    lineHeight: 16,
   },
 
   optionList: {
@@ -902,12 +1116,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
   },
 
   optionSelected: {
@@ -1022,12 +1236,12 @@ const styles = StyleSheet.create({
   },
 
   dateChip: {
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
   },
 
   slotGrid: {
@@ -1037,14 +1251,29 @@ const styles = StyleSheet.create({
   },
 
   slotChip: {
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: 10,
+    paddingVertical: 9,
     minWidth: "30%",
     alignItems: "center",
+  },
+
+  slotChipBooked: {
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F1F5F9",
+    opacity: 0.85,
+  },
+
+  slotChipTextBooked: {
+    color: "#94A3B8",
+    textDecorationLine: "line-through",
+  },
+
+  availabilityLoader: {
+    marginVertical: 12,
   },
 
   chipSelected: {
@@ -1068,11 +1297,11 @@ const styles = StyleSheet.create({
   },
 
   reviewCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    padding: 16,
+    padding: 14,
   },
 
   reviewLabel: {

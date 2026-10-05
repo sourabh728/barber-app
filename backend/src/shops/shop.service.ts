@@ -215,6 +215,7 @@ type PublicShopRecord = {
   photoUrl: string | null;
   openTime: string;
   closeTime: string;
+  servicesServed?: number;
 };
 
 function serializePublicShop(shop: PublicShopRecord) {
@@ -231,6 +232,7 @@ function serializePublicShop(shop: PublicShopRecord) {
     photoUrl: shop.photoUrl,
     openTime: shop.openTime,
     closeTime: shop.closeTime,
+    servicesServed: shop.servicesServed ?? 0,
   };
 }
 
@@ -278,12 +280,10 @@ export class ShopService {
         : {}),
     };
 
-    const [shops, total, cityRows, stateRows] = await Promise.all([
+    const [shops, cityRows, stateRows] = await Promise.all([
       this.prisma.shop.findMany({
         where,
         orderBy: { name: 'asc' },
-        skip: (page - 1) * limit,
-        take: limit,
         select: {
           id: true,
           name: true,
@@ -299,7 +299,6 @@ export class ShopService {
           closeTime: true,
         },
       }),
-      this.prisma.shop.count({ where }),
       this.prisma.shop.findMany({
         distinct: ['city'],
         orderBy: { city: 'asc' },
@@ -312,10 +311,40 @@ export class ShopService {
       }),
     ]);
 
+    const completedCounts =
+      shops.length === 0
+        ? []
+        : await this.prisma.appointment.groupBy({
+            by: ['shopId'],
+            where: {
+              shopId: { in: shops.map((shop) => shop.id) },
+              status: AppointmentStatus.COMPLETED,
+            },
+            _count: { _all: true },
+          });
+
+    const countByShopId = new Map(
+      completedCounts.map((row) => [row.shopId, row._count._all]),
+    );
+
+    const ranked = shops
+      .map((shop) => ({
+        ...shop,
+        servicesServed: countByShopId.get(shop.id) ?? 0,
+      }))
+      .sort((a, b) => {
+        if (b.servicesServed !== a.servicesServed) {
+          return b.servicesServed - a.servicesServed;
+        }
+        return a.name.localeCompare(b.name);
+      });
+
+    const total = ranked.length;
     const totalPages = Math.max(1, Math.ceil(total / limit));
+    const pageItems = ranked.slice((page - 1) * limit, page * limit);
 
     return {
-      items: shops.map(serializePublicShop),
+      items: pageItems.map(serializePublicShop),
       page,
       limit,
       total,
@@ -384,6 +413,110 @@ export class ShopService {
         createdAt: string;
       }>,
     };
+  }
+
+  /** Occupied intervals for booking UI (one barber or whole shop capacity). */
+  async getStaffOccupiedSlots(
+    shopId: string,
+    dateKey: string,
+    staffId?: string,
+  ) {
+    const shop = await this.prisma.shop.findUnique({
+      where: { id: shopId },
+      select: { id: true },
+    });
+
+    if (!shop) {
+      throw new NotFoundException('Shop not found');
+    }
+
+    const day = toDateOnlyUtc(dateKey);
+    const anyStaff =
+      !staffId || staffId === 'any' || staffId.trim().length === 0;
+
+    if (!anyStaff) {
+      await this.assertStaffBelongsToShop(shopId, staffId);
+
+      const occupied = await this.prisma.appointment.findMany({
+        where: {
+          shopId,
+          staffId,
+          date: day,
+          status: {
+            notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.REJECTED],
+          },
+        },
+        select: { startTime: true, endTime: true },
+        orderBy: { startTime: 'asc' },
+      });
+
+      return { occupied, activeStaffCount: 1 };
+    }
+
+    const [activeStaffCount, occupied] = await Promise.all([
+      this.prisma.shopStaff.count({
+        where: { shopId, status: StaffStatus.ACTIVE },
+      }),
+      this.prisma.appointment.findMany({
+        where: {
+          shopId,
+          date: day,
+          status: {
+            notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.REJECTED],
+          },
+        },
+        select: { startTime: true, endTime: true },
+        orderBy: { startTime: 'asc' },
+      }),
+    ]);
+
+    return {
+      occupied,
+      activeStaffCount: Math.max(1, activeStaffCount),
+    };
+  }
+
+  /** Ensures at least one active barber is free for an "Any available" booking. */
+  private async assertShopHasOpenCapacity(params: {
+    shopId: string;
+    date: Date;
+    startTime: string;
+    endTime: string;
+    excludeAppointmentId?: string;
+  }) {
+    const [activeStaffCount, candidates] = await Promise.all([
+      this.prisma.shopStaff.count({
+        where: { shopId: params.shopId, status: StaffStatus.ACTIVE },
+      }),
+      this.prisma.appointment.findMany({
+        where: {
+          shopId: params.shopId,
+          date: params.date,
+          status: {
+            notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.REJECTED],
+          },
+          ...(params.excludeAppointmentId
+            ? { id: { not: params.excludeAppointmentId } }
+            : {}),
+        },
+        select: { startTime: true, endTime: true },
+      }),
+    ]);
+
+    if (activeStaffCount <= 0) {
+      throw new BadRequestException('No barbers are available at this shop');
+    }
+
+    const overlapping = candidates.filter(
+      (other) =>
+        params.startTime < other.endTime && other.startTime < params.endTime,
+    ).length;
+
+    if (overlapping >= activeStaffCount) {
+      throw new ConflictException(
+        'All barbers are booked for this time. Try another slot.',
+      );
+    }
   }
 
   private async findOwnerShop(ownerId: string) {
@@ -885,32 +1018,47 @@ export class ShopService {
       throw new NotFoundException('User not found');
     }
 
-    const staff = await this.prisma.shopStaff.findFirst({
-      where: {
-        id: dto.staffId,
-        shopId: shop.id,
-        status: StaffStatus.ACTIVE,
-      },
-      select: { id: true },
-    });
+    const requestedStaffId = dto.staffId?.trim() || null;
+    let staffId: string | null = null;
 
-    if (!staff) {
-      throw new BadRequestException(
-        'Selected barber is not available for this shop',
-      );
+    if (requestedStaffId) {
+      const staff = await this.prisma.shopStaff.findFirst({
+        where: {
+          id: requestedStaffId,
+          shopId: shop.id,
+          status: StaffStatus.ACTIVE,
+        },
+        select: { id: true },
+      });
+
+      if (!staff) {
+        throw new BadRequestException(
+          'Selected barber is not available for this shop',
+        );
+      }
+      staffId = staff.id;
     }
 
     const status = AppointmentStatus.PENDING;
     const date = toDateOnlyUtc(dto.date);
 
-    await this.assertNoStaffSlotClash({
-      shopId: shop.id,
-      staffId: staff.id,
-      date,
-      startTime: dto.startTime,
-      endTime: dto.endTime,
-      status,
-    });
+    if (staffId) {
+      await this.assertNoStaffSlotClash({
+        shopId: shop.id,
+        staffId,
+        date,
+        startTime: dto.startTime,
+        endTime: dto.endTime,
+        status,
+      });
+    } else {
+      await this.assertShopHasOpenCapacity({
+        shopId: shop.id,
+        date,
+        startTime: dto.startTime,
+        endTime: dto.endTime,
+      });
+    }
 
     const appointment = await this.prisma.appointment.create({
       data: {
@@ -919,7 +1067,7 @@ export class ShopService {
         customerName: customer.name.trim(),
         customerPhone: customer.phone?.trim() || null,
         serviceName: dto.serviceName.trim(),
-        staffId: staff.id,
+        staffId,
         priceInr: dto.priceInr,
         status,
         date,
@@ -984,6 +1132,11 @@ export class ShopService {
     const nextStatus = dto.status ?? existing.status;
     const statusChanged =
       dto.status !== undefined && dto.status !== existing.status;
+    const scheduleChanged =
+      (dto.date !== undefined &&
+        formatDateOnly(existing.date) !== formatDateOnly(nextDate)) ||
+      (dto.startTime !== undefined && dto.startTime !== existing.startTime) ||
+      (dto.endTime !== undefined && dto.endTime !== existing.endTime);
 
     await this.assertNoStaffSlotClash({
       shopId: shop.id,
@@ -1026,6 +1179,14 @@ export class ShopService {
         userId: existing.customerId,
         title: `Booking ${label}`,
         body: `Your booking at ${existing.shop.name} for ${appointment.serviceName} is now ${label}.`,
+        href: '/history',
+        appointmentId: appointment.id,
+      });
+    } else if (scheduleChanged && existing.customerId) {
+      await this.notificationsService.create({
+        userId: existing.customerId,
+        title: 'New time suggested',
+        body: `${existing.shop.name} suggested ${appointment.startTime}–${appointment.endTime} on ${formatDateOnly(appointment.date)} for ${appointment.serviceName}. Open History to review.`,
         href: '/history',
         appointmentId: appointment.id,
       });
