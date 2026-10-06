@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { BookingSuccessDialog } from "@/components/booking-success-dialog";
 import { useSession } from "@/context/session-provider";
 import {
   createCustomerBooking,
@@ -176,6 +177,7 @@ export default function ShopBookAppointmentScreen() {
     null,
   );
   const [confirming, setConfirming] = useState(false);
+  const [successVisible, setSuccessVisible] = useState(false);
   const [occupiedSlots, setOccupiedSlots] = useState<OccupiedSlotInterval[]>(
     [],
   );
@@ -369,26 +371,22 @@ export default function ShopBookAppointmentScreen() {
         endTime,
       });
 
-      showAppAlert(
-        "Request sent",
-        "Your booking is waiting for approval. The shop will confirm or reject it soon.",
-        [
-          {
-            text: "View history",
-            onPress: () => router.replace("/history"),
-          },
-          {
-            text: "OK",
-            style: "cancel",
-            onPress: () => router.back(),
-          },
-        ],
-      );
+      setSuccessVisible(true);
     } catch (err) {
       showAppAlert("Booking failed", getCustomerBookingErrorMessage(err));
     } finally {
       setConfirming(false);
     }
+  };
+
+  const closeSuccessAndGoBack = () => {
+    setSuccessVisible(false);
+    router.back();
+  };
+
+  const closeSuccessAndViewHistory = () => {
+    setSuccessVisible(false);
+    router.replace("/history");
   };
 
   if (loading) {
@@ -886,6 +884,13 @@ export default function ShopBookAppointmentScreen() {
           </View>
         ) : null}
       </View>
+
+      <BookingSuccessDialog
+        visible={successVisible}
+        shopName={shop.name}
+        onViewHistory={closeSuccessAndViewHistory}
+        onOk={closeSuccessAndGoBack}
+      />
     </View>
   );
 }
