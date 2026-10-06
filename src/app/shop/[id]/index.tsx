@@ -30,6 +30,7 @@ import {
   isShopOpenNow,
   staffFirstName,
   type ShopDetail,
+  type ShopServiceOption,
 } from "@/services/shops-api";
 import { shopImageSource } from "@/utils/media";
 
@@ -40,7 +41,7 @@ const DAYS_AHEAD = 14;
 /** Sentinel for "Any available" barber preference. */
 const ANY_STAFF_ID = "any";
 
-type ShopService = (typeof DEFAULT_SHOP_SERVICES)[number];
+type BookableService = ShopServiceOption;
 
 function toDateKey(date: Date) {
   const year = date.getFullYear();
@@ -250,12 +251,25 @@ export default function ShopBookAppointmentScreen() {
 
   const isOpen = useMemo(() => (shop ? isShopOpenNow(shop) : false), [shop]);
 
+  const bookableServices = useMemo<BookableService[]>(() => {
+    if (!shop) return [];
+    if (shop.services?.length) {
+      return shop.services;
+    }
+    return DEFAULT_SHOP_SERVICES.map((service) => ({
+      id: service.id,
+      name: service.name,
+      priceInr: service.priceInr,
+      durationMin: service.durationMin,
+    }));
+  }, [shop]);
+
   const selectedServices = useMemo(
     () =>
-      DEFAULT_SHOP_SERVICES.filter((service) =>
+      bookableServices.filter((service) =>
         selectedServiceIds.includes(service.id),
       ),
-    [selectedServiceIds],
+    [bookableServices, selectedServiceIds],
   );
 
   const totalAmount = useMemo(
@@ -265,7 +279,10 @@ export default function ShopBookAppointmentScreen() {
 
   const durationMinutes = Math.max(
     SLOT_MINUTES,
-    selectedServices.length * SLOT_MINUTES,
+    selectedServices.reduce(
+      (sum, service) => sum + (service.durationMin || SLOT_MINUTES),
+      0,
+    ) || SLOT_MINUTES,
   );
 
   useEffect(() => {
@@ -287,6 +304,13 @@ export default function ShopBookAppointmentScreen() {
     () => (shop ? buildUpcomingDates(DAYS_AHEAD, shop.holidays) : []),
     [shop],
   );
+
+  // Default to today's first bookable date + Any available so slots show immediately.
+  useEffect(() => {
+    if (!shop || availableDates.length === 0) return;
+    setSelectedDate((current) => current ?? availableDates[0] ?? null);
+    setSelectedStaffId((current) => current ?? ANY_STAFF_ID);
+  }, [availableDates, shop]);
 
   const timeSlots = useMemo(() => {
     if (!shop || !selectedDate) return [];
@@ -426,63 +450,35 @@ export default function ShopBookAppointmentScreen() {
         ]}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.topBar}>
+        <View style={styles.headerRow}>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
             accessibilityRole="button"
             accessibilityLabel="Go back"
           >
-            <Ionicons name="arrow-back" size={20} color="#0F172A" />
+            <Ionicons name="arrow-back" size={18} color="#0F172A" />
           </TouchableOpacity>
-          <Text style={styles.topTitle}>Book Appointment</Text>
-          <View style={styles.backButtonPlaceholder} />
-        </View>
 
-        <View style={styles.shopHeaderCard}>
           <Image
-            source={shopImageSource(shop?.photoUrl)}
-            style={styles.shopThumb}
+            source={shopImageSource(shop.photoUrl)}
+            style={styles.headerThumb}
           />
-          <View style={styles.shopHeaderCopy}>
-            <View style={styles.nameRow}>
-              <Text style={styles.shopName} numberOfLines={1}>
-                {shop.name}
-              </Text>
-              <View
-                style={[
-                  styles.statusBadge,
-                  isOpen ? styles.statusOpen : styles.statusClosed,
-                ]}
-              >
-                <Text style={styles.statusText}>
-                  {isOpen ? "Open" : "Closed"}
-                </Text>
-              </View>
-            </View>
 
-            <TouchableOpacity
-              style={styles.ratingRow}
-              onPress={() =>
-                router.push({
-                  pathname: "/shop/[id]/reviews",
-                  params: { id: shop.id },
-                })
-              }
-              accessibilityRole="button"
-              accessibilityLabel="Read reviews"
-            >
-              <Ionicons name="star" size={14} color="#F59E0B" />
-              <Text style={styles.ratingText}>{ratingLabel}</Text>
-              <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
-            </TouchableOpacity>
+          <View style={styles.headerCopy}>
+            <Text style={styles.headerShopName} numberOfLines={1}>
+              {shop.name}
+            </Text>
+            <Text style={styles.headerSubtitle}>Book Appointment</Text>
+          </View>
 
-            <Text style={styles.infoText} numberOfLines={2}>
-              {address}
-            </Text>
-            <Text style={styles.phoneText} numberOfLines={1}>
-              {shop.phone?.trim() || "Phone not available"}
-            </Text>
+          <View
+            style={[
+              styles.statusBadge,
+              isOpen ? styles.statusOpen : styles.statusClosed,
+            ]}
+          >
+            <Text style={styles.statusText}>{isOpen ? "Open" : "Closed"}</Text>
           </View>
         </View>
 
@@ -528,15 +524,21 @@ export default function ShopBookAppointmentScreen() {
           })}
         </View>
 
-        <View style={styles.stepPanel}>
-          {step === 0 ? (
-            <>
-              <Text style={styles.sectionTitle}>Services</Text>
-              <Text style={styles.sectionHint}>
-                Select one or more services for this visit.
+        {step === 0 ? (
+          <View style={styles.panel}>
+            <Text style={styles.sectionTitle}>Services</Text>
+            <Text style={styles.sectionHint}>
+              {shop.services?.length
+                ? "Select one or more services for this visit."
+                : "This shop has not set a custom menu yet — showing defaults."}
+            </Text>
+            {bookableServices.length === 0 ? (
+              <Text style={styles.emptyStaff}>
+                No services available for this shop.
               </Text>
+            ) : (
               <View style={styles.optionList}>
-                {DEFAULT_SHOP_SERVICES.map((service: ShopService) => {
+                {bookableServices.map((service: BookableService) => {
                   const selected = selectedServiceIds.includes(service.id);
                   return (
                     <TouchableOpacity
@@ -553,6 +555,9 @@ export default function ShopBookAppointmentScreen() {
                         <Text style={styles.optionTitle}>{service.name}</Text>
                         <Text style={styles.optionMeta}>
                           ₹{service.priceInr}
+                          {service.durationMin
+                            ? ` · ${service.durationMin} min`
+                            : ""}
                         </Text>
                       </View>
                       <View
@@ -562,69 +567,41 @@ export default function ShopBookAppointmentScreen() {
                         ]}
                       >
                         {selected ? (
-                          <Ionicons
-                            name="checkmark"
-                            size={14}
-                            color="#FFFFFF"
-                          />
+                          <Ionicons name="checkmark" size={14} color="#FFFFFF" />
                         ) : null}
                       </View>
                     </TouchableOpacity>
                   );
                 })}
               </View>
-            </>
-          ) : null}
-
-          {step === 1 ? (
-            <>
-              <Text style={styles.sectionTitle}>Select barber</Text>
-              <Text style={styles.sectionHint}>
-                No preference? Choose Any available.
+            )}
+            <TouchableOpacity
+              style={styles.metaLink}
+              onPress={() =>
+                router.push({
+                  pathname: "/shop/[id]/reviews",
+                  params: { id: shop.id },
+                })
+              }
+            >
+              <Ionicons name="star" size={14} color="#F59E0B" />
+              <Text style={styles.metaLinkText}>{ratingLabel}</Text>
+              <Text style={styles.metaLinkMuted} numberOfLines={1}>
+                {address}
               </Text>
-              {shop.staff.length === 0 ? (
-                <Text style={styles.emptyStaff}>
-                  No barbers available right now.
-                </Text>
-              ) : (
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
+        {step === 1 ? (
+          <>
+            {shop.staff.length === 0 ? (
+              <Text style={styles.emptyStaff}>
+                No barbers available right now.
+              </Text>
+            ) : (
+              <>
                 <View style={styles.barberRow}>
-                  <TouchableOpacity
-                    style={[
-                      styles.barberChip,
-                      prefersAnyStaff ? styles.barberChipSelected : null,
-                    ]}
-                    onPress={() => {
-                      setSelectedStaffId(ANY_STAFF_ID);
-                      setSelectedStartTime(null);
-                    }}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: prefersAnyStaff }}
-                  >
-                    <View
-                      style={[
-                        styles.barberAvatar,
-                        prefersAnyStaff ? styles.barberAvatarSelected : null,
-                      ]}
-                    >
-                      <Ionicons
-                        name="people-outline"
-                        size={18}
-                        color={prefersAnyStaff ? "#FFFFFF" : "#0B5A47"}
-                      />
-                    </View>
-                    <Text
-                      style={[
-                        styles.barberName,
-                        prefersAnyStaff ? styles.barberNameSelected : null,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      Any available
-                    </Text>
-                    <Text style={styles.barberTitle} numberOfLines={1}>
-                      No preference
-                    </Text>
-                  </TouchableOpacity>
                   {shop.staff.map((member) => {
                     const selected = selectedStaffId === member.id;
                     return (
@@ -667,18 +644,39 @@ export default function ShopBookAppointmentScreen() {
                         >
                           {staffFirstName(member.name)}
                         </Text>
-                        <Text style={styles.barberTitle} numberOfLines={1}>
-                          {member.title}
-                        </Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
-              )}
 
+                <TouchableOpacity
+                  style={[
+                    styles.anyStaffButton,
+                    prefersAnyStaff ? styles.anyStaffButtonSelected : null,
+                  ]}
+                  onPress={() => {
+                    setSelectedStaffId(ANY_STAFF_ID);
+                    setSelectedStartTime(null);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: prefersAnyStaff }}
+                >
+                  <Text
+                    style={[
+                      styles.anyStaffText,
+                      prefersAnyStaff ? styles.anyStaffTextSelected : null,
+                    ]}
+                  >
+                    Any available
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            <View style={styles.schedulePanel}>
               <Text style={styles.sectionTitle}>Appointment date</Text>
               <Text style={styles.sectionHint}>
-                Next two weeks — shop holidays are skipped.
+                Next two weeks – shop holidays are skipped.
               </Text>
               <ScrollView
                 horizontal
@@ -692,7 +690,7 @@ export default function ShopBookAppointmentScreen() {
                       key={dateKey}
                       style={[
                         styles.dateChip,
-                        selected ? styles.chipSelected : null,
+                        selected ? styles.selectionGlow : null,
                       ]}
                       onPress={() => {
                         setSelectedDate(dateKey);
@@ -712,19 +710,10 @@ export default function ShopBookAppointmentScreen() {
                 })}
               </ScrollView>
 
-              <Text style={styles.sectionTitle}>Time slot</Text>
-              <Text style={styles.sectionHint}>
-                {prefersAnyStaff
-                  ? "Grey slots are full — all barbers are booked then."
-                  : "Grey slots are already booked for this barber."}
+              <Text style={[styles.sectionTitle, styles.slotTitle]}>
+                Time slot
               </Text>
-              {!selectedStaffId ? (
-                <Text style={styles.emptyStaff}>
-                  Pick a barber to see available times.
-                </Text>
-              ) : !selectedDate ? (
-                <Text style={styles.emptyStaff}>Pick a date to see slots.</Text>
-              ) : loadingAvailability ? (
+              {loadingAvailability ? (
                 <ActivityIndicator
                   color="#0B5A47"
                   style={styles.availabilityLoader}
@@ -736,12 +725,12 @@ export default function ShopBookAppointmentScreen() {
               ) : (
                 <View style={styles.slotGrid}>
                   {timeSlots.map((slot) => {
-                  const booked = slotOverlapsOccupied(
-                    slot,
-                    durationMinutes,
-                    occupiedSlots,
-                    activeStaffCount,
-                  );
+                    const booked = slotOverlapsOccupied(
+                      slot,
+                      durationMinutes,
+                      occupiedSlots,
+                      activeStaffCount,
+                    );
                     const selected = !booked && selectedStartTime === slot;
                     return (
                       <TouchableOpacity
@@ -749,7 +738,7 @@ export default function ShopBookAppointmentScreen() {
                         style={[
                           styles.slotChip,
                           booked ? styles.slotChipBooked : null,
-                          selected ? styles.chipSelected : null,
+                          selected ? styles.selectionGlow : null,
                         ]}
                         disabled={booked}
                         onPress={() => setSelectedStartTime(slot)}
@@ -769,64 +758,62 @@ export default function ShopBookAppointmentScreen() {
                   })}
                 </View>
               )}
-            </>
-          ) : null}
+            </View>
+          </>
+        ) : null}
 
-          {step === 2 ? (
-            <>
-              <Text style={styles.sectionTitle}>Review</Text>
-              <View style={styles.reviewCard}>
-                <Text style={styles.reviewLabel}>Services</Text>
-                {selectedServices.map((service) => (
-                  <View key={service.id} style={styles.reviewLine}>
-                    <Text style={styles.reviewValue}>{service.name}</Text>
-                    <Text style={styles.reviewValue}>₹{service.priceInr}</Text>
-                  </View>
-                ))}
-
-                <View style={styles.reviewDivider} />
-
-                <Text style={styles.reviewLabel}>Barber</Text>
-                <Text style={styles.reviewValue}>
-                  {prefersAnyStaff
-                    ? "Any available"
-                    : selectedStaff
-                      ? staffFirstName(selectedStaff.name)
-                      : "Not selected"}
-                </Text>
-
-                <Text style={[styles.reviewLabel, styles.reviewSpacer]}>
-                  Date
-                </Text>
-                <Text style={styles.reviewValue}>
-                  {selectedDate ? formatDateLong(selectedDate) : "Not selected"}
-                </Text>
-
-                <Text style={[styles.reviewLabel, styles.reviewSpacer]}>
-                  Time slot
-                </Text>
-                <Text style={styles.reviewValue}>
-                  {selectedStartTime && endTime
-                    ? `${formatTime12h(selectedStartTime)} – ${formatTime12h(endTime)}`
-                    : "Not selected"}
-                </Text>
-
-                <View style={styles.reviewDivider} />
-
-                <View style={styles.reviewLine}>
-                  <Text style={styles.totalLabel}>Total</Text>
-                  <Text style={styles.totalValue}>
-                    ₹{totalAmount.toLocaleString("en-IN")}
-                  </Text>
+        {step === 2 ? (
+          <View style={styles.panel}>
+            <Text style={styles.sectionTitle}>Review</Text>
+            <View style={styles.reviewCard}>
+              <Text style={styles.reviewLabel}>Services</Text>
+              {selectedServices.map((service) => (
+                <View key={service.id} style={styles.reviewLine}>
+                  <Text style={styles.reviewValue}>{service.name}</Text>
+                  <Text style={styles.reviewValue}>₹{service.priceInr}</Text>
                 </View>
+              ))}
 
-                {user?.name ? (
-                  <Text style={styles.bookedAs}>Booking as {user.name}</Text>
-                ) : null}
+              <View style={styles.reviewDivider} />
+
+              <Text style={styles.reviewLabel}>Barber</Text>
+              <Text style={styles.reviewValue}>
+                {prefersAnyStaff
+                  ? "Any available"
+                  : selectedStaff
+                    ? staffFirstName(selectedStaff.name)
+                    : "Not selected"}
+              </Text>
+
+              <Text style={[styles.reviewLabel, styles.reviewSpacer]}>Date</Text>
+              <Text style={styles.reviewValue}>
+                {selectedDate ? formatDateLong(selectedDate) : "Not selected"}
+              </Text>
+
+              <Text style={[styles.reviewLabel, styles.reviewSpacer]}>
+                Time slot
+              </Text>
+              <Text style={styles.reviewValue}>
+                {selectedStartTime && endTime
+                  ? `${formatTime12h(selectedStartTime)} – ${formatTime12h(endTime)}`
+                  : "Not selected"}
+              </Text>
+
+              <View style={styles.reviewDivider} />
+
+              <View style={styles.reviewLine}>
+                <Text style={styles.totalLabel}>Total</Text>
+                <Text style={styles.totalValue}>
+                  ₹{totalAmount.toLocaleString("en-IN")}
+                </Text>
               </View>
-            </>
-          ) : null}
-        </View>
+
+              {user?.name ? (
+                <Text style={styles.bookedAs}>Booking as {user.name}</Text>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
       </ScrollView>
 
       <View
@@ -898,259 +885,187 @@ export default function ShopBookAppointmentScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#EAF6F1",
   },
-
   centered: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#EAF6F1",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 24,
     gap: 12,
   },
-
   scrollContent: {
     paddingHorizontal: 16,
+    paddingTop: 8,
   },
-
-  topBar: {
+  headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 10,
-    marginTop: 6,
+    gap: 10,
+    marginBottom: 14,
   },
-
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#D1E7DD",
     alignItems: "center",
     justifyContent: "center",
   },
-
-  backButtonPlaceholder: {
-    width: 36,
+  headerThumb: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: "#D1E7DD",
   },
-
-  topTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#0F172A",
-  },
-
-  shopHeaderCard: {
-    flexDirection: "row",
-    gap: 12,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    padding: 12,
-  },
-
-  shopThumb: {
-    width: 72,
-    height: 72,
-    borderRadius: 12,
-    backgroundColor: "#E2E8F0",
-  },
-
-  shopHeaderCopy: {
+  headerCopy: {
     flex: 1,
     minWidth: 0,
-    gap: 4,
   },
-
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-
-  shopName: {
-    flex: 1,
-    fontSize: 17,
+  headerShopName: {
+    fontSize: 18,
     fontWeight: "800",
     color: "#0F172A",
   },
-
+  headerSubtitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#64748B",
+    marginTop: 1,
+  },
   statusBadge: {
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
-
   statusOpen: {
-    backgroundColor: "#16A34A",
+    backgroundColor: "#0B5A47",
   },
-
   statusClosed: {
     backgroundColor: "#DC2626",
   },
-
   statusText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "800",
     color: "#FFFFFF",
   },
-
-  ratingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-
-  ratingText: {
-    flex: 1,
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#334155",
-  },
-
-  infoText: {
-    fontSize: 12,
-    lineHeight: 16,
-    color: "#64748B",
-  },
-
-  phoneText: {
-    fontSize: 12,
-    color: "#475569",
-    fontWeight: "600",
-  },
-
   stepper: {
-    marginTop: 16,
+    marginBottom: 14,
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 4,
   },
-
   stepItem: {
     flex: 1,
     alignItems: "center",
     gap: 4,
     position: "relative",
   },
-
   stepDot: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#CBD5E1",
+    borderColor: "#B7D7C9",
     backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
   },
-
   stepDotActive: {
     backgroundColor: "#0B5A47",
     borderColor: "#0B5A47",
   },
-
   stepDotText: {
     fontSize: 12,
     fontWeight: "700",
     color: "#64748B",
   },
-
   stepDotTextActive: {
     color: "#FFFFFF",
   },
-
   stepLabel: {
     fontSize: 11,
     fontWeight: "600",
     color: "#94A3B8",
   },
-
   stepLabelActive: {
     color: "#0B5A47",
   },
-
   stepConnector: {
     position: "absolute",
-    top: 12,
-    left: "60%",
-    width: "80%",
+    top: 13,
+    left: "58%",
+    width: "84%",
     height: 2,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#C5DDD3",
   },
-
   stepConnectorDone: {
     backgroundColor: "#0B5A47",
   },
-
-  stepPanel: {
-    marginTop: 12,
+  panel: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: "#D7EBE3",
     paddingHorizontal: 14,
     paddingBottom: 16,
-    paddingTop: 4,
+    paddingTop: 6,
   },
-
+  schedulePanel: {
+    marginTop: 12,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#D7EBE3",
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
   sectionTitle: {
-    marginTop: 14,
+    marginTop: 12,
     marginBottom: 4,
-    fontSize: 16,
-    fontWeight: "700",
+    fontSize: 17,
+    fontWeight: "800",
     color: "#0F172A",
   },
-
+  slotTitle: {
+    marginTop: 16,
+  },
   sectionHint: {
     marginBottom: 10,
     fontSize: 12,
     color: "#64748B",
     lineHeight: 16,
   },
-
-  optionList: {
-    gap: 10,
-  },
-
+  optionList: { gap: 10 },
   optionCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F4FAF7",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#D7EBE3",
     paddingHorizontal: 12,
     paddingVertical: 12,
   },
-
   optionSelected: {
     borderColor: "#0B5A47",
-    backgroundColor: "#F0FDF4",
+    backgroundColor: "#E8F7F0",
   },
-
-  optionCopy: {
-    flex: 1,
-    gap: 2,
-  },
-
+  optionCopy: { flex: 1, gap: 2 },
   optionTitle: {
     fontSize: 15,
     fontWeight: "700",
     color: "#0F172A",
   },
-
   optionMeta: {
     fontSize: 13,
     color: "#64748B",
     fontWeight: "600",
   },
-
   checkbox: {
     width: 22,
     height: 22,
@@ -1160,155 +1075,169 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
   checkboxSelected: {
     borderColor: "#0B5A47",
     backgroundColor: "#0B5A47",
   },
-
+  metaLink: {
+    marginTop: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  metaLinkText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#334155",
+  },
+  metaLinkMuted: {
+    flex: 1,
+    fontSize: 11,
+    color: "#94A3B8",
+  },
   emptyStaff: {
     color: "#64748B",
     fontSize: 14,
+    marginBottom: 8,
   },
-
   barberRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
   },
-
   barberChip: {
-    width: "30%",
-    minWidth: 96,
+    width: "47%",
     flexGrow: 1,
+    alignItems: "center",
     backgroundColor: "#FFFFFF",
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    alignItems: "center",
-    gap: 6,
+    borderWidth: 1.5,
+    borderColor: "#C9DED4",
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    gap: 8,
   },
-
   barberChipSelected: {
     borderColor: "#0B5A47",
-    backgroundColor: "#F0FDF4",
+    backgroundColor: "#F0FDF7",
   },
-
   barberAvatar: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#E7F3ED",
     alignItems: "center",
     justifyContent: "center",
   },
-
   barberAvatarSelected: {
     backgroundColor: "#0B5A47",
   },
-
   barberInitial: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#0F172A",
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0B5A47",
   },
-
   barberInitialSelected: {
     color: "#FFFFFF",
   },
-
   barberName: {
     fontSize: 14,
     fontWeight: "700",
     color: "#0F172A",
   },
-
   barberNameSelected: {
     color: "#0B5A47",
   },
-
-  barberTitle: {
-    fontSize: 11,
-    color: "#64748B",
-    textAlign: "center",
+  anyStaffButton: {
+    marginTop: 10,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: "#C9DED4",
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 14,
+    alignItems: "center",
   },
-
+  anyStaffButtonSelected: {
+    borderColor: "#0B5A47",
+    backgroundColor: "#0B5A47",
+  },
+  anyStaffText: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  anyStaffTextSelected: {
+    color: "#FFFFFF",
+  },
   chipRow: {
     gap: 8,
     paddingBottom: 4,
   },
-
   dateChip: {
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    backgroundColor: "#F8FAFC",
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#1F2937",
+    backgroundColor: "#F4FAF7",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
-
   slotGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
   },
-
   slotChip: {
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    backgroundColor: "#F8FAFC",
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    minWidth: "30%",
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#1F2937",
+    backgroundColor: "#F4FAF7",
+    paddingHorizontal: 8,
+    paddingVertical: 11,
+    width: "31.5%",
     alignItems: "center",
   },
-
   slotChipBooked: {
-    borderColor: "#E2E8F0",
-    backgroundColor: "#F1F5F9",
-    opacity: 0.85,
+    borderColor: "#CBD5E1",
+    backgroundColor: "#E2E8F0",
+    opacity: 0.7,
   },
-
   slotChipTextBooked: {
     color: "#94A3B8",
     textDecorationLine: "line-through",
   },
-
   availabilityLoader: {
     marginVertical: 12,
   },
-
-  chipSelected: {
-    borderColor: "#0B5A47",
+  selectionGlow: {
     backgroundColor: "#0B5A47",
+    borderColor: "#2DD4BF",
+    borderWidth: 2,
+    shadowColor: "#2DD4BF",
+    shadowOpacity: 0.75,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 6,
   },
-
   dateChipText: {
     fontWeight: "700",
-    color: "#334155",
-  },
-
-  slotChipText: {
-    fontWeight: "600",
-    color: "#334155",
+    color: "#0F172A",
     fontSize: 13,
   },
-
+  slotChipText: {
+    fontWeight: "700",
+    color: "#0F172A",
+    fontSize: 12,
+  },
   chipTextSelected: {
     color: "#FFFFFF",
   },
-
   reviewCard: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F4FAF7",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#D7EBE3",
     padding: 14,
   },
-
   reviewLabel: {
     fontSize: 12,
     fontWeight: "700",
@@ -1317,86 +1246,72 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     marginBottom: 6,
   },
-
   reviewSpacer: {
     marginTop: 14,
   },
-
   reviewValue: {
     fontSize: 15,
     fontWeight: "600",
     color: "#0F172A",
   },
-
   reviewLine: {
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 12,
     marginBottom: 6,
   },
-
   reviewDivider: {
     height: 1,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#D7EBE3",
     marginVertical: 14,
   },
-
   totalLabel: {
     fontSize: 16,
     fontWeight: "700",
     color: "#0F172A",
   },
-
   totalValue: {
     fontSize: 18,
     fontWeight: "800",
     color: "#0B5A47",
   },
-
   bookedAs: {
     marginTop: 12,
     fontSize: 13,
     color: "#64748B",
   },
-
   footer: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 12,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#EAF6F1",
     borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
+    borderTopColor: "#D7EBE3",
   },
-
   footerRow: {
     flexDirection: "row",
     gap: 10,
   },
-
   primaryButton: {
     backgroundColor: "#0B5A47",
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: "center",
   },
-
   buttonDisabled: {
     opacity: 0.6,
   },
-
   footerPrimary: {
     flex: 1,
   },
-
   primaryButtonText: {
     color: "#FFFFFF",
     fontWeight: "700",
     fontSize: 15,
   },
-
   secondaryButton: {
     flex: 1,
     borderRadius: 12,
@@ -1406,34 +1321,30 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: "center",
   },
-
   secondaryButtonText: {
     color: "#334155",
     fontWeight: "700",
     fontSize: 15,
   },
-
   errorText: {
     textAlign: "center",
     color: "#64748B",
     fontSize: 15,
     lineHeight: 22,
   },
-
   retryButton: {
     backgroundColor: "#0B5A47",
     borderRadius: 10,
     paddingHorizontal: 18,
     paddingVertical: 10,
   },
-
   retryText: {
     color: "#FFFFFF",
     fontWeight: "700",
   },
-
   backLink: {
     color: "#0B5A47",
     fontWeight: "600",
   },
 });
+

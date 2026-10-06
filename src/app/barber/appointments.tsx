@@ -316,12 +316,16 @@ export default function BarberAppointmentsScreen() {
   const patchStatus = async (
     appointment: ShopAppointment,
     status: AppointmentStatus,
+    staffId?: string | null,
   ) => {
     setActionId(appointment.id);
     setErrorMessage("");
 
     try {
-      const updated = await updateMyShopAppointment(appointment.id, { status });
+      const updated = await updateMyShopAppointment(appointment.id, {
+        status,
+        ...(staffId !== undefined ? { staffId } : {}),
+      });
       // If status moved out of current tab, drop it; otherwise replace in place.
       const staysInTab =
         (activeTab === "upcoming" &&
@@ -342,6 +346,36 @@ export default function BarberAppointmentsScreen() {
     } finally {
       setActionId(null);
     }
+  };
+
+  const approveAppointment = async (appointment: ShopAppointment) => {
+    if (appointment.staffId) {
+      void patchStatus(appointment, "CONFIRMED");
+      return;
+    }
+
+    const active = staff.filter((item) => item.status === "ACTIVE");
+    if (active.length === 0) {
+      Alert.alert(
+        "Add staff first",
+        "This booking has no barber assigned. Add staff, then approve.",
+      );
+      return;
+    }
+
+    Alert.alert(
+      "Assign barber",
+      "Customer chose Any available. Who should take this booking?",
+      [
+        ...active.map((member) => ({
+          text: member.name,
+          onPress: () => {
+            void patchStatus(appointment, "CONFIRMED", member.id);
+          },
+        })),
+        { text: "Cancel", style: "cancel" as const },
+      ],
+    );
   };
 
   const confirmCancel = (appointment: ShopAppointment) => {
@@ -411,7 +445,7 @@ export default function BarberAppointmentsScreen() {
             style={[styles.primaryAction, busy && styles.buttonDisabled]}
             disabled={busy}
             onPress={() => {
-              void patchStatus(appointment, "CONFIRMED");
+              void approveAppointment(appointment);
             }}
           >
             {busy ? (

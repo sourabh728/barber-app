@@ -38,6 +38,7 @@ import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { CreateCustomerAppointmentDto } from './dto/create-customer-appointment.dto';
 import { CreateShopDto } from './dto/create-shop.dto';
 import { CreateShopStaffDto } from './dto/create-shop-staff.dto';
+import { CreateShopServiceDto } from './dto/create-shop-service.dto';
 import {
   AppointmentTabValue,
 } from './dto/list-appointments.query.dto';
@@ -45,6 +46,7 @@ import { ListShopsQueryDto } from './dto/list-shops.query.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { UpdateShopDto } from './dto/update-shop.dto';
 import { UpdateShopScheduleDto } from './dto/update-shop-schedule.dto';
+import { UpdateShopServiceDto } from './dto/update-shop-service.dto';
 import { UpdateShopStaffDto } from './dto/update-shop-staff.dto';
 
 function toDateOnlyUtc(isoDate: string): Date {
@@ -88,6 +90,32 @@ function serializeStaff(staff: StaffRecord) {
       : null,
     createdAt: staff.createdAt,
     updatedAt: staff.updatedAt,
+  };
+}
+
+type ServiceRecord = {
+  id: string;
+  shopId: string;
+  name: string;
+  priceInr: number;
+  durationMin: number;
+  active: boolean;
+  sortOrder: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+function serializeService(service: ServiceRecord) {
+  return {
+    id: service.id,
+    shopId: service.shopId,
+    name: service.name,
+    priceInr: service.priceInr,
+    durationMin: service.durationMin,
+    active: service.active,
+    sortOrder: service.sortOrder,
+    createdAt: service.createdAt,
+    updatedAt: service.updatedAt,
   };
 }
 
@@ -387,6 +415,16 @@ export class ShopService {
             status: true,
           },
         },
+        services: {
+          where: { active: true },
+          orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+          select: {
+            id: true,
+            name: true,
+            priceInr: true,
+            durationMin: true,
+          },
+        },
       },
     });
 
@@ -394,7 +432,8 @@ export class ShopService {
       throw new NotFoundException('Shop not found');
     }
 
-    const { holidays, staff, lunchStart, lunchEnd, ...shopFields } = shop;
+    const { holidays, staff, services, lunchStart, lunchEnd, ...shopFields } =
+      shop;
 
     return {
       ...serializePublicShop(shopFields),
@@ -402,6 +441,7 @@ export class ShopService {
       lunchEnd,
       holidays: holidays.map((h) => formatDateOnly(h.date)),
       staff,
+      services,
       // Reviews are not modeled yet — keep zeros until a Review table exists.
       ratingAverage: 0,
       reviewCount: 0,
@@ -721,6 +761,70 @@ export class ShopService {
     return { id: existing.id, deleted: true };
   }
 
+  async listMyServices(ownerId: string) {
+    const shop = await this.findOwnerShop(ownerId);
+    const services = await this.prisma.shopService.findMany({
+      where: { shopId: shop.id },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    });
+    return services.map(serializeService);
+  }
+
+  async createMyService(ownerId: string, dto: CreateShopServiceDto) {
+    const shop = await this.findOwnerShop(ownerId);
+    const service = await this.prisma.shopService.create({
+      data: {
+        shopId: shop.id,
+        name: dto.name.trim(),
+        priceInr: dto.priceInr,
+        durationMin: dto.durationMin ?? 30,
+        active: dto.active ?? true,
+        sortOrder: dto.sortOrder ?? 0,
+      },
+    });
+    return serializeService(service);
+  }
+
+  async updateMyService(
+    ownerId: string,
+    serviceId: string,
+    dto: UpdateShopServiceDto,
+  ) {
+    const shop = await this.findOwnerShop(ownerId);
+    const existing = await this.prisma.shopService.findFirst({
+      where: { id: serviceId, shopId: shop.id },
+    });
+    if (!existing) {
+      throw new NotFoundException('Service not found');
+    }
+
+    const service = await this.prisma.shopService.update({
+      where: { id: existing.id },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+        ...(dto.priceInr !== undefined ? { priceInr: dto.priceInr } : {}),
+        ...(dto.durationMin !== undefined
+          ? { durationMin: dto.durationMin }
+          : {}),
+        ...(dto.active !== undefined ? { active: dto.active } : {}),
+        ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
+      },
+    });
+    return serializeService(service);
+  }
+
+  async deleteMyService(ownerId: string, serviceId: string) {
+    const shop = await this.findOwnerShop(ownerId);
+    const existing = await this.prisma.shopService.findFirst({
+      where: { id: serviceId, shopId: shop.id },
+    });
+    if (!existing) {
+      throw new NotFoundException('Service not found');
+    }
+    await this.prisma.shopService.delete({ where: { id: existing.id } });
+    return { id: existing.id, deleted: true };
+  }
+
   private async assertStaffBelongsToShop(
     shopId: string,
     staffId: string | null | undefined,
@@ -852,6 +956,86 @@ export class ShopService {
     };
   }
 
+  /**
+   * Onboarding checklist for shop owners.
+   * Weights: basics 25, staff 25, services 25, schedule+holidays 25.
+   */
+  async getMySetupProgress(ownerId: string) {
+    const shop = await this.findOwnerShop(ownerId);
+    const [staffCount, serviceCount, holidayCount] = await Promise.all([
+      this.prisma.shopStaff.count({
+        where: { shopId: shop.id, status: StaffStatus.ACTIVE },
+      }),
+      this.prisma.shopService.count({
+        where: { shopId: shop.id, active: true },
+      }),
+      this.prisma.shopHoliday.count({ where: { shopId: shop.id } }),
+    ]);
+
+    const basicsComplete = Boolean(
+      shop.name?.trim() &&
+        shop.address?.trim() &&
+        shop.city?.trim() &&
+        shop.state?.trim() &&
+        shop.pincode?.trim() &&
+        shop.phone?.trim(),
+    );
+
+    const scheduleComplete = Boolean(
+      shop.openTime &&
+        shop.closeTime &&
+        shop.lunchStart &&
+        shop.lunchEnd &&
+        (shop.photoUrl?.trim() || holidayCount > 0),
+    );
+
+    const items = [
+      {
+        key: 'basics',
+        label: 'Shop basic details',
+        hint: 'Name, address, city, state, pincode, phone',
+        complete: basicsComplete,
+        weight: 25,
+        href: '/edit-profile',
+      },
+      {
+        key: 'staff',
+        label: 'Add staff',
+        hint: 'At least one active barber',
+        complete: staffCount > 0,
+        weight: 25,
+        href: '/barber/staff',
+      },
+      {
+        key: 'services',
+        label: 'Add services',
+        hint: 'At least one service with price',
+        complete: serviceCount > 0,
+        weight: 25,
+        href: '/barber/services',
+      },
+      {
+        key: 'schedule',
+        label: 'Schedule & holidays',
+        hint: 'Hours set, plus shop photo or holidays',
+        complete: scheduleComplete,
+        weight: 25,
+        href: '/barber/schedule',
+      },
+    ] as const;
+
+    const percent = items.reduce(
+      (sum, item) => sum + (item.complete ? item.weight : 0),
+      0,
+    );
+
+    return {
+      shopId: shop.id,
+      percent,
+      items,
+    };
+  }
+
   async getMyDailyReport(ownerId: string, date?: string) {
     const shop = await this.findOwnerShop(ownerId);
     const dateKey = date ?? todayUtcDateOnly();
@@ -969,7 +1153,9 @@ export class ShopService {
     const appointment = await this.prisma.appointment.create({
       data: {
         shopId: shop.id,
-        customerName: dto.customerName.trim(),
+        customerName:
+          dto.customerName?.trim() ||
+          (isWalkIn ? 'Walk-in Customer' : 'Customer'),
         customerPhone: dto.customerPhone?.trim() || null,
         serviceName: dto.serviceName.trim(),
         staffId,

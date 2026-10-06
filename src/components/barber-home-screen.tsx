@@ -4,17 +4,20 @@ import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
+  Vibration,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useSession } from "@/context/session-provider";
+import { WalkInBookingDialog } from "@/components/walk-in-booking-dialog";
 import {
   fetchMyShopSchedule,
   getScheduleErrorMessage,
@@ -27,6 +30,14 @@ import {
   type AppointmentStatus,
   type ShopAppointment,
 } from "@/services/shop-appointments-api";
+import {
+  fetchMyShopSetupProgress,
+  type ShopSetupProgress,
+} from "@/services/shop-setup-api";
+import {
+  fetchMyShopStaff,
+  type ShopStaff,
+} from "@/services/shop-staff-api";
 import { showAppAlert } from "@/utils/app-alert";
 
 const SLOT_BLOCK_MINUTES = 45;
@@ -311,6 +322,18 @@ export function BarberHomeScreen() {
     null,
   );
   const [suggestSlots, setSuggestSlots] = useState<string[]>([]);
+  const [walkInSlot, setWalkInSlot] = useState<{
+    startTime: string;
+    endTime: string;
+  } | null>(null);
+  const [setupProgress, setSetupProgress] = useState<ShopSetupProgress | null>(
+    null,
+  );
+  const [acceptTarget, setAcceptTarget] = useState<ShopAppointment | null>(
+    null,
+  );
+  const [assignStaffId, setAssignStaffId] = useState<string | null>(null);
+  const [activeStaff, setActiveStaff] = useState<ShopStaff[]>([]);
 
   const loadDashboard = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -321,12 +344,14 @@ export function BarberHomeScreen() {
     setError(null);
 
     try {
-      const [scheduleData, upcoming] = await Promise.all([
+      const [scheduleData, upcoming, setup] = await Promise.all([
         fetchMyShopSchedule(),
         fetchMyShopAppointments({ date: todayKey, tab: "upcoming" }),
+        fetchMyShopSetupProgress().catch(() => null),
       ]);
       setSchedule(scheduleData);
       setAppointments(upcoming);
+      setSetupProgress(setup);
     } catch (err) {
       setError(
         getScheduleErrorMessage(err) || getAppointmentErrorMessage(err),
@@ -359,17 +384,56 @@ export function BarberHomeScreen() {
   const patchStatus = async (
     appointment: ShopAppointment,
     status: AppointmentStatus,
+    staffId?: string | null,
   ) => {
     setActionId(appointment.id);
     setError(null);
     try {
-      await updateMyShopAppointment(appointment.id, { status });
+      await updateMyShopAppointment(appointment.id, {
+        status,
+        ...(staffId !== undefined ? { staffId } : {}),
+      });
+      setAcceptTarget(null);
+      setAssignStaffId(null);
       await loadDashboard(true);
     } catch (err) {
       showAppAlert("Could not update", getAppointmentErrorMessage(err));
     } finally {
       setActionId(null);
     }
+  };
+
+  const openAccept = async (appointment: ShopAppointment) => {
+    if (appointment.staffId) {
+      void patchStatus(appointment, "CONFIRMED");
+      return;
+    }
+
+    try {
+      const staffList = await fetchMyShopStaff();
+      const active = staffList.filter((item) => item.status === "ACTIVE");
+      setActiveStaff(active);
+      if (active.length === 0) {
+        showAppAlert(
+          "Add staff first",
+          "This booking has no barber assigned. Add active staff, then accept.",
+        );
+        return;
+      }
+      setAssignStaffId(active.length === 1 ? active[0].id : null);
+      setAcceptTarget(appointment);
+    } catch (err) {
+      showAppAlert("Could not load staff", getAppointmentErrorMessage(err));
+    }
+  };
+
+  const confirmAcceptAssign = () => {
+    if (!acceptTarget) return;
+    if (!assignStaffId) {
+      showAppAlert("Select barber", "Choose who will take this booking.");
+      return;
+    }
+    void patchStatus(acceptTarget, "CONFIRMED", assignStaffId);
   };
 
   const confirmDecline = (appointment: ShopAppointment) => {
@@ -476,12 +540,28 @@ export function BarberHomeScreen() {
     }
 
     return (
-      <View key={`${block.startTime}-${index}`} style={[styles.slotBlock, slotStyle]}>
+      <Pressable
+        key={`${block.startTime}-${index}`}
+        style={[styles.slotBlock, slotStyle]}
+        disabled={block.status !== "available"}
+        delayLongPress={2000}
+        onLongPress={() => {
+          if (block.status !== "available") return;
+          if (Platform.OS !== "web") {
+            Vibration.vibrate([0, 30, 40, 30]);
+          }
+          setWalkInSlot({
+            startTime: block.startTime,
+            endTime: block.endTime,
+          });
+        }}
+      >
         <Text style={[styles.slotTime, textStyle]}>{labelTime}</Text>
         <Text style={[styles.slotSubtitle, textStyle]} numberOfLines={2}>
           {subtitle}
+          {block.status === "available" ? " · hold 2s" : ""}
         </Text>
-      </View>
+      </Pressable>
     );
   };
 
@@ -510,6 +590,54 @@ export function BarberHomeScreen() {
         </Text>
         <Text style={styles.pageTitle}>Home</Text>
         <View style={styles.titleRule} />
+
+        {setupProgress && setupProgress.percent < 100 ? (
+          <View style={styles.setupCard}>
+            <View style={styles.setupHeader}>
+              <Text style={styles.setupTitle}>Shop setup</Text>
+              <Text style={styles.setupPercent}>{setupProgress.percent}%</Text>
+            </View>
+            <View style={styles.setupTrack}>
+              <View
+                style={[
+                  styles.setupFill,
+                  { width: `${setupProgress.percent}%` },
+                ]}
+              />
+            </View>
+            <Text style={styles.setupHint}>
+              Complete the red items below to reach 100%.
+            </Text>
+            {setupProgress.items.map((item) => (
+              <TouchableOpacity
+                key={item.key}
+                style={[
+                  styles.setupItem,
+                  item.complete ? styles.setupItemDone : styles.setupItemTodo,
+                ]}
+                onPress={() => router.push(item.href as never)}
+              >
+                <Ionicons
+                  name={item.complete ? "checkmark-circle" : "alert-circle"}
+                  size={18}
+                  color={item.complete ? "#16A34A" : "#DC2626"}
+                />
+                <View style={styles.setupItemCopy}>
+                  <Text
+                    style={[
+                      styles.setupItemLabel,
+                      !item.complete && styles.setupItemLabelTodo,
+                    ]}
+                  >
+                    {item.label} (+{item.weight}%)
+                  </Text>
+                  <Text style={styles.setupItemHint}>{item.hint}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : null}
 
         {error ? (
           <View style={styles.errorBanner}>
@@ -550,7 +678,7 @@ export function BarberHomeScreen() {
                     <TouchableOpacity
                       style={[styles.acceptButton, busy && styles.buttonDisabled]}
                       disabled={busy}
-                      onPress={() => void patchStatus(appointment, "CONFIRMED")}
+                      onPress={() => void openAccept(appointment)}
                     >
                       {busy ? (
                         <ActivityIndicator color="#FFFFFF" size="small" />
@@ -583,6 +711,9 @@ export function BarberHomeScreen() {
           <Text style={styles.slotDate}>{formatTodayHeading(todayKey)}</Text>
           <Text style={styles.slotStatusLabel}>Slot Status</Text>
         </View>
+        <Text style={styles.walkInHint}>
+          Long-press an Available slot (2 seconds) to add a walk-in booking.
+        </Text>
 
         {!schedule ? (
           <Text style={styles.incomingEmpty}>
@@ -669,6 +800,85 @@ export function BarberHomeScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <Modal
+        visible={Boolean(acceptTarget)}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          setAcceptTarget(null);
+          setAssignStaffId(null);
+        }}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => {
+            setAcceptTarget(null);
+            setAssignStaffId(null);
+          }}
+        >
+          <Pressable
+            style={[styles.modalSheet, { paddingBottom: insets.bottom + 16 }]}
+            onPress={(event) => event.stopPropagation()}
+          >
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Assign barber & accept</Text>
+            <Text style={styles.modalHint}>
+              This customer chose Any available. Pick who will take{" "}
+              {acceptTarget
+                ? customerShortName(acceptTarget.customerName)
+                : "this"}{" "}
+              at{" "}
+              {acceptTarget
+                ? formatTime12h(acceptTarget.startTime)
+                : ""}
+              .
+            </Text>
+            <View style={styles.assignChipRow}>
+              {activeStaff.map((member) => {
+                const selected = assignStaffId === member.id;
+                return (
+                  <TouchableOpacity
+                    key={member.id}
+                    style={[
+                      styles.assignChip,
+                      selected ? styles.assignChipSelected : null,
+                    ]}
+                    onPress={() => setAssignStaffId(member.id)}
+                  >
+                    <Text
+                      style={[
+                        styles.assignChipText,
+                        selected ? styles.assignChipTextSelected : null,
+                      ]}
+                    >
+                      {member.name.split(/\s+/)[0]}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <TouchableOpacity
+              style={styles.acceptConfirmButton}
+              onPress={confirmAcceptAssign}
+            >
+              <Text style={styles.acceptConfirmText}>Accept booking</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <WalkInBookingDialog
+        visible={Boolean(walkInSlot)}
+        date={todayKey}
+        startTime={walkInSlot?.startTime ?? "09:00"}
+        endTime={walkInSlot?.endTime ?? "09:45"}
+        onClose={() => setWalkInSlot(null)}
+        onCreated={() => {
+          void loadDashboard(true);
+          showAppAlert("Walk-in booked", "The slot is marked as booked.");
+        }}
+      />
     </View>
   );
 }
@@ -710,6 +920,132 @@ const styles = StyleSheet.create({
     backgroundColor: "#CBD5E1",
     marginTop: 10,
     marginBottom: 18,
+  },
+
+  setupCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    padding: 14,
+    marginBottom: 16,
+  },
+
+  setupHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+
+  setupTitle: {
+    fontWeight: "800",
+    fontSize: 16,
+    color: "#991B1B",
+  },
+
+  setupPercent: {
+    fontWeight: "800",
+    fontSize: 18,
+    color: "#DC2626",
+  },
+
+  setupTrack: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: "#FEE2E2",
+    overflow: "hidden",
+    marginBottom: 8,
+  },
+
+  setupFill: {
+    height: "100%",
+    backgroundColor: "#DC2626",
+  },
+
+  setupHint: {
+    color: "#7F1D1D",
+    fontSize: 12,
+    marginBottom: 10,
+  },
+
+  setupItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 8,
+  },
+
+  setupItemDone: {
+    backgroundColor: "#F0FDF4",
+  },
+
+  setupItemTodo: {
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+  },
+
+  setupItemCopy: { flex: 1 },
+
+  setupItemLabel: {
+    fontWeight: "700",
+    color: "#166534",
+    fontSize: 13,
+  },
+
+  setupItemLabelTodo: {
+    color: "#991B1B",
+  },
+
+  setupItemHint: {
+    color: "#64748B",
+    fontSize: 11,
+    marginTop: 2,
+  },
+
+  assignChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 14,
+  },
+
+  assignChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "#F8FAFC",
+  },
+
+  assignChipSelected: {
+    backgroundColor: "#0B5A47",
+    borderColor: "#0B5A47",
+  },
+
+  assignChipText: {
+    fontWeight: "700",
+    color: "#334155",
+  },
+
+  assignChipTextSelected: {
+    color: "#FFFFFF",
+  },
+
+  acceptConfirmButton: {
+    backgroundColor: "#16A34A",
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+
+  acceptConfirmText: {
+    color: "#FFFFFF",
+    fontWeight: "800",
   },
 
   errorBanner: {
@@ -867,6 +1203,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
     color: "#64748B",
+  },
+
+  walkInHint: {
+    marginTop: -4,
+    marginBottom: 10,
+    color: "#64748B",
+    fontSize: 12,
   },
 
   slotGrid: {

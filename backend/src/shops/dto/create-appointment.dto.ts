@@ -30,9 +30,10 @@ export type AppointmentStatusValue = (typeof APPOINTMENT_STATUSES)[number];
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export class CreateAppointmentDto {
+  /** Optional for walk-ins; defaults to "Walk-in Customer". */
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  customerName!: string;
+  customerName?: string;
 
   @IsOptional()
   @Transform(({ value }) => normalizeOptionalPhone(value))

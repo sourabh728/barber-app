@@ -84,6 +84,7 @@ model Shop {
   owner       User     @relation(fields: [ownerId], references: [id])
   holidays     ShopHoliday[]
   staff        ShopStaff[]
+  services     ShopService[]
   appointments Appointment[]
 
   createdAt   DateTime @default(now())
@@ -101,6 +102,24 @@ model ShopHoliday {
 
   @@unique([shopId, date])
   @@index([shopId])
+}
+
+model ShopService {
+  id          String   @id @default(uuid())
+  shopId      String
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name        String
+  /// Price in INR rupees (whole units)
+  priceInr    Int
+  /// Typical duration in minutes (used for display; walk-in slot still uses pressed slot)
+  durationMin Int      @default(30)
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([shopId, active])
 }
 
 model ShopStaff {

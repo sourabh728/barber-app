@@ -120,24 +120,32 @@ export type ShopReview = {
   createdAt: string;
 };
 
+export type ShopServiceOption = {
+  id: string;
+  name: string;
+  priceInr: number;
+  durationMin: number;
+};
+
 export type ShopDetail = PublicShop & {
   lunchStart: string;
   lunchEnd: string;
   holidays: string[];
   staff: ShopStaffOption[];
+  services: ShopServiceOption[];
   ratingAverage: number;
   reviewCount: number;
   reviews: ShopReview[];
 };
 
-/** Shared menu until shops have their own service catalog. */
+/** Fallback menu only when a shop has not configured services yet. */
 export const DEFAULT_SHOP_SERVICES = [
-  { id: "haircut", name: "Haircut", priceInr: 199 },
-  { id: "beard", name: "Beard Trim", priceInr: 99 },
-  { id: "haircut-beard", name: "Haircut + Beard", priceInr: 249 },
-  { id: "spa", name: "Head Spa", priceInr: 299 },
-  { id: "color", name: "Hair Color", priceInr: 499 },
-  { id: "kids", name: "Kids Haircut", priceInr: 149 },
+  { id: "haircut", name: "Haircut", priceInr: 199, durationMin: 30 },
+  { id: "beard", name: "Beard Trim", priceInr: 99, durationMin: 20 },
+  { id: "haircut-beard", name: "Haircut + Beard", priceInr: 249, durationMin: 45 },
+  { id: "spa", name: "Head Spa", priceInr: 299, durationMin: 30 },
+  { id: "color", name: "Hair Color", priceInr: 499, durationMin: 60 },
+  { id: "kids", name: "Kids Haircut", priceInr: 149, durationMin: 25 },
 ] as const;
 
 export async function fetchShopById(shopId: string) {

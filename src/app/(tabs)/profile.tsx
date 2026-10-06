@@ -227,6 +227,14 @@ export default function Profile() {
             />
 
             <MenuItem
+              icon={<Ionicons name="pricetag-outline" size={22} color="#0F766E" />}
+              title="Shop Services"
+              onPress={() => {
+                router.push("/barber/services");
+              }}
+            />
+
+            <MenuItem
               icon={<Ionicons name="cut" size={22} color="#EA580C" />}
               title="Appointments"
               onPress={() => {

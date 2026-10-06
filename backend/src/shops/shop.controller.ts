@@ -27,6 +27,7 @@ import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { CreateCustomerAppointmentDto } from './dto/create-customer-appointment.dto';
 import { CreateShopDto } from './dto/create-shop.dto';
 import { CreateShopStaffDto } from './dto/create-shop-staff.dto';
+import { CreateShopServiceDto } from './dto/create-shop-service.dto';
 import { DailyReportQueryDto } from './dto/daily-report.query.dto';
 import { ListAppointmentsQueryDto } from './dto/list-appointments.query.dto';
 import { ListShopsQueryDto } from './dto/list-shops.query.dto';
@@ -34,6 +35,7 @@ import { ShopAvailabilityQueryDto } from './dto/shop-availability.query.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { UpdateShopDto } from './dto/update-shop.dto';
 import { UpdateShopScheduleDto } from './dto/update-shop-schedule.dto';
+import { UpdateShopServiceDto } from './dto/update-shop-service.dto';
 import { UpdateShopStaffDto } from './dto/update-shop-staff.dto';
 import { ShopService } from './shop.service';
 
@@ -127,12 +129,65 @@ export class ShopController {
     return this.shopService.deleteMyStaff(req.user.userId, staffId);
   }
 
+  /** Owner's shop services catalog. Declared before :id. */
+  @Get('me/services')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BARBER)
+  listMyServices(@Req() req: AuthenticatedRequest) {
+    return this.shopService.listMyServices(req.user.userId);
+  }
+
+  @Post('me/services')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BARBER)
+  createMyService(
+    @Body() createShopServiceDto: CreateShopServiceDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.shopService.createMyService(
+      req.user.userId,
+      createShopServiceDto,
+    );
+  }
+
+  @Patch('me/services/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BARBER)
+  updateMyService(
+    @Param('id') serviceId: string,
+    @Body() updateShopServiceDto: UpdateShopServiceDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.shopService.updateMyService(
+      req.user.userId,
+      serviceId,
+      updateShopServiceDto,
+    );
+  }
+
+  @Delete('me/services/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BARBER)
+  deleteMyService(
+    @Param('id') serviceId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.shopService.deleteMyService(req.user.userId, serviceId);
+  }
+
   /** Owner's shop profile stats. Declared before :id so "me" is not treated as an id. */
   @Get('me/stats')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.BARBER)
   getMyStats(@Req() req: AuthenticatedRequest) {
     return this.shopService.getMyStats(req.user.userId);
+  }
+
+  @Get('me/setup-progress')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BARBER)
+  getMySetupProgress(@Req() req: AuthenticatedRequest) {
+    return this.shopService.getMySetupProgress(req.user.userId);
   }
 
   /** Owner's shop daily report. Declared before :id so "me" is not treated as an id. */

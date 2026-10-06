@@ -30,7 +30,7 @@ export type ShopAppointment = {
 };
 
 export type UpsertAppointmentPayload = {
-  customerName: string;
+  customerName?: string;
   customerPhone?: string;
   serviceName: string;
   staffId?: string | null;
