@@ -34,7 +34,11 @@ async function bootstrap() {
     }),
   );
 
-  await app.listen(process.env.PORT ?? 3000);
+  // Render (and most PaaS) require binding on 0.0.0.0 so the port scanner /
+  // health check can reach the process. Listening on localhost alone times out.
+  const port = Number(process.env.PORT ?? 3000);
+  await app.listen(port, '0.0.0.0');
+  console.log(`Listening on 0.0.0.0:${port}`);
 }
 
 bootstrap();

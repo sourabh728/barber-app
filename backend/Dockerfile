@@ -22,5 +22,6 @@ COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 COPY --from=build /app/generated ./generated
 RUN mkdir -p uploads && chown -R nest:nest /app
 USER nest
-EXPOSE 3000
+# Render injects PORT (default 10000). EXPOSE is documentation only.
+EXPOSE 10000
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main.js"]

@@ -9,4 +9,10 @@ export class AppController {
   getHello(): string {
     return this.appService.getHello();
   }
+
+  /** Lightweight readiness probe for Render health checks. */
+  @Get('health')
+  health() {
+    return { ok: true };
+  }
 }
