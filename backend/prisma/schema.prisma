@@ -132,6 +132,8 @@ model ShopStaff {
   status          StaffStatus @default(ACTIVE)
   /// Calendar date only (when status is ON_LEAVE)
   leaveReturnDate DateTime?   @db.Date
+  /// Wall-clock return instant (when status is AWAY). Compared to slot date+HH:mm as UTC components.
+  awayUntil       DateTime?
   appointments    Appointment[]
 
   createdAt       DateTime    @default(now())
@@ -187,6 +189,7 @@ enum OtpPurpose {
 
 enum StaffStatus {
   ACTIVE
+  AWAY
   ON_LEAVE
 }
 

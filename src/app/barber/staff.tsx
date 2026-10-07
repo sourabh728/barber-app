@@ -38,7 +38,23 @@ type StaffFormState = {
   phone: string;
   status: StaffStatus;
   leaveReturnDate: string;
+  awayUntilDate: string;
+  awayUntilTime: string;
 };
+
+function todayDateKey() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function defaultAwayTime() {
+  const now = new Date();
+  now.setHours(now.getHours() + 2, 0, 0, 0);
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+}
 
 const emptyForm: StaffFormState = {
   name: "",
@@ -46,9 +62,12 @@ const emptyForm: StaffFormState = {
   phone: "",
   status: "ACTIVE",
   leaveReturnDate: "",
+  awayUntilDate: todayDateKey(),
+  awayUntilTime: defaultAwayTime(),
 };
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 function initialsFromName(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -71,14 +90,52 @@ function formatLeaveBack(dateKey: string) {
   });
 }
 
+function formatAwayBack(awayUntil: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T([01]\d|2[0-3]):([0-5]\d)/.exec(
+    awayUntil,
+  );
+  if (!match) return awayUntil.replace("T", " ");
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const date = new Date(year, month - 1, day, hour, minute);
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 function formFromStaff(staff: ShopStaff): StaffFormState {
+  const awayMatch = staff.awayUntil
+    ? /^(\d{4}-\d{2}-\d{2})T(([01]\d|2[0-3]):[0-5]\d)/.exec(staff.awayUntil)
+    : null;
   return {
     name: staff.name,
     title: staff.title,
     phone: staff.phone,
     status: staff.status,
     leaveReturnDate: staff.leaveReturnDate ?? "",
+    awayUntilDate: awayMatch?.[1] ?? todayDateKey(),
+    awayUntilTime: awayMatch?.[2] ?? defaultAwayTime(),
   };
+}
+
+function staffStatusLabel(member: ShopStaff) {
+  if (member.status === "AWAY" && member.awayUntil) {
+    return `Away (Back ${formatAwayBack(member.awayUntil)})`;
+  }
+  if (member.status === "ON_LEAVE") {
+    return `On Leave (Back ${
+      member.leaveReturnDate
+        ? formatLeaveBack(member.leaveReturnDate)
+        : "TBD"
+    })`;
+  }
+  return "Active Today";
 }
 
 export default function BarberStaffScreen() {
@@ -197,6 +254,21 @@ export default function BarberStaffScreen() {
       }
     }
 
+    const awayUntilDate = form.awayUntilDate.trim();
+    const awayUntilTime = form.awayUntilTime.trim();
+    let awayUntil: string | undefined;
+    if (form.status === "AWAY") {
+      if (!DATE_RE.test(awayUntilDate)) {
+        setFormError("Away return date must be YYYY-MM-DD.");
+        return;
+      }
+      if (!TIME_RE.test(awayUntilTime)) {
+        setFormError("Away return time must be HH:mm (24h).");
+        return;
+      }
+      awayUntil = `${awayUntilDate}T${awayUntilTime}`;
+    }
+
     setIsSaving(true);
     setFormError("");
 
@@ -206,6 +278,7 @@ export default function BarberStaffScreen() {
       phone,
       status: form.status,
       ...(form.status === "ON_LEAVE" ? { leaveReturnDate } : {}),
+      ...(form.status === "AWAY" && awayUntil ? { awayUntil } : {}),
     };
 
     try {
@@ -214,6 +287,7 @@ export default function BarberStaffScreen() {
           ...payload,
           leaveReturnDate:
             form.status === "ON_LEAVE" ? leaveReturnDate : undefined,
+          awayUntil: form.status === "AWAY" ? awayUntil : undefined,
         });
         setStaff((prev) =>
           prev
@@ -339,17 +413,13 @@ export default function BarberStaffScreen() {
                         styles.statusDot,
                         member.status === "ACTIVE"
                           ? styles.statusDotActive
-                          : styles.statusDotLeave,
+                          : member.status === "AWAY"
+                            ? styles.statusDotAway
+                            : styles.statusDotLeave,
                       ]}
                     />
                     <Text style={styles.statusText}>
-                      {member.status === "ACTIVE"
-                        ? "Active Today"
-                        : `On Leave (Back ${
-                            member.leaveReturnDate
-                              ? formatLeaveBack(member.leaveReturnDate)
-                              : "TBD"
-                          })`}
+                      {staffStatusLabel(member)}
                     </Text>
                   </View>
                 </View>
@@ -453,6 +523,31 @@ export default function BarberStaffScreen() {
                 <TouchableOpacity
                   style={[
                     styles.statusChip,
+                    form.status === "AWAY" && styles.statusChipAway,
+                  ]}
+                  onPress={() => {
+                    setForm((prev) => ({
+                      ...prev,
+                      status: "AWAY",
+                      awayUntilDate: prev.awayUntilDate || todayDateKey(),
+                      awayUntilTime: prev.awayUntilTime || defaultAwayTime(),
+                    }));
+                    setFormError("");
+                  }}
+                  disabled={isSaving}
+                >
+                  <Text
+                    style={[
+                      styles.statusChipText,
+                      form.status === "AWAY" && styles.statusChipTextActive,
+                    ]}
+                  >
+                    Away
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.statusChip,
                     form.status === "ON_LEAVE" && styles.statusChipLeave,
                   ]}
                   onPress={() => setField("status", "ON_LEAVE")}
@@ -468,6 +563,31 @@ export default function BarberStaffScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
+
+              {form.status === "AWAY" ? (
+                <>
+                  <Text style={styles.label}>Back on date (YYYY-MM-DD)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={form.awayUntilDate}
+                    onChangeText={(value) => setField("awayUntilDate", value)}
+                    placeholder={todayDateKey()}
+                    placeholderTextColor="#777"
+                    editable={!isSaving}
+                    autoCapitalize="none"
+                  />
+                  <Text style={styles.label}>Back at time (HH:mm, 24h)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={form.awayUntilTime}
+                    onChangeText={(value) => setField("awayUntilTime", value)}
+                    placeholder="15:00"
+                    placeholderTextColor="#777"
+                    editable={!isSaving}
+                    autoCapitalize="none"
+                  />
+                </>
+              ) : null}
 
               {form.status === "ON_LEAVE" ? (
                 <>
@@ -694,6 +814,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#4ADE80",
   },
 
+  statusDotAway: {
+    backgroundColor: "#60A5FA",
+  },
+
   statusDotLeave: {
     backgroundColor: "#FBBF24",
   },
@@ -782,6 +906,11 @@ const styles = StyleSheet.create({
   statusChipActive: {
     borderColor: "#4ADE80",
     backgroundColor: "rgba(74,222,128,0.12)",
+  },
+
+  statusChipAway: {
+    borderColor: "#60A5FA",
+    backgroundColor: "rgba(96,165,250,0.12)",
   },
 
   statusChipLeave: {

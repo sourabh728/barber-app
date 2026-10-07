@@ -94,7 +94,9 @@ export function WalkInBookingDialog({
       .then(([serviceList, staffList]) => {
         if (cancelled) return;
         const activeServices = serviceList.filter((item) => item.active);
-        const activeStaff = staffList.filter((item) => item.status === "ACTIVE");
+        const activeStaff = staffList.filter(
+          (item) => item.status === "ACTIVE" || item.status === "AWAY",
+        );
         setServices(activeServices);
         setStaff(activeStaff);
         if (activeStaff.length === 1) {

@@ -411,7 +411,9 @@ export function BarberHomeScreen() {
 
     try {
       const staffList = await fetchMyShopStaff();
-      const active = staffList.filter((item) => item.status === "ACTIVE");
+      const active = staffList.filter(
+        (item) => item.status === "ACTIVE" || item.status === "AWAY",
+      );
       setActiveStaff(active);
       if (active.length === 0) {
         showAppAlert(

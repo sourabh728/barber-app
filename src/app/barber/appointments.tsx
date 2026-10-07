@@ -213,7 +213,12 @@ export default function BarberAppointmentsScreen() {
       try {
         const list = await fetchMyShopStaff();
         if (!cancelled) {
-          setStaff(list.filter((member) => member.status === "ACTIVE"));
+          setStaff(
+            list.filter(
+              (member) =>
+                member.status === "ACTIVE" || member.status === "AWAY",
+            ),
+          );
         }
       } catch {
         // Staff picker is optional; create can still use Any Available.
@@ -354,7 +359,9 @@ export default function BarberAppointmentsScreen() {
       return;
     }
 
-    const active = staff.filter((item) => item.status === "ACTIVE");
+    const active = staff.filter(
+      (item) => item.status === "ACTIVE" || item.status === "AWAY",
+    );
     if (active.length === 0) {
       Alert.alert(
         "Add staff first",

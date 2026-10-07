@@ -644,6 +644,13 @@ export default function ShopBookAppointmentScreen() {
                         >
                           {staffFirstName(member.name)}
                         </Text>
+                        {member.status === "AWAY" && member.awayUntil ? (
+                          <Text style={styles.barberAwayHint} numberOfLines={1}>
+                            Back{" "}
+                            {member.awayUntil.slice(11, 16) ||
+                              member.awayUntil.replace("T", " ")}
+                          </Text>
+                        ) : null}
                       </TouchableOpacity>
                     );
                   })}
@@ -1147,6 +1154,12 @@ const styles = StyleSheet.create({
   },
   barberNameSelected: {
     color: "#0B5A47",
+  },
+  barberAwayHint: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#64748B",
   },
   anyStaffButton: {
     marginTop: 10,

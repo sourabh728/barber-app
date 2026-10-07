@@ -1,7 +1,7 @@
 import { api } from "./api";
 import { isAxiosError } from "axios";
 
-export type StaffStatus = "ACTIVE" | "ON_LEAVE";
+export type StaffStatus = "ACTIVE" | "AWAY" | "ON_LEAVE";
 
 export type ShopStaff = {
   id: string;
@@ -11,6 +11,8 @@ export type ShopStaff = {
   phone: string;
   status: StaffStatus;
   leaveReturnDate: string | null;
+  /** Wall-clock return time: YYYY-MM-DDTHH:mm */
+  awayUntil: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -21,6 +23,7 @@ export type UpsertShopStaffPayload = {
   phone: string;
   status: StaffStatus;
   leaveReturnDate?: string;
+  awayUntil?: string;
 };
 
 export async function fetchMyShopStaff() {

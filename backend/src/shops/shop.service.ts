@@ -73,9 +73,66 @@ type StaffRecord = {
   phone: string;
   status: StaffStatus;
   leaveReturnDate: Date | null;
+  awayUntil: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
+
+function formatAwayUntil(date: Date): string {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const hour = String(date.getUTCHours()).padStart(2, '0');
+  const minute = String(date.getUTCMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
+function parseAwayUntil(value: string): Date {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T([01]\d|2[0-3]):([0-5]\d)/.exec(
+    value,
+  );
+  if (!match) {
+    throw new BadRequestException(
+      'awayUntil must be YYYY-MM-DDTHH:mm (or ISO datetime)',
+    );
+  }
+  return new Date(
+    Date.UTC(
+      Number(match[1]),
+      Number(match[2]) - 1,
+      Number(match[3]),
+      Number(match[4]),
+      Number(match[5]),
+      0,
+      0,
+    ),
+  );
+}
+
+function formatHhmmUtc(date: Date): string {
+  return `${String(date.getUTCHours()).padStart(2, '0')}:${String(
+    date.getUTCMinutes(),
+  ).padStart(2, '0')}`;
+}
+
+function slotInstantUtc(dateKey: string, hhmm: string): Date {
+  const timeMatch = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(hhmm);
+  if (!timeMatch) {
+    throw new BadRequestException('Invalid time');
+  }
+  const day = toDateOnlyUtc(dateKey);
+  return new Date(
+    Date.UTC(
+      day.getUTCFullYear(),
+      day.getUTCMonth(),
+      day.getUTCDate(),
+      Number(timeMatch[1]),
+      Number(timeMatch[2]),
+      0,
+      0,
+    ),
+  );
+}
 
 function serializeStaff(staff: StaffRecord) {
   return {
@@ -88,6 +145,7 @@ function serializeStaff(staff: StaffRecord) {
     leaveReturnDate: staff.leaveReturnDate
       ? formatDateOnly(staff.leaveReturnDate)
       : null,
+    awayUntil: staff.awayUntil ? formatAwayUntil(staff.awayUntil) : null,
     createdAt: staff.createdAt,
     updatedAt: staff.updatedAt,
   };
@@ -119,20 +177,70 @@ function serializeService(service: ServiceRecord) {
   };
 }
 
-function resolveStaffLeaveDate(
+function resolveStaffPresence(
   status: StaffStatus,
   leaveReturnDate: string | undefined | null,
-): Date | null {
+  awayUntil: string | undefined | null,
+): { leaveReturnDate: Date | null; awayUntil: Date | null } {
   if (status === StaffStatus.ON_LEAVE) {
     if (!leaveReturnDate) {
       throw new BadRequestException(
         'leaveReturnDate is required when status is ON_LEAVE',
       );
     }
-    return toDateOnlyUtc(leaveReturnDate);
+    return {
+      leaveReturnDate: toDateOnlyUtc(leaveReturnDate),
+      awayUntil: null,
+    };
   }
 
-  return null;
+  if (status === StaffStatus.AWAY) {
+    if (!awayUntil) {
+      throw new BadRequestException(
+        'awayUntil is required when status is AWAY',
+      );
+    }
+    const parsed = parseAwayUntil(awayUntil);
+    if (parsed.getTime() <= Date.now()) {
+      throw new BadRequestException('awayUntil must be in the future');
+    }
+    return { leaveReturnDate: null, awayUntil: parsed };
+  }
+
+  return { leaveReturnDate: null, awayUntil: null };
+}
+
+/**
+ * Synthetic busy window for a staff member who is AWAY until `awayUntil`
+ * on the booking calendar day `dateKey` (wall-clock UTC components).
+ */
+function awayOccupiedInterval(
+  awayUntil: Date,
+  dateKey: string,
+  openTime: string,
+  closeTime: string,
+): { startTime: string; endTime: string } | null {
+  const dayStart = toDateOnlyUtc(dateKey);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+
+  if (awayUntil.getTime() <= dayStart.getTime()) {
+    return null;
+  }
+
+  if (awayUntil.getTime() >= dayEnd.getTime()) {
+    return { startTime: openTime, endTime: closeTime };
+  }
+
+  const untilHhmm = formatHhmmUtc(awayUntil);
+  if (untilHhmm <= openTime) {
+    return null;
+  }
+
+  return {
+    startTime: openTime,
+    endTime: untilHhmm < closeTime ? untilHhmm : closeTime,
+  };
 }
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -406,13 +514,16 @@ export class ShopService {
           select: { date: true },
         },
         staff: {
-          where: { status: StaffStatus.ACTIVE },
+          where: {
+            status: { in: [StaffStatus.ACTIVE, StaffStatus.AWAY] },
+          },
           orderBy: { name: 'asc' },
           select: {
             id: true,
             name: true,
             title: true,
             status: true,
+            awayUntil: true,
           },
         },
         services: {
@@ -435,12 +546,22 @@ export class ShopService {
     const { holidays, staff, services, lunchStart, lunchEnd, ...shopFields } =
       shop;
 
+    const bookableStaff = await this.normalizeBookableStaff(staff);
+
     return {
       ...serializePublicShop(shopFields),
       lunchStart,
       lunchEnd,
       holidays: holidays.map((h) => formatDateOnly(h.date)),
-      staff,
+      staff: bookableStaff.map((member) => ({
+        id: member.id,
+        name: member.name,
+        title: member.title,
+        status: member.status,
+        awayUntil: member.awayUntil
+          ? formatAwayUntil(member.awayUntil)
+          : null,
+      })),
       services,
       // Reviews are not modeled yet — keep zeros until a Review table exists.
       ratingAverage: 0,
@@ -455,6 +576,40 @@ export class ShopService {
     };
   }
 
+  /**
+   * Clears expired AWAY rows (back time has passed) so they count as ACTIVE.
+   */
+  private async normalizeBookableStaff<
+    T extends { id: string; status: StaffStatus; awayUntil: Date | null },
+  >(staff: T[]): Promise<T[]> {
+    const now = Date.now();
+    const expiredIds = staff
+      .filter(
+        (member) =>
+          member.status === StaffStatus.AWAY &&
+          (!member.awayUntil || member.awayUntil.getTime() <= now),
+      )
+      .map((member) => member.id);
+
+    if (expiredIds.length > 0) {
+      await this.prisma.shopStaff.updateMany({
+        where: { id: { in: expiredIds } },
+        data: { status: StaffStatus.ACTIVE, awayUntil: null },
+      });
+    }
+
+    return staff.map((member) => {
+      if (expiredIds.includes(member.id)) {
+        return {
+          ...member,
+          status: StaffStatus.ACTIVE,
+          awayUntil: null,
+        };
+      }
+      return member;
+    });
+  }
+
   /** Occupied intervals for booking UI (one barber or whole shop capacity). */
   async getStaffOccupiedSlots(
     shopId: string,
@@ -463,7 +618,7 @@ export class ShopService {
   ) {
     const shop = await this.prisma.shop.findUnique({
       where: { id: shopId },
-      select: { id: true },
+      select: { id: true, openTime: true, closeTime: true },
     });
 
     if (!shop) {
@@ -476,6 +631,23 @@ export class ShopService {
 
     if (!anyStaff) {
       await this.assertStaffBelongsToShop(shopId, staffId);
+
+      const member = await this.prisma.shopStaff.findFirst({
+        where: { id: staffId, shopId },
+        select: {
+          id: true,
+          status: true,
+          awayUntil: true,
+        },
+      });
+
+      if (!member) {
+        throw new BadRequestException(
+          'Assigned staff was not found for this shop',
+        );
+      }
+
+      const [normalized] = await this.normalizeBookableStaff([member]);
 
       const occupied = await this.prisma.appointment.findMany({
         where: {
@@ -490,12 +662,36 @@ export class ShopService {
         orderBy: { startTime: 'asc' },
       });
 
+      if (normalized.status === StaffStatus.ON_LEAVE) {
+        return {
+          occupied: [{ startTime: shop.openTime, endTime: shop.closeTime }],
+          activeStaffCount: 1,
+        };
+      }
+
+      if (normalized.status === StaffStatus.AWAY && normalized.awayUntil) {
+        const awayBlock = awayOccupiedInterval(
+          normalized.awayUntil,
+          dateKey,
+          shop.openTime,
+          shop.closeTime,
+        );
+        if (awayBlock) {
+          occupied.push(awayBlock);
+          occupied.sort((a, b) => a.startTime.localeCompare(b.startTime));
+        }
+      }
+
       return { occupied, activeStaffCount: 1 };
     }
 
-    const [activeStaffCount, occupied] = await Promise.all([
-      this.prisma.shopStaff.count({
-        where: { shopId, status: StaffStatus.ACTIVE },
+    const [staffRows, occupied] = await Promise.all([
+      this.prisma.shopStaff.findMany({
+        where: {
+          shopId,
+          status: { in: [StaffStatus.ACTIVE, StaffStatus.AWAY] },
+        },
+        select: { id: true, status: true, awayUntil: true },
       }),
       this.prisma.appointment.findMany({
         where: {
@@ -510,13 +706,32 @@ export class ShopService {
       }),
     ]);
 
+    const bookable = await this.normalizeBookableStaff(staffRows);
+    const activeStaffCount = Math.max(1, bookable.length);
+
+    for (const member of bookable) {
+      if (member.status === StaffStatus.AWAY && member.awayUntil) {
+        const awayBlock = awayOccupiedInterval(
+          member.awayUntil,
+          dateKey,
+          shop.openTime,
+          shop.closeTime,
+        );
+        if (awayBlock) {
+          occupied.push(awayBlock);
+        }
+      }
+    }
+
+    occupied.sort((a, b) => a.startTime.localeCompare(b.startTime));
+
     return {
       occupied,
-      activeStaffCount: Math.max(1, activeStaffCount),
+      activeStaffCount,
     };
   }
 
-  /** Ensures at least one active barber is free for an "Any available" booking. */
+  /** Ensures at least one bookable barber is free for an "Any available" booking. */
   private async assertShopHasOpenCapacity(params: {
     shopId: string;
     date: Date;
@@ -524,9 +739,23 @@ export class ShopService {
     endTime: string;
     excludeAppointmentId?: string;
   }) {
-    const [activeStaffCount, candidates] = await Promise.all([
-      this.prisma.shopStaff.count({
-        where: { shopId: params.shopId, status: StaffStatus.ACTIVE },
+    const dateKey = formatDateOnly(params.date);
+    const shop = await this.prisma.shop.findUnique({
+      where: { id: params.shopId },
+      select: { openTime: true, closeTime: true },
+    });
+
+    if (!shop) {
+      throw new NotFoundException('Shop not found');
+    }
+
+    const [staffRows, candidates] = await Promise.all([
+      this.prisma.shopStaff.findMany({
+        where: {
+          shopId: params.shopId,
+          status: { in: [StaffStatus.ACTIVE, StaffStatus.AWAY] },
+        },
+        select: { id: true, status: true, awayUntil: true },
       }),
       this.prisma.appointment.findMany({
         where: {
@@ -543,11 +772,29 @@ export class ShopService {
       }),
     ]);
 
+    const bookable = await this.normalizeBookableStaff(staffRows);
+    const activeStaffCount = bookable.length;
+
     if (activeStaffCount <= 0) {
       throw new BadRequestException('No barbers are available at this shop');
     }
 
-    const overlapping = candidates.filter(
+    const occupied = [...candidates];
+    for (const member of bookable) {
+      if (member.status === StaffStatus.AWAY && member.awayUntil) {
+        const awayBlock = awayOccupiedInterval(
+          member.awayUntil,
+          dateKey,
+          shop.openTime,
+          shop.closeTime,
+        );
+        if (awayBlock) {
+          occupied.push(awayBlock);
+        }
+      }
+    }
+
+    const overlapping = occupied.filter(
       (other) =>
         params.startTime < other.endTime && other.startTime < params.endTime,
     ).length;
@@ -556,6 +803,43 @@ export class ShopService {
       throw new ConflictException(
         'All barbers are booked for this time. Try another slot.',
       );
+    }
+  }
+
+  /** Blocks booking a specific barber while they are ON_LEAVE or still AWAY. */
+  private async assertStaffBookableAtSlot(params: {
+    shopId: string;
+    staffId: string;
+    date: Date;
+    startTime: string;
+  }) {
+    const member = await this.prisma.shopStaff.findFirst({
+      where: { id: params.staffId, shopId: params.shopId },
+      select: { id: true, status: true, awayUntil: true },
+    });
+
+    if (!member) {
+      throw new BadRequestException(
+        'Selected barber is not available for this shop',
+      );
+    }
+
+    const [normalized] = await this.normalizeBookableStaff([member]);
+
+    if (normalized.status === StaffStatus.ON_LEAVE) {
+      throw new BadRequestException(
+        'Selected barber is on leave for this time',
+      );
+    }
+
+    if (normalized.status === StaffStatus.AWAY && normalized.awayUntil) {
+      const dateKey = formatDateOnly(params.date);
+      const slotStart = slotInstantUtc(dateKey, params.startTime);
+      if (slotStart.getTime() < normalized.awayUntil.getTime()) {
+        throw new BadRequestException(
+          `Selected barber is away until ${formatAwayUntil(normalized.awayUntil).replace('T', ' ')}`,
+        );
+      }
     }
   }
 
@@ -679,14 +963,16 @@ export class ShopService {
       orderBy: [{ name: 'asc' }, { createdAt: 'asc' }],
     });
 
-    return staff.map(serializeStaff);
+    const normalized = await this.normalizeBookableStaff(staff);
+    return normalized.map(serializeStaff);
   }
 
   async createMyStaff(ownerId: string, dto: CreateShopStaffDto) {
     const shop = await this.findOwnerShop(ownerId);
-    const leaveReturnDate = resolveStaffLeaveDate(
+    const presence = resolveStaffPresence(
       dto.status,
       dto.leaveReturnDate,
+      dto.awayUntil,
     );
 
     const staff = await this.prisma.shopStaff.create({
@@ -696,7 +982,8 @@ export class ShopService {
         title: dto.title.trim(),
         phone: dto.phone.trim(),
         status: dto.status,
-        leaveReturnDate,
+        leaveReturnDate: presence.leaveReturnDate,
+        awayUntil: presence.awayUntil,
       },
     });
 
@@ -722,13 +1009,22 @@ export class ShopService {
       dto,
       'leaveReturnDate',
     );
+    const awayUntilProvided = Object.prototype.hasOwnProperty.call(
+      dto,
+      'awayUntil',
+    );
     const leaveInput = leaveReturnDateProvided
       ? dto.leaveReturnDate
       : existing.leaveReturnDate
         ? formatDateOnly(existing.leaveReturnDate)
         : undefined;
+    const awayInput = awayUntilProvided
+      ? dto.awayUntil
+      : existing.awayUntil
+        ? formatAwayUntil(existing.awayUntil)
+        : undefined;
 
-    const leaveReturnDate = resolveStaffLeaveDate(nextStatus, leaveInput);
+    const presence = resolveStaffPresence(nextStatus, leaveInput, awayInput);
 
     const staff = await this.prisma.shopStaff.update({
       where: { id: existing.id },
@@ -737,7 +1033,8 @@ export class ShopService {
         ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
         ...(dto.phone !== undefined ? { phone: dto.phone.trim() } : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
-        leaveReturnDate,
+        leaveReturnDate: presence.leaveReturnDate,
+        awayUntil: presence.awayUntil,
       },
     });
 
@@ -1141,6 +1438,15 @@ export class ShopService {
       (isWalkIn ? AppointmentStatus.CONFIRMED : AppointmentStatus.PENDING);
     const date = toDateOnlyUtc(dto.date);
 
+    if (staffId) {
+      await this.assertStaffBookableAtSlot({
+        shopId: shop.id,
+        staffId,
+        date,
+        startTime: dto.startTime,
+      });
+    }
+
     await this.assertNoStaffSlotClash({
       shopId: shop.id,
       staffId,
@@ -1212,7 +1518,7 @@ export class ShopService {
         where: {
           id: requestedStaffId,
           shopId: shop.id,
-          status: StaffStatus.ACTIVE,
+          status: { in: [StaffStatus.ACTIVE, StaffStatus.AWAY] },
         },
         select: { id: true },
       });
@@ -1229,6 +1535,12 @@ export class ShopService {
     const date = toDateOnlyUtc(dto.date);
 
     if (staffId) {
+      await this.assertStaffBookableAtSlot({
+        shopId: shop.id,
+        staffId,
+        date,
+        startTime: dto.startTime,
+      });
       await this.assertNoStaffSlotClash({
         shopId: shop.id,
         staffId,
@@ -1323,6 +1635,19 @@ export class ShopService {
         formatDateOnly(existing.date) !== formatDateOnly(nextDate)) ||
       (dto.startTime !== undefined && dto.startTime !== existing.startTime) ||
       (dto.endTime !== undefined && dto.endTime !== existing.endTime);
+
+    if (
+      nextStaffId &&
+      nextStatus !== AppointmentStatus.CANCELLED &&
+      nextStatus !== AppointmentStatus.REJECTED
+    ) {
+      await this.assertStaffBookableAtSlot({
+        shopId: shop.id,
+        staffId: nextStaffId,
+        date: nextDate,
+        startTime: nextStart,
+      });
+    }
 
     await this.assertNoStaffSlotClash({
       shopId: shop.id,

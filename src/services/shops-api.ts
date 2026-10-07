@@ -109,7 +109,8 @@ export type ShopStaffOption = {
   id: string;
   name: string;
   title: string;
-  status: "ACTIVE" | "ON_LEAVE";
+  status: "ACTIVE" | "AWAY" | "ON_LEAVE";
+  awayUntil?: string | null;
 };
 
 export type ShopReview = {
