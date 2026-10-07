@@ -68,6 +68,65 @@ export async function cancelMyBooking(appointmentId: string) {
   return response.data;
 }
 
+const ACTIVE_BOOKING_STATUSES: AppointmentStatus[] = [
+  "PENDING",
+  "CONFIRMED",
+  "IN_PROGRESS",
+];
+
+/** Max concurrent customer bookings (pending + confirmed + in progress). */
+export const MAX_ACTIVE_CUSTOMER_BOOKINGS = 2;
+
+export type CustomerBookingLimit = {
+  canBook: boolean;
+  reason: string | null;
+  pendingCount: number;
+  activeCount: number;
+};
+
+export function evaluateCustomerBookingLimit(
+  bookings: CustomerBooking[],
+): CustomerBookingLimit {
+  const pendingCount = bookings.filter(
+    (booking) => booking.status === "PENDING",
+  ).length;
+  const activeCount = bookings.filter((booking) =>
+    ACTIVE_BOOKING_STATUSES.includes(booking.status),
+  ).length;
+
+  if (pendingCount > 0) {
+    return {
+      canBook: false,
+      reason:
+        "You already have a pending booking request. Wait for the shop to respond, or cancel it in History, before booking again.",
+      pendingCount,
+      activeCount,
+    };
+  }
+
+  if (activeCount >= MAX_ACTIVE_CUSTOMER_BOOKINGS) {
+    return {
+      canBook: false,
+      reason:
+        "You can have at most 2 active bookings. Cancel or complete one in History before booking again.",
+      pendingCount,
+      activeCount,
+    };
+  }
+
+  return {
+    canBook: true,
+    reason: null,
+    pendingCount,
+    activeCount,
+  };
+}
+
+export async function fetchCustomerBookingLimit(): Promise<CustomerBookingLimit> {
+  const bookings = await fetchMyBookings();
+  return evaluateCustomerBookingLimit(bookings);
+}
+
 function messageFromResponseData(data: unknown, fallback: string) {
   const message = (data as { message?: unknown } | undefined)?.message;
 

@@ -806,6 +806,46 @@ export class ShopService {
     }
   }
 
+  /**
+   * Customer booking caps:
+   * - At most one PENDING request at a time (wait for accept/reject/cancel).
+   * - At most two active bookings total (PENDING + CONFIRMED + IN_PROGRESS).
+   */
+  private async assertCustomerCanCreateBooking(customerId: string) {
+    const activeStatuses: AppointmentStatus[] = [
+      AppointmentStatus.PENDING,
+      AppointmentStatus.CONFIRMED,
+      AppointmentStatus.IN_PROGRESS,
+    ];
+
+    const [pendingCount, activeCount] = await Promise.all([
+      this.prisma.appointment.count({
+        where: {
+          customerId,
+          status: AppointmentStatus.PENDING,
+        },
+      }),
+      this.prisma.appointment.count({
+        where: {
+          customerId,
+          status: { in: activeStatuses },
+        },
+      }),
+    ]);
+
+    if (pendingCount > 0) {
+      throw new BadRequestException(
+        'You already have a pending booking request. Wait for the shop to respond, or cancel it in History, before booking again.',
+      );
+    }
+
+    if (activeCount >= 2) {
+      throw new BadRequestException(
+        'You can have at most 2 active bookings. Cancel or complete one in History before booking again.',
+      );
+    }
+  }
+
   /** Blocks booking a specific barber while they are ON_LEAVE or still AWAY. */
   private async assertStaffBookableAtSlot(params: {
     shopId: string;
@@ -1509,6 +1549,8 @@ export class ShopService {
     if (!customer) {
       throw new NotFoundException('User not found');
     }
+
+    await this.assertCustomerCanCreateBooking(customer.id);
 
     const requestedStaffId = dto.staffId?.trim() || null;
     let staffId: string | null = null;

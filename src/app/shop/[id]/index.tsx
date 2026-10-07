@@ -16,7 +16,9 @@ import { BookingSuccessDialog } from "@/components/booking-success-dialog";
 import { useSession } from "@/context/session-provider";
 import {
   createCustomerBooking,
+  fetchCustomerBookingLimit,
   getCustomerBookingErrorMessage,
+  type CustomerBookingLimit,
 } from "@/services/customer-bookings-api";
 import { showAppAlert } from "@/utils/app-alert";
 import {
@@ -185,6 +187,9 @@ export default function ShopBookAppointmentScreen() {
   const [activeStaffCount, setActiveStaffCount] = useState(1);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [availabilityNonce, setAvailabilityNonce] = useState(0);
+  const [bookingLimit, setBookingLimit] = useState<CustomerBookingLimit | null>(
+    null,
+  );
 
   const loadShop = useCallback(async () => {
     if (!shopId) {
@@ -206,6 +211,15 @@ export default function ShopBookAppointmentScreen() {
       setAvailabilityNonce((n) => n + 1);
     }
   }, [shopId]);
+
+  const loadBookingLimit = useCallback(async () => {
+    try {
+      const limit = await fetchCustomerBookingLimit();
+      setBookingLimit(limit);
+    } catch {
+      setBookingLimit(null);
+    }
+  }, []);
 
   useEffect(() => {
     if (!shopId || !selectedStaffId || !selectedDate) {
@@ -246,8 +260,14 @@ export default function ShopBookAppointmentScreen() {
   useFocusEffect(
     useCallback(() => {
       void loadShop();
-    }, [loadShop]),
+      void loadBookingLimit();
+    }, [loadBookingLimit, loadShop]),
   );
+
+  const bookingBlocked = bookingLimit != null && !bookingLimit.canBook;
+  const bookingBlockReason =
+    bookingLimit?.reason ??
+    "You cannot book right now. Check History for your existing requests.";
 
   const isOpen = useMemo(() => (shop ? isShopOpenNow(shop) : false), [shop]);
 
@@ -345,6 +365,10 @@ export default function ShopBookAppointmentScreen() {
   };
 
   const goNextFromServices = () => {
+    if (bookingBlocked) {
+      showAppAlert("Booking limit", bookingBlockReason);
+      return;
+    }
     if (selectedServiceIds.length === 0) {
       showAppAlert("Select services", "Choose at least one service to continue.");
       return;
@@ -353,6 +377,10 @@ export default function ShopBookAppointmentScreen() {
   };
 
   const goNextFromBarber = () => {
+    if (bookingBlocked) {
+      showAppAlert("Booking limit", bookingBlockReason);
+      return;
+    }
     if (!selectedStaffId) {
       showAppAlert(
         "Select barber",
@@ -372,6 +400,10 @@ export default function ShopBookAppointmentScreen() {
   };
 
   const handleConfirm = async () => {
+    if (bookingBlocked) {
+      showAppAlert("Booking limit", bookingBlockReason);
+      return;
+    }
     if (
       !shop ||
       selectedServices.length === 0 ||
@@ -396,8 +428,10 @@ export default function ShopBookAppointmentScreen() {
       });
 
       setSuccessVisible(true);
+      void loadBookingLimit();
     } catch (err) {
       showAppAlert("Booking failed", getCustomerBookingErrorMessage(err));
+      void loadBookingLimit();
     } finally {
       setConfirming(false);
     }
@@ -481,6 +515,20 @@ export default function ShopBookAppointmentScreen() {
             <Text style={styles.statusText}>{isOpen ? "Open" : "Closed"}</Text>
           </View>
         </View>
+
+        {bookingBlocked ? (
+          <TouchableOpacity
+            style={styles.limitBanner}
+            activeOpacity={0.9}
+            onPress={() => router.push("/history")}
+            accessibilityRole="button"
+            accessibilityLabel="Open history to manage existing bookings"
+          >
+            <Ionicons name="alert-circle" size={18} color="#B45309" />
+            <Text style={styles.limitBannerText}>{bookingBlockReason}</Text>
+            <Text style={styles.limitBannerLink}>History</Text>
+          </TouchableOpacity>
+        ) : null}
 
         <View style={styles.stepper}>
           {STEPS.map((label, index) => {
@@ -828,10 +876,16 @@ export default function ShopBookAppointmentScreen() {
       >
         {step === 0 ? (
           <TouchableOpacity
-            style={styles.primaryButton}
+            style={[
+              styles.primaryButton,
+              bookingBlocked ? styles.buttonDisabled : null,
+            ]}
+            disabled={bookingBlocked}
             onPress={goNextFromServices}
           >
-            <Text style={styles.primaryButtonText}>Next</Text>
+            <Text style={styles.primaryButtonText}>
+              {bookingBlocked ? "Booking unavailable" : "Next"}
+            </Text>
           </TouchableOpacity>
         ) : null}
 
@@ -844,10 +898,17 @@ export default function ShopBookAppointmentScreen() {
               <Text style={styles.secondaryButtonText}>Previous</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.primaryButton, styles.footerPrimary]}
+              style={[
+                styles.primaryButton,
+                styles.footerPrimary,
+                bookingBlocked ? styles.buttonDisabled : null,
+              ]}
+              disabled={bookingBlocked}
               onPress={goNextFromBarber}
             >
-              <Text style={styles.primaryButtonText}>Next</Text>
+              <Text style={styles.primaryButtonText}>
+                {bookingBlocked ? "Unavailable" : "Next"}
+              </Text>
             </TouchableOpacity>
           </View>
         ) : null}
@@ -864,15 +925,17 @@ export default function ShopBookAppointmentScreen() {
               style={[
                 styles.primaryButton,
                 styles.footerPrimary,
-                confirming ? styles.buttonDisabled : null,
+                confirming || bookingBlocked ? styles.buttonDisabled : null,
               ]}
-              disabled={confirming}
+              disabled={confirming || bookingBlocked}
               onPress={() => void handleConfirm()}
             >
               {confirming ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.primaryButtonText}>Confirm</Text>
+                <Text style={styles.primaryButtonText}>
+                  {bookingBlocked ? "Unavailable" : "Confirm"}
+                </Text>
               )}
             </TouchableOpacity>
           </View>
@@ -958,6 +1021,30 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     color: "#FFFFFF",
+  },
+  limitBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#FFFBEB",
+    borderWidth: 1,
+    borderColor: "#FCD34D",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  limitBannerText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#92400E",
+    lineHeight: 17,
+  },
+  limitBannerLink: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#0B5A47",
   },
   stepper: {
     marginBottom: 14,

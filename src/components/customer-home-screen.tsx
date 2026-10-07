@@ -18,6 +18,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useSession } from "@/context/session-provider";
 import {
+  fetchMyBookings,
+  type CustomerBooking,
+} from "@/services/customer-bookings-api";
+import {
   fetchShops,
   getShopsErrorMessage,
   type PublicShop,
@@ -37,6 +41,75 @@ function formatShopLine(shop: PublicShop) {
     .map((part) => part.trim())
     .filter(Boolean)
     .join(", ");
+}
+
+function toDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateKey(dateKey: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
+  if (!match) return new Date();
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
+
+function formatReminderDate(dateKey: string) {
+  const date = parseDateKey(dateKey);
+  const today = toDateKey(new Date());
+  const tomorrowDate = new Date();
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrow = toDateKey(tomorrowDate);
+
+  if (dateKey === today) return "Today";
+  if (dateKey === tomorrow) return "Tomorrow";
+  return date.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function formatTime12h(time24: string) {
+  const match = /^(\d{2}):(\d{2})$/.exec(time24);
+  if (!match) return time24;
+  let hour = Number(match[1]);
+  const minute = match[2];
+  const suffix = hour >= 12 ? "PM" : "AM";
+  hour = hour % 12;
+  if (hour === 0) hour = 12;
+  return `${hour}:${minute} ${suffix}`;
+}
+
+/** Soonest accepted booking that has not ended yet. */
+function pickNextAcceptedReminder(bookings: CustomerBooking[]) {
+  const now = new Date();
+  const todayKey = toDateKey(now);
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  const upcoming = bookings
+    .filter((booking) => {
+      if (
+        booking.status !== "CONFIRMED" &&
+        booking.status !== "IN_PROGRESS"
+      ) {
+        return false;
+      }
+      if (booking.date > todayKey) return true;
+      if (booking.date < todayKey) return false;
+      const endMatch = /^(\d{2}):(\d{2})$/.exec(booking.endTime);
+      if (!endMatch) return true;
+      const endMinutes = Number(endMatch[1]) * 60 + Number(endMatch[2]);
+      return endMinutes > nowMinutes;
+    })
+    .sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return a.startTime.localeCompare(b.startTime);
+    });
+
+  return upcoming[0] ?? null;
 }
 
 const SHOP_ICONS: (keyof typeof Ionicons.glyphMap)[] = [
@@ -64,6 +137,8 @@ export function CustomerHomeScreen() {
   const [draftCity, setDraftCity] = useState<string | null>(null);
   const [draftState, setDraftState] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [acceptedReminder, setAcceptedReminder] =
+    useState<CustomerBooking | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -96,10 +171,26 @@ export function CustomerHomeScreen() {
     }
   }, [debouncedQuery, page, selectedCity, selectedState]);
 
+  const loadAcceptedReminder = useCallback(async () => {
+    try {
+      const [confirmed, inProgress] = await Promise.all([
+        fetchMyBookings({ status: "CONFIRMED" }),
+        fetchMyBookings({ status: "IN_PROGRESS" }),
+      ]);
+      setAcceptedReminder(
+        pickNextAcceptedReminder([...confirmed, ...inProgress]),
+      );
+    } catch {
+      // Home shops list should still work if history fetch fails.
+      setAcceptedReminder(null);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       void loadShops();
-    }, [loadShops]),
+      void loadAcceptedReminder();
+    }, [loadAcceptedReminder, loadShops]),
   );
 
   const firstName = customerFirstName(user?.name);
@@ -199,6 +290,41 @@ export function CustomerHomeScreen() {
           <View style={styles.header}>
             <Text style={styles.greeting}>Hello,</Text>
             <Text style={styles.customerName}>{firstName}</Text>
+
+            {acceptedReminder ? (
+              <TouchableOpacity
+                style={styles.reminderCard}
+                activeOpacity={0.9}
+                onPress={() => router.push("/history")}
+                accessibilityRole="button"
+                accessibilityLabel={`Reminder: appointment at ${acceptedReminder.shopName} on ${acceptedReminder.date} at ${acceptedReminder.startTime}`}
+              >
+                <View style={styles.reminderIconWrap}>
+                  <Ionicons name="notifications" size={18} color="#0B5A47" />
+                </View>
+                <View style={styles.reminderCopy}>
+                  <Text style={styles.reminderEyebrow}>
+                    {acceptedReminder.status === "IN_PROGRESS"
+                      ? "In progress now"
+                      : "Appointment confirmed"}
+                  </Text>
+                  <Text style={styles.reminderTitle} numberOfLines={1}>
+                    {acceptedReminder.shopName}
+                  </Text>
+                  <Text style={styles.reminderMeta} numberOfLines={2}>
+                    {formatReminderDate(acceptedReminder.date)} ·{" "}
+                    {formatTime12h(acceptedReminder.startTime)}
+                    {acceptedReminder.serviceName
+                      ? ` · ${acceptedReminder.serviceName}`
+                      : ""}
+                    {acceptedReminder.staffName
+                      ? ` · ${acceptedReminder.staffName}`
+                      : ""}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#0B5A47" />
+              </TouchableOpacity>
+            ) : null}
 
             <View style={styles.searchWrap}>
               <Ionicons name="search" size={18} color="#64748B" />
@@ -315,7 +441,10 @@ export function CustomerHomeScreen() {
         }
         renderItem={renderShop}
         refreshing={loading && shops.length > 0}
-        onRefresh={() => void loadShops()}
+        onRefresh={() => {
+          void loadShops();
+          void loadAcceptedReminder();
+        }}
       />
 
       <Modal
@@ -475,6 +604,54 @@ const styles = StyleSheet.create({
     color: "#0F172A",
     marginTop: 0,
     marginBottom: 12,
+  },
+
+  reminderCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "#E7F3ED",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#B7D8C8",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+
+  reminderIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  reminderCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+
+  reminderEyebrow: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#0B5A47",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
+
+  reminderTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  reminderMeta: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#334155",
   },
 
   searchWrap: {
