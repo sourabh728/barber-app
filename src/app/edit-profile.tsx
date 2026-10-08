@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -19,6 +19,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useSession } from "@/context/session-provider";
+import type { AppColors } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
 import {
   fetchCurrentUser,
   sessionUserFromMe,
@@ -115,6 +117,8 @@ async function pickImage(aspect: [number, number]) {
 
 export default function EditProfileScreen() {
   const router = useRouter();
+  const colors = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, updateUser } = useSession();
   const isBarber = user?.role === "BARBER";
 
@@ -309,7 +313,7 @@ export default function EditProfileScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <LinearGradient colors={["#12121C", "#0D0D15"]} style={styles.card}>
+          <LinearGradient colors={[colors.backgroundCard, colors.background]} style={styles.card}>
             <View style={styles.headerRow}>
               <TouchableOpacity
                 style={styles.backButton}
@@ -318,7 +322,7 @@ export default function EditProfileScreen() {
                 accessibilityLabel="Go back"
                 disabled={busy}
               >
-                <Ionicons name="chevron-back" size={22} color="#fff" />
+                <Ionicons name="chevron-back" size={22} color={colors.text} />
               </TouchableOpacity>
               <Text style={styles.heading}>Edit Profile</Text>
               <View style={styles.headerSpacer} />
@@ -603,10 +607,11 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   return <Text style={styles.label}>{children}</Text>;
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: AppColors) {
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#09090F",
+    backgroundColor: colors.background,
   },
 
   flex: {
@@ -635,7 +640,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -645,13 +650,13 @@ const styles = StyleSheet.create({
   },
 
   heading: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 22,
     fontWeight: "700",
   },
 
   subtitle: {
-    color: "#8B8BA7",
+    color: colors.textSecondary,
     fontSize: 15,
     marginTop: 12,
     marginBottom: 8,
@@ -663,7 +668,7 @@ const styles = StyleSheet.create({
   },
 
   sectionTitle: {
-    color: "#F97316",
+    color: colors.accent,
     fontSize: 14,
     fontWeight: "700",
     letterSpacing: 0.6,
@@ -687,21 +692,21 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: "#1A1A26",
+    backgroundColor: colors.backgroundMuted,
   },
 
   shopPhoto: {
     width: "100%",
     height: 140,
     borderRadius: 16,
-    backgroundColor: "#1A1A26",
+    backgroundColor: colors.backgroundMuted,
   },
 
   photoButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#F97316",
+    backgroundColor: colors.accent,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -709,24 +714,24 @@ const styles = StyleSheet.create({
   },
 
   photoButtonText: {
-    color: "#111",
+    color: colors.accentText,
     fontSize: 14,
     fontWeight: "700",
   },
 
   label: {
-    color: "#C9C9D6",
+    color: colors.textSecondary,
     fontSize: 14,
     marginBottom: 8,
     marginTop: 12,
   },
 
   input: {
-    backgroundColor: "#1A1A26",
+    backgroundColor: colors.backgroundMuted,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#2A2A3A",
-    color: "#fff",
+    borderColor: colors.border,
+    color: colors.text,
     paddingHorizontal: 14,
     paddingVertical: 14,
     fontSize: 16,
@@ -737,10 +742,10 @@ const styles = StyleSheet.create({
   },
 
   passwordContainer: {
-    backgroundColor: "#1A1A26",
+    backgroundColor: colors.backgroundMuted,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#2A2A3A",
+    borderColor: colors.border,
     paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
@@ -748,7 +753,7 @@ const styles = StyleSheet.create({
 
   passwordInput: {
     flex: 1,
-    color: "#fff",
+    color: colors.text,
     paddingVertical: 14,
     fontSize: 16,
   },
@@ -767,7 +772,7 @@ const styles = StyleSheet.create({
 
   updateButton: {
     marginTop: 24,
-    backgroundColor: "#F97316",
+    backgroundColor: colors.accent,
     borderRadius: 16,
     minHeight: 54,
     alignItems: "center",
@@ -779,8 +784,10 @@ const styles = StyleSheet.create({
   },
 
   updateButtonText: {
-    color: "#111",
+    color: colors.accentText,
     fontSize: 17,
     fontWeight: "700",
   },
 });
+}
+

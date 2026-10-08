@@ -1,53 +1,71 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * App color tokens for light (home-style) and dark (history/edit-profile style).
  */
 
-import '@/global.css';
+import "@/global.css";
 
-import { Platform } from 'react-native';
+import { Platform } from "react-native";
 
 export const Colors = {
   light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    text: "#0F172A",
+    textSecondary: "#64748B",
+    background: "#F3F4F6",
+    backgroundElement: "#FFFFFF",
+    backgroundSelected: "#E7F3ED",
+    backgroundCard: "#FFFFFF",
+    backgroundMuted: "#F1F5F9",
+    border: "#E5E7EB",
+    primary: "#0B5A47",
+    primaryText: "#FFFFFF",
+    accent: "#F97316",
+    accentText: "#111111",
+    danger: "#DC2626",
+    header: "#0B5A47",
+    headerText: "#FFFFFF",
+    statusBarStyle: "light" as const,
   },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    text: "#FFFFFF",
+    textSecondary: "#C9C9D6",
+    background: "#09090F",
+    backgroundElement: "#14141F",
+    backgroundSelected: "#1A1A26",
+    backgroundCard: "#14141F",
+    backgroundMuted: "#1A1A26",
+    border: "#2A2A3A",
+    primary: "#F97316",
+    primaryText: "#111111",
+    accent: "#F97316",
+    accentText: "#111111",
+    danger: "#F87171",
+    header: "#0C0C14",
+    headerText: "#FFFFFF",
+    statusBarStyle: "light" as const,
   },
 } as const;
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
+export type AppColors = (typeof Colors)[keyof typeof Colors];
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
+    sans: "system-ui",
+    serif: "ui-serif",
+    rounded: "ui-rounded",
+    mono: "ui-monospace",
   },
   default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
+    sans: "normal",
+    serif: "serif",
+    rounded: "normal",
+    mono: "monospace",
   },
   web: {
-    sans: 'var(--font-display)',
-    serif: 'var(--font-serif)',
-    rounded: 'var(--font-rounded)',
-    mono: 'var(--font-mono)',
+    sans: "var(--font-display)",
+    serif: "var(--font-serif)",
+    rounded: "var(--font-rounded)",
+    mono: "var(--font-mono)",
   },
 });
 

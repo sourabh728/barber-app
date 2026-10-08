@@ -1,21 +1,21 @@
-import { useEffect, useState } from 'react';
-import { useColorScheme as useRNColorScheme } from 'react-native';
+import { useEffect, useState } from "react";
+
+import { useAppearancePreference } from "@/context/appearance-provider";
 
 /**
- * To support static rendering, this value needs to be re-calculated on the client side for web
+ * Web + static render: prefer light until hydrated, then the saved preference.
  */
-export function useColorScheme() {
+export function useColorScheme(): "light" | "dark" {
   const [hasHydrated, setHasHydrated] = useState(false);
+  const preference = useAppearancePreference();
 
   useEffect(() => {
     setHasHydrated(true);
   }, []);
 
-  const colorScheme = useRNColorScheme();
-
-  if (hasHydrated) {
-    return colorScheme;
+  if (!hasHydrated) {
+    return "light";
   }
 
-  return 'light';
+  return preference;
 }

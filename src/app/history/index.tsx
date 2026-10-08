@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState , useMemo} from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -11,6 +11,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+import type { AppColors } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
 
 import {
   fetchMyBookings,
@@ -65,13 +68,13 @@ function statusMeta(status: AppointmentStatus) {
     case "IN_PROGRESS":
       return { label: "In Progress", color: "#4ADE80" };
     case "COMPLETED":
-      return { label: "Completed", color: "#8B8BA7" };
+      return { label: "Completed", color: colors.textSecondary };
     case "CANCELLED":
       return { label: "Cancelled", color: "#F87171" };
     case "REJECTED":
       return { label: "Rejected", color: "#F87171" };
     default:
-      return { label: status, color: "#8B8BA7" };
+      return { label: status, color: colors.textSecondary };
   }
 }
 
@@ -81,6 +84,8 @@ function formatInr(amount: number) {
 
 export default function CustomerHistoryScreen() {
   const router = useRouter();
+  const colors = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [bookings, setBookings] = useState<CustomerBooking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -114,7 +119,7 @@ export default function CustomerHistoryScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <LinearGradient
-          colors={["#14141F", "#0C0C14"]}
+          colors={[colors.backgroundCard, colors.background]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.card}
@@ -235,10 +240,11 @@ export default function CustomerHistoryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: AppColors) {
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#09090F",
+    backgroundColor: colors.background,
   },
 
   scrollContent: {
@@ -265,7 +271,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -275,19 +281,19 @@ const styles = StyleSheet.create({
   },
 
   heading: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 20,
     fontWeight: "700",
   },
 
   subtitle: {
-    color: "#8B8BA7",
+    color: colors.textSecondary,
     fontSize: 14,
     marginBottom: 4,
   },
 
   hint: {
-    color: "#6B6B84",
+    color: colors.textSecondary,
     fontSize: 13,
     marginBottom: 8,
   },
@@ -298,7 +304,7 @@ const styles = StyleSheet.create({
   },
 
   emptyText: {
-    color: "#8B8BA7",
+    color: colors.textSecondary,
     fontSize: 15,
     lineHeight: 22,
     marginTop: 8,
@@ -321,18 +327,18 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
+    borderColor: colors.border,
   },
 
   retryButtonText: {
-    color: "#fff",
+    color: colors.text,
     fontWeight: "600",
   },
 
   bookingRow: {
     paddingVertical: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(255,255,255,0.1)",
+    borderBottomColor: colors.border,
   },
 
   bookingTop: {
@@ -344,20 +350,20 @@ const styles = StyleSheet.create({
   },
 
   dateText: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 16,
     fontWeight: "700",
     flex: 1,
   },
 
   detailLine: {
-    color: "#C9C9D6",
+    color: colors.textSecondary,
     fontSize: 14,
     marginTop: 4,
   },
 
   detailIcon: {
-    color: "#8B8BA7",
+    color: colors.textSecondary,
   },
 
   metaRow: {
@@ -369,7 +375,7 @@ const styles = StyleSheet.create({
   },
 
   priceText: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 14,
     fontWeight: "600",
   },
@@ -395,3 +401,5 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
+}
+

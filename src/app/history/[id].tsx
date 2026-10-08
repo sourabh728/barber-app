@@ -5,10 +5,9 @@ import {
   useLocalSearchParams,
   useRouter,
 } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState , useMemo} from "react";
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,6 +16,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import type { AppColors } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
+
+import { CancelBookingDialog } from "@/components/cancel-booking-dialog";
 import {
   cancelMyBooking,
   fetchMyBooking,
@@ -24,6 +27,7 @@ import {
   type CustomerBooking,
 } from "@/services/customer-bookings-api";
 import type { AppointmentStatus } from "@/services/shop-appointments-api";
+import { showAppAlert } from "@/utils/app-alert";
 
 function toDateKey(date: Date) {
   const year = date.getFullYear();
@@ -66,7 +70,7 @@ function formatInr(amount: number) {
   return `₹${amount.toLocaleString("en-IN")}`;
 }
 
-function statusMeta(status: AppointmentStatus) {
+function statusMeta(status: AppointmentStatus, mutedColor: string) {
   switch (status) {
     case "PENDING":
       return {
@@ -94,7 +98,7 @@ function statusMeta(status: AppointmentStatus) {
     case "COMPLETED":
       return {
         label: "Completed",
-        color: "#8B8BA7",
+        color: mutedColor,
         bannerTitle: "Visit completed",
         bannerBody: "This booking has been completed.",
       };
@@ -116,7 +120,7 @@ function statusMeta(status: AppointmentStatus) {
     default:
       return {
         label: status,
-        color: "#8B8BA7",
+        color: mutedColor,
         bannerTitle: "Request details",
         bannerBody: "",
       };
@@ -127,15 +131,19 @@ function DetailRow({
   icon,
   label,
   value,
+  styles,
+  accentColor,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value: string;
+  styles: Record<string, object>;
+  accentColor: string;
 }) {
   return (
     <View style={styles.detailRow}>
       <View style={styles.detailIconWrap}>
-        <Ionicons name={icon} size={18} color="#F97316" />
+        <Ionicons name={icon} size={18} color={accentColor} />
       </View>
       <View style={styles.detailCopy}>
         <Text style={styles.detailLabel}>{label}</Text>
@@ -149,11 +157,14 @@ export default function BookingRequestDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const bookingId = Array.isArray(id) ? id[0] : id;
+  const colors = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [booking, setBooking] = useState<CustomerBooking | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [cancelling, setCancelling] = useState(false);
+  const [cancelDialogVisible, setCancelDialogVisible] = useState(false);
 
   const loadBooking = useCallback(async () => {
     if (!bookingId) {
@@ -182,38 +193,28 @@ export default function BookingRequestDetailScreen() {
     }, [loadBooking]),
   );
 
-  const confirmCancel = () => {
-    if (!booking) return;
-    Alert.alert(
-      "Cancel booking?",
-      "This will cancel your appointment request.",
-      [
-        { text: "Keep", style: "cancel" },
-        {
-          text: "Cancel booking",
-          style: "destructive",
-          onPress: () => {
-            void (async () => {
-              setCancelling(true);
-              try {
-                const updated = await cancelMyBooking(booking.id);
-                setBooking(updated);
-              } catch (error) {
-                Alert.alert(
-                  "Could not cancel",
-                  getCustomerBookingErrorMessage(error),
-                );
-              } finally {
-                setCancelling(false);
-              }
-            })();
-          },
-        },
-      ],
-    );
+  const runCancel = async () => {
+    if (!booking || cancelling) return;
+    setCancelling(true);
+    try {
+      const updated = await cancelMyBooking(booking.id);
+      setBooking(updated);
+      setCancelDialogVisible(false);
+    } catch (error) {
+      showAppAlert("Could not cancel", getCustomerBookingErrorMessage(error));
+    } finally {
+      setCancelling(false);
+    }
   };
 
-  const meta = booking ? statusMeta(booking.status) : null;
+  const openCancelDialog = () => {
+    if (!booking || cancelling) return;
+    setCancelDialogVisible(true);
+  };
+
+  const meta = booking
+    ? statusMeta(booking.status, colors.textSecondary)
+    : null;
   const canCancel =
     booking?.status === "PENDING" || booking?.status === "CONFIRMED";
 
@@ -224,7 +225,7 @@ export default function BookingRequestDetailScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <LinearGradient
-          colors={["#14141F", "#0C0C14"]}
+          colors={[colors.backgroundCard, colors.background]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.card}
@@ -288,31 +289,43 @@ export default function BookingRequestDetailScreen() {
                 icon="storefront-outline"
                 label="Shop"
                 value={booking.shopName}
+                styles={styles}
+                accentColor={colors.accent}
               />
               <DetailRow
                 icon="cut-outline"
                 label="Barber"
                 value={booking.staffName ?? "Any available"}
+                styles={styles}
+                accentColor={colors.accent}
               />
               <DetailRow
                 icon="list-outline"
                 label="Services"
                 value={booking.serviceName}
+                styles={styles}
+                accentColor={colors.accent}
               />
               <DetailRow
                 icon="calendar-outline"
                 label="Booking date"
                 value={formatBookingDate(booking.date)}
+                styles={styles}
+                accentColor={colors.accent}
               />
               <DetailRow
                 icon="time-outline"
                 label="Booking time"
                 value={`${formatTime12h(booking.startTime)} – ${formatTime12h(booking.endTime)}`}
+                styles={styles}
+                accentColor={colors.accent}
               />
               <DetailRow
                 icon="cash-outline"
                 label="Payment"
                 value={`${formatInr(booking.priceInr)} · Pay at shop`}
+                styles={styles}
+                accentColor={colors.accent}
               />
 
               {canCancel ? (
@@ -322,7 +335,7 @@ export default function BookingRequestDetailScreen() {
                     cancelling ? styles.buttonDisabled : null,
                   ]}
                   disabled={cancelling}
-                  onPress={confirmCancel}
+                  onPress={openCancelDialog}
                   accessibilityRole="button"
                   accessibilityLabel="Cancel booking"
                 >
@@ -346,14 +359,27 @@ export default function BookingRequestDetailScreen() {
           )}
         </LinearGradient>
       </ScrollView>
+
+      <CancelBookingDialog
+        visible={cancelDialogVisible}
+        shopName={booking?.shopName}
+        busy={cancelling}
+        onKeep={() => {
+          if (!cancelling) setCancelDialogVisible(false);
+        }}
+        onConfirmCancel={() => {
+          void runCancel();
+        }}
+      />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: AppColors) {
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#09090F",
+    backgroundColor: colors.background,
   },
 
   scrollContent: {
@@ -380,7 +406,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -390,7 +416,7 @@ const styles = StyleSheet.create({
   },
 
   heading: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 20,
     fontWeight: "700",
   },
@@ -417,19 +443,19 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
+    borderColor: colors.border,
   },
 
   retryButtonText: {
-    color: "#fff",
+    color: colors.text,
     fontWeight: "600",
   },
 
   statusBanner: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "#1A1A26",
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundMuted,
     padding: 16,
     marginBottom: 20,
   },
@@ -458,20 +484,20 @@ const styles = StyleSheet.create({
   },
 
   bannerTitle: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 18,
     fontWeight: "800",
   },
 
   bannerBody: {
     marginTop: 6,
-    color: "#C9C9D6",
+    color: colors.textSecondary,
     fontSize: 14,
     lineHeight: 20,
   },
 
   sectionTitle: {
-    color: "#8B8BA7",
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: "700",
     textTransform: "uppercase",
@@ -484,7 +510,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(255,255,255,0.1)",
+    borderBottomColor: colors.border,
   },
 
   detailIconWrap: {
@@ -503,13 +529,13 @@ const styles = StyleSheet.create({
   },
 
   detailLabel: {
-    color: "#8B8BA7",
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: "600",
   },
 
   detailValue: {
-    color: "#fff",
+    color: colors.text,
     fontSize: 15,
     fontWeight: "700",
   },
@@ -533,14 +559,14 @@ const styles = StyleSheet.create({
   homeButton: {
     marginTop: 12,
     borderRadius: 14,
-    backgroundColor: "#F97316",
+    backgroundColor: colors.accent,
     minHeight: 48,
     alignItems: "center",
     justifyContent: "center",
   },
 
   homeButtonText: {
-    color: "#111",
+    color: colors.accentText,
     fontWeight: "800",
     fontSize: 15,
   },
@@ -549,3 +575,5 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
 });
+}
+

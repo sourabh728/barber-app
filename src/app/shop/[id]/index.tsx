@@ -12,12 +12,16 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { BookForSomeoneDialog } from "@/components/book-for-someone-dialog";
 import { BookingSuccessDialog } from "@/components/booking-success-dialog";
 import { useSession } from "@/context/session-provider";
 import {
   createCustomerBooking,
   fetchCustomerBookingLimit,
+  fetchMyBookings,
+  findOverlappingApprovedBooking,
   getCustomerBookingErrorMessage,
+  type CustomerBooking,
   type CustomerBookingLimit,
 } from "@/services/customer-bookings-api";
 import { showAppAlert } from "@/utils/app-alert";
@@ -189,6 +193,10 @@ export default function ShopBookAppointmentScreen() {
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [availabilityNonce, setAvailabilityNonce] = useState(0);
   const [bookingLimit, setBookingLimit] = useState<CustomerBookingLimit | null>(
+    null,
+  );
+  const [behalfDialogVisible, setBehalfDialogVisible] = useState(false);
+  const [behalfConflict, setBehalfConflict] = useState<CustomerBooking | null>(
     null,
   );
 
@@ -400,11 +408,7 @@ export default function ShopBookAppointmentScreen() {
     setStep(2);
   };
 
-  const handleConfirm = async () => {
-    if (bookingBlocked) {
-      showAppAlert("Booking limit", bookingBlockReason);
-      return;
-    }
+  const submitBooking = async (onBehalfOfName?: string) => {
     if (
       !shop ||
       selectedServices.length === 0 ||
@@ -426,11 +430,67 @@ export default function ShopBookAppointmentScreen() {
         date: selectedDate,
         startTime: selectedStartTime,
         endTime,
+        ...(onBehalfOfName ? { onBehalfOfName } : {}),
       });
 
+      setBehalfDialogVisible(false);
+      setBehalfConflict(null);
       setCreatedBookingId(created.id);
       setSuccessVisible(true);
       void loadBookingLimit();
+    } catch (err) {
+      showAppAlert("Booking failed", getCustomerBookingErrorMessage(err));
+      void loadBookingLimit();
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (bookingBlocked) {
+      showAppAlert("Booking limit", bookingBlockReason);
+      return;
+    }
+    if (
+      !shop ||
+      selectedServices.length === 0 ||
+      !selectedStaffId ||
+      !selectedDate ||
+      !selectedStartTime ||
+      !endTime
+    ) {
+      showAppAlert("Incomplete booking", "Please complete all steps first.");
+      return;
+    }
+
+    setConfirming(true);
+    try {
+      const myBookings = await fetchMyBookings();
+      const overlap = findOverlappingApprovedBooking(
+        myBookings,
+        selectedDate,
+        selectedStartTime,
+        endTime,
+      );
+
+      if (overlap) {
+        if (
+          !prefersAnyStaff &&
+          overlap.staffId &&
+          selectedStaffId === overlap.staffId
+        ) {
+          showAppAlert(
+            "Same barber",
+            `You already have an approved booking with ${overlap.staffName ?? "this barber"} at this time. Choose a different barber to book for someone else.`,
+          );
+          return;
+        }
+        setBehalfConflict(overlap);
+        setBehalfDialogVisible(true);
+        return;
+      }
+
+      await submitBooking();
     } catch (err) {
       showAppAlert("Booking failed", getCustomerBookingErrorMessage(err));
       void loadBookingLimit();
@@ -945,6 +1005,31 @@ export default function ShopBookAppointmentScreen() {
           </View>
         ) : null}
       </View>
+
+      <BookForSomeoneDialog
+        visible={behalfDialogVisible}
+        conflict={
+          behalfConflict && selectedStartTime && endTime
+            ? {
+                barberName: behalfConflict.staffName ?? "your barber",
+                startTime: behalfConflict.startTime,
+                endTime: behalfConflict.endTime,
+                timeLabel: `${formatTime12h(behalfConflict.startTime)} – ${formatTime12h(behalfConflict.endTime)}`,
+              }
+            : null
+        }
+        bookerName={user?.name?.trim() || "You"}
+        busy={confirming}
+        onClose={() => {
+          if (!confirming) {
+            setBehalfDialogVisible(false);
+            setBehalfConflict(null);
+          }
+        }}
+        onConfirm={(guestName) => {
+          void submitBooking(guestName);
+        }}
+      />
 
       <BookingSuccessDialog
         visible={successVisible}

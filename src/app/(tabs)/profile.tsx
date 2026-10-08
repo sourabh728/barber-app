@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,8 @@ import {
 import { useFocusEffect, useRouter } from "expo-router";
 
 import { useSession } from "@/context/session-provider";
+import type { AppColors } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
 import {
   fetchMyBookingStats,
   getCustomerBookingErrorMessage,
@@ -29,6 +31,8 @@ import { profileImageSource } from "@/utils/media";
 
 export default function Profile() {
   const router = useRouter();
+  const colors = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { signOut, user } = useSession();
   const isBarber = user?.role === "BARBER";
   const displayName = user?.name?.trim() || user?.email || "Account";
@@ -126,7 +130,12 @@ export default function Profile() {
         <View style={styles.topRow}>
           <Text style={styles.profileTitle}>Profile</Text>
 
-          <TouchableOpacity style={styles.settingsBtn}>
+          <TouchableOpacity
+            style={styles.settingsBtn}
+            onPress={() => router.push("/settings")}
+            accessibilityRole="button"
+            accessibilityLabel="Open settings"
+          >
             <Ionicons name="settings-outline" size={22} color="white" />
           </TouchableOpacity>
         </View>
@@ -160,7 +169,7 @@ export default function Profile() {
           }
         >
           {statsLoading ? (
-            <ActivityIndicator color="#0B5A47" />
+            <ActivityIndicator color={colors.primary} />
           ) : (
             <Text style={styles.statNumber}>{bookingsDisplay}</Text>
           )}
@@ -177,7 +186,7 @@ export default function Profile() {
             accessibilityLabel="View rating and reviews"
           >
             {statsLoading ? (
-              <ActivityIndicator color="#0B5A47" />
+              <ActivityIndicator color={colors.primary} />
             ) : (
               <Text style={styles.statNumber}>{ratingDisplay}</Text>
             )}
@@ -203,6 +212,8 @@ export default function Profile() {
         {isBarber ? (
           <>
             <MenuItem
+              colors={colors}
+              styles={styles}
               icon={<Ionicons name="storefront" size={22} color="#2563EB" />}
               title="Edit Shop Profile"
               onPress={() => {
@@ -211,7 +222,11 @@ export default function Profile() {
             />
 
             <MenuItem
-              icon={<Ionicons name="calendar-outline" size={22} color="#0B5A47" />}
+              colors={colors}
+              styles={styles}
+              icon={
+                <Ionicons name="calendar-outline" size={22} color="#0B5A47" />
+              }
               title="Shop Schedule"
               onPress={() => {
                 router.push("/barber/schedule");
@@ -219,6 +234,8 @@ export default function Profile() {
             />
 
             <MenuItem
+              colors={colors}
+              styles={styles}
               icon={<Ionicons name="people" size={22} color="#7C3AED" />}
               title="Manage Staff"
               onPress={() => {
@@ -227,7 +244,11 @@ export default function Profile() {
             />
 
             <MenuItem
-              icon={<Ionicons name="pricetag-outline" size={22} color="#0F766E" />}
+              colors={colors}
+              styles={styles}
+              icon={
+                <Ionicons name="pricetag-outline" size={22} color="#0F766E" />
+              }
               title="Shop Services"
               onPress={() => {
                 router.push("/barber/services");
@@ -235,6 +256,8 @@ export default function Profile() {
             />
 
             <MenuItem
+              colors={colors}
+              styles={styles}
               icon={<Ionicons name="cut" size={22} color="#EA580C" />}
               title="Appointments"
               onPress={() => {
@@ -243,6 +266,8 @@ export default function Profile() {
             />
 
             <MenuItem
+              colors={colors}
+              styles={styles}
               icon={<Ionicons name="notifications" size={22} color="#F59E0B" />}
               title={
                 unreadNotifications > 0
@@ -255,6 +280,8 @@ export default function Profile() {
             />
 
             <MenuItem
+              colors={colors}
+              styles={styles}
               icon={<Feather name="help-circle" size={22} color="#475569" />}
               title="Help & Support"
               onPress={() => {
@@ -263,6 +290,8 @@ export default function Profile() {
             />
 
             <MenuItem
+              colors={colors}
+              styles={styles}
               icon={<MaterialIcons name="logout" size={22} color="#DC2626" />}
               title="Logout"
               onPress={() => {
@@ -273,6 +302,8 @@ export default function Profile() {
         ) : (
           <>
             <MenuItem
+              colors={colors}
+              styles={styles}
               icon={<Ionicons name="person" size={22} color="#2563EB" />}
               title="Edit Profile"
               onPress={() => {
@@ -281,6 +312,8 @@ export default function Profile() {
             />
 
             <MenuItem
+              colors={colors}
+              styles={styles}
               icon={<Ionicons name="time" size={22} color="#EA580C" />}
               title="History"
               onPress={() => {
@@ -289,6 +322,8 @@ export default function Profile() {
             />
 
             <MenuItem
+              colors={colors}
+              styles={styles}
               icon={<Ionicons name="notifications" size={22} color="#F59E0B" />}
               title={
                 unreadNotifications > 0
@@ -301,6 +336,8 @@ export default function Profile() {
             />
 
             <MenuItem
+              colors={colors}
+              styles={styles}
               icon={<Ionicons name="wallet" size={22} color="#22C55E" />}
               title="Payment Methods"
               onPress={() => {
@@ -309,6 +346,8 @@ export default function Profile() {
             />
 
             <MenuItem
+              colors={colors}
+              styles={styles}
               icon={<Feather name="help-circle" size={22} color="#475569" />}
               title="Help & Support"
               onPress={() => {
@@ -317,6 +356,8 @@ export default function Profile() {
             />
 
             <MenuItem
+              colors={colors}
+              styles={styles}
               icon={<MaterialIcons name="logout" size={22} color="#DC2626" />}
               title="Logout"
               onPress={() => {
@@ -329,14 +370,19 @@ export default function Profile() {
     </ScrollView>
   );
 }
+
 function MenuItem({
   icon,
   title,
   onPress,
+  colors,
+  styles,
 }: {
   icon: React.ReactNode;
   title: string;
   onPress?: () => void;
+  colors: AppColors;
+  styles: ReturnType<typeof createStyles>;
 }) {
   return (
     <TouchableOpacity style={styles.menuItem} onPress={onPress}>
@@ -344,143 +390,149 @@ function MenuItem({
 
       <Text style={styles.menuTitle}>{title}</Text>
 
-      <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+      <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
     </TouchableOpacity>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F5F5F5",
-  },
+function createStyles(colors: AppColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
 
-  header: {
-    backgroundColor: "#0B5A47",
-    paddingTop: 60,
-    paddingHorizontal: 25,
-    paddingBottom: 35,
-    borderBottomLeftRadius: 35,
-    borderBottomRightRadius: 35,
-  },
+    header: {
+      backgroundColor: colors.header,
+      paddingTop: 60,
+      paddingHorizontal: 25,
+      paddingBottom: 35,
+      borderBottomLeftRadius: 35,
+      borderBottomRightRadius: 35,
+    },
 
-  topRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
+    topRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
 
-  profileTitle: {
-    color: "white",
-    fontSize: 34,
-    fontWeight: "700",
-  },
+    profileTitle: {
+      color: colors.headerText,
+      fontSize: 34,
+      fontWeight: "700",
+    },
 
-  settingsBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.4)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
+    settingsBtn: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: "rgba(255,255,255,0.4)",
+      justifyContent: "center",
+      alignItems: "center",
+    },
 
-  userRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 35,
-  },
+    userRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginTop: 35,
+    },
 
-  avatar: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    marginRight: 18,
-    borderWidth: 4,
-    borderColor: "rgba(255,255,255,0.4)",
-  },
+    avatar: {
+      width: 90,
+      height: 90,
+      borderRadius: 45,
+      marginRight: 18,
+      borderWidth: 4,
+      borderColor: "rgba(255,255,255,0.4)",
+    },
 
-  name: {
-    color: "white",
-    fontSize: 30,
-    fontWeight: "700",
-  },
+    name: {
+      color: colors.headerText,
+      fontSize: 30,
+      fontWeight: "700",
+    },
 
-  phone: {
-    color: "white",
-    fontSize: 17,
-    marginTop: 6,
-  },
+    phone: {
+      color: colors.headerText,
+      fontSize: 17,
+      marginTop: 6,
+    },
 
-  role: {
-    color: "rgba(255,255,255,0.85)",
-    fontSize: 14,
-    marginTop: 4,
-    fontWeight: "600",
-  },
+    role: {
+      color: "rgba(255,255,255,0.85)",
+      fontSize: 14,
+      marginTop: 4,
+      fontWeight: "600",
+    },
 
+    statsContainer: {
+      backgroundColor: colors.backgroundCard,
+      marginHorizontal: 20,
+      marginTop: -28,
+      borderRadius: 20,
+      flexDirection: "row",
+      justifyContent: "space-around",
+      paddingVertical: 22,
+      elevation: 4,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
 
-  statsContainer: {
-    backgroundColor: "white",
-    marginHorizontal: 20,
-    marginTop: -28,
-    borderRadius: 20,
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: 22,
-    elevation: 4,
-  },
+    stat: {
+      alignItems: "center",
+      flex: 1,
+    },
 
-  stat: {
-    alignItems: "center",
-    flex: 1,
-  },
+    divider: {
+      width: 1,
+      backgroundColor: colors.border,
+    },
 
-  divider: {
-    width: 1,
-    backgroundColor: "#E5E7EB",
-  },
+    statNumber: {
+      fontSize: 28,
+      fontWeight: "700",
+      color: colors.text,
+    },
 
-  statNumber: {
-    fontSize: 28,
-    fontWeight: "700",
-  },
+    statLabel: {
+      marginTop: 8,
+      color: colors.textSecondary,
+    },
 
-  statLabel: {
-    marginTop: 8,
-    color: "#6B7280",
-  },
+    menu: {
+      backgroundColor: colors.backgroundCard,
+      margin: 20,
+      borderRadius: 25,
+      paddingVertical: 12,
+      elevation: 3,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
 
-  menu: {
-    backgroundColor: "white",
-    margin: 20,
-    borderRadius: 25,
-    paddingVertical: 12,
-    elevation: 3,
-  },
+    menuItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 20,
+      paddingVertical: 18,
+    },
 
-  menuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-  },
+    iconCircle: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: colors.backgroundMuted,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 18,
+    },
 
-  iconCircle: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#F3F4F6",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 18,
-  },
-
-  menuTitle: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#111827",
-  },
-});
+    menuTitle: {
+      flex: 1,
+      fontSize: 18,
+      fontWeight: "600",
+      color: colors.text,
+    },
+  });
+}

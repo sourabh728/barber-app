@@ -44,4 +44,14 @@ export class CreateCustomerAppointmentDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  /**
+   * When the customer already has an approved booking at the same time,
+   * they may book another chair for someone else. Stored as
+   * `{accountHolder} ({guest})`.
+   */
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  onBehalfOfName?: string;
 }

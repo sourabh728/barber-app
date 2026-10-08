@@ -55,7 +55,38 @@ export type CreateCustomerBookingPayload = {
   date: string;
   startTime: string;
   endTime: string;
+  /**
+   * Guest name when booking another chair at the same time as an approved
+   * booking. Stored as `{accountHolder} ({guest})`.
+   */
+  onBehalfOfName?: string;
 };
+
+/** True when two HH:mm intervals overlap. */
+export function timesOverlap(
+  startA: string,
+  endA: string,
+  startB: string,
+  endB: string,
+) {
+  return startA < endB && startB < endA;
+}
+
+export function findOverlappingApprovedBooking(
+  bookings: CustomerBooking[],
+  date: string,
+  startTime: string,
+  endTime: string,
+) {
+  return (
+    bookings.find(
+      (booking) =>
+        (booking.status === "CONFIRMED" || booking.status === "IN_PROGRESS") &&
+        booking.date === date &&
+        timesOverlap(startTime, endTime, booking.startTime, booking.endTime),
+    ) ?? null
+  );
+}
 
 export async function createCustomerBooking(
   shopId: string,
@@ -176,10 +207,14 @@ export function getCustomerBookingErrorMessage(error: unknown) {
   }
 
   if (error.response.status === 409) {
-    return messageFromResponseData(
+    const raw = messageFromResponseData(
       error.response.data,
       "This time slot is already booked for that barber.",
     );
+    if (raw.startsWith("SAME_TIME_APPROVED:")) {
+      return "You already have an approved booking at this time. You can book another chair for someone else.";
+    }
+    return raw;
   }
 
   if (error.response.status === 400) {

@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -17,6 +17,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useSession } from "@/context/session-provider";
+import type { AppColors } from "@/constants/theme";
+import { useTheme } from "@/hooks/use-theme";
 import {
   fetchMyBookings,
   type CustomerBooking,
@@ -120,6 +122,8 @@ const SHOP_ICONS: (keyof typeof Ionicons.glyphMap)[] = [
 export function CustomerHomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const colors = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { user } = useSession();
 
   const [shops, setShops] = useState<PublicShop[]>([]);
@@ -575,10 +579,11 @@ export function CustomerHomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(colors: AppColors) {
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.background,
   },
 
   listContent: {
@@ -594,14 +599,14 @@ const styles = StyleSheet.create({
 
   greeting: {
     fontSize: 15,
-    color: "#64748B",
+    color: colors.textSecondary,
     fontWeight: "500",
   },
 
   customerName: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#0F172A",
+    color: colors.text,
     marginTop: 0,
     marginBottom: 12,
   },
@@ -610,10 +615,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    backgroundColor: "#E7F3ED",
+    backgroundColor: colors.backgroundSelected,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#B7D8C8",
+    borderColor: colors.border,
     paddingHorizontal: 12,
     paddingVertical: 12,
     marginBottom: 12,
@@ -623,7 +628,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.backgroundCard,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -637,7 +642,7 @@ const styles = StyleSheet.create({
   reminderEyebrow: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#0B5A47",
+    color: colors.primary,
     textTransform: "uppercase",
     letterSpacing: 0.3,
   },
@@ -645,31 +650,31 @@ const styles = StyleSheet.create({
   reminderTitle: {
     fontSize: 15,
     fontWeight: "800",
-    color: "#0F172A",
+    color: colors.text,
   },
 
   reminderMeta: {
     fontSize: 12,
     fontWeight: "500",
-    color: "#334155",
+    color: colors.textSecondary,
   },
 
   searchWrap: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.backgroundCard,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
   },
 
   searchInput: {
     flex: 1,
     fontSize: 14,
-    color: "#0F172A",
+    color: colors.text,
     padding: 0,
   },
 
@@ -685,7 +690,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 17,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.text,
   },
 
   filterButton: {
@@ -694,19 +699,19 @@ const styles = StyleSheet.create({
     gap: 5,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#CBD5E1",
+    borderColor: colors.border,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.backgroundCard,
   },
 
   filterButtonActive: {
-    backgroundColor: "#0B5A47",
-    borderColor: "#0B5A47",
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
 
   filterButtonText: {
-    color: "#0F172A",
+    color: colors.text,
     fontWeight: "700",
     fontSize: 12,
   },
@@ -718,15 +723,15 @@ const styles = StyleSheet.create({
   filterSummary: {
     marginTop: -2,
     marginBottom: 8,
-    color: "#64748B",
+    color: colors.textSecondary,
     fontSize: 12,
   },
 
   shopCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.backgroundCard,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
     marginBottom: 8,
     padding: 10,
   },
@@ -741,7 +746,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 10,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: colors.backgroundMuted,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
@@ -771,14 +776,14 @@ const styles = StyleSheet.create({
   shopName: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.text,
   },
 
   shopAddress: {
     marginTop: 2,
     fontSize: 11,
     lineHeight: 15,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
 
   servicesWrap: {
@@ -788,7 +793,7 @@ const styles = StyleSheet.create({
 
   servicesLabel: {
     fontSize: 10,
-    color: "#64748B",
+    color: colors.textSecondary,
     fontWeight: "600",
     textAlign: "right",
   },
@@ -796,13 +801,13 @@ const styles = StyleSheet.create({
   servicesValue: {
     fontSize: 18,
     fontWeight: "800",
-    color: "#0F172A",
+    color: colors.text,
     marginTop: 1,
   },
 
   bookButton: {
     alignSelf: "flex-start",
-    backgroundColor: "#0B5A47",
+    backgroundColor: colors.primary,
     borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 12,
@@ -824,7 +829,7 @@ const styles = StyleSheet.create({
   },
 
   pageButton: {
-    backgroundColor: "#0B5A47",
+    backgroundColor: colors.primary,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -855,13 +860,13 @@ const styles = StyleSheet.create({
 
   stateText: {
     textAlign: "center",
-    color: "#64748B",
+    color: colors.textSecondary,
     fontSize: 15,
     lineHeight: 22,
   },
 
   retryButton: {
-    backgroundColor: "#0B5A47",
+    backgroundColor: colors.primary,
     borderRadius: 10,
     paddingHorizontal: 18,
     paddingVertical: 10,
@@ -879,7 +884,7 @@ const styles = StyleSheet.create({
   },
 
   modalSheet: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.backgroundCard,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
@@ -898,14 +903,14 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#0F172A",
+    color: colors.text,
     marginBottom: 16,
   },
 
   modalLabel: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#334155",
+    color: colors.textSecondary,
     marginBottom: 8,
     marginTop: 4,
   },
@@ -918,19 +923,19 @@ const styles = StyleSheet.create({
   chip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#CBD5E1",
+    borderColor: colors.border,
     paddingHorizontal: 14,
     paddingVertical: 8,
     backgroundColor: "#F8FAFC",
   },
 
   chipActive: {
-    backgroundColor: "#0B5A47",
-    borderColor: "#0B5A47",
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
 
   chipText: {
-    color: "#334155",
+    color: colors.textSecondary,
     fontWeight: "600",
     fontSize: 13,
   },
@@ -949,20 +954,20 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#CBD5E1",
+    borderColor: colors.border,
     paddingVertical: 14,
     alignItems: "center",
   },
 
   clearButtonText: {
-    color: "#334155",
+    color: colors.textSecondary,
     fontWeight: "700",
   },
 
   applyButton: {
     flex: 1,
     borderRadius: 12,
-    backgroundColor: "#0B5A47",
+    backgroundColor: colors.primary,
     paddingVertical: 14,
     alignItems: "center",
   },
@@ -972,3 +977,5 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
+}
+

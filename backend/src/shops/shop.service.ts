@@ -806,6 +806,38 @@ export class ShopService {
     }
   }
 
+  /** Approved (or in-progress) booking for this customer overlapping the slot. */
+  private async findCustomerOverlappingApproved(params: {
+    customerId: string;
+    date: Date;
+    startTime: string;
+    endTime: string;
+  }) {
+    const candidates = await this.prisma.appointment.findMany({
+      where: {
+        customerId: params.customerId,
+        date: params.date,
+        status: {
+          in: [AppointmentStatus.CONFIRMED, AppointmentStatus.IN_PROGRESS],
+        },
+      },
+      select: {
+        id: true,
+        staffId: true,
+        startTime: true,
+        endTime: true,
+        staff: { select: { name: true } },
+      },
+    });
+
+    return (
+      candidates.find(
+        (other) =>
+          params.startTime < other.endTime && other.startTime < params.endTime,
+      ) ?? null
+    );
+  }
+
   /**
    * Customer booking caps:
    * - At most one PENDING request at a time (wait for accept/reject/cancel).
@@ -1552,6 +1584,31 @@ export class ShopService {
 
     await this.assertCustomerCanCreateBooking(customer.id);
 
+    const status = AppointmentStatus.PENDING;
+    const date = toDateOnlyUtc(dto.date);
+    const onBehalfOfName = dto.onBehalfOfName?.trim() || '';
+
+    const overlappingApproved = await this.findCustomerOverlappingApproved({
+      customerId: customer.id,
+      date,
+      startTime: dto.startTime,
+      endTime: dto.endTime,
+    });
+
+    if (overlappingApproved && !onBehalfOfName) {
+      const barberLabel =
+        overlappingApproved.staff?.name?.trim() || 'another barber';
+      throw new ConflictException(
+        `SAME_TIME_APPROVED:${overlappingApproved.id}:${barberLabel}:${overlappingApproved.startTime}-${overlappingApproved.endTime}`,
+      );
+    }
+
+    if (!overlappingApproved && onBehalfOfName) {
+      throw new BadRequestException(
+        'onBehalfOfName is only allowed when you already have an approved booking at the same time',
+      );
+    }
+
     const requestedStaffId = dto.staffId?.trim() || null;
     let staffId: string | null = null;
 
@@ -1573,8 +1630,16 @@ export class ShopService {
       staffId = staff.id;
     }
 
-    const status = AppointmentStatus.PENDING;
-    const date = toDateOnlyUtc(dto.date);
+    if (
+      overlappingApproved &&
+      staffId &&
+      overlappingApproved.staffId &&
+      staffId === overlappingApproved.staffId
+    ) {
+      throw new BadRequestException(
+        'That barber is already booked for you at this time. Choose a different barber or book for someone else with another barber.',
+      );
+    }
 
     if (staffId) {
       await this.assertStaffBookableAtSlot({
@@ -1600,11 +1665,16 @@ export class ShopService {
       });
     }
 
+    const bookerName = customer.name.trim();
+    const customerName = onBehalfOfName
+      ? `${bookerName} (${onBehalfOfName})`
+      : bookerName;
+
     const appointment = await this.prisma.appointment.create({
       data: {
         shopId: shop.id,
         customerId: customer.id,
-        customerName: customer.name.trim(),
+        customerName,
         customerPhone: customer.phone?.trim() || null,
         serviceName: dto.serviceName.trim(),
         staffId,
@@ -1624,7 +1694,7 @@ export class ShopService {
     await this.notificationsService.create({
       userId: shop.ownerId,
       title: 'New booking request',
-      body: `${customer.name.trim()} booked ${appointment.serviceName} at ${appointment.shop.name} on ${formatDateOnly(appointment.date)} (${appointment.startTime}).`,
+      body: `${customerName} booked ${appointment.serviceName} at ${appointment.shop.name} on ${formatDateOnly(appointment.date)} (${appointment.startTime}).`,
       href: '/barber/appointments',
       appointmentId: appointment.id,
     });

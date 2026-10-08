@@ -6,9 +6,13 @@ import {
   ThemeProvider,
 } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useColorScheme } from "react-native";
+import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import {
+  AppearanceProvider,
+  useAppearancePreference,
+} from "@/context/appearance-provider";
 import { SessionProvider, useSession } from "@/context/session-provider";
 
 SplashScreen.preventAutoHideAsync();
@@ -25,17 +29,26 @@ function SplashScreenController() {
   return null;
 }
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
+function ThemedApp() {
+  const colorScheme = useAppearancePreference();
 
   return (
+    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+      <StatusBar style="light" />
+      <RootNavigator />
+    </ThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
     <SafeAreaProvider>
-      <SessionProvider>
-        <SplashScreenController />
-        <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-          <RootNavigator />
-        </ThemeProvider>
-      </SessionProvider>
+      <AppearanceProvider>
+        <SessionProvider>
+          <SplashScreenController />
+          <ThemedApp />
+        </SessionProvider>
+      </AppearanceProvider>
     </SafeAreaProvider>
   );
 }
@@ -51,6 +64,7 @@ function RootNavigator() {
       <Stack.Protected guard={!!session}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="edit-profile" />
+        <Stack.Screen name="settings" />
         <Stack.Screen name="help-support" />
         <Stack.Screen name="payment-methods" />
         <Stack.Screen name="history/index" />
