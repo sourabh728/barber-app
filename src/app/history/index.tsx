@@ -4,7 +4,6 @@ import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,7 +13,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
-  cancelMyBooking,
   fetchMyBookings,
   getCustomerBookingErrorMessage,
   type CustomerBooking,
@@ -87,7 +85,6 @@ export default function CustomerHistoryScreen() {
   const [bookings, setBookings] = useState<CustomerBooking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   const loadBookings = useCallback(async () => {
     setErrorMessage("");
@@ -109,40 +106,6 @@ export default function CustomerHistoryScreen() {
       void loadBookings();
     }, [loadBookings]),
   );
-
-  const confirmCancel = (booking: CustomerBooking) => {
-    Alert.alert(
-      "Cancel booking?",
-      "This will cancel your appointment request.",
-      [
-        { text: "Keep", style: "cancel" },
-        {
-          text: "Cancel booking",
-          style: "destructive",
-          onPress: () => {
-            void (async () => {
-              setCancellingId(booking.id);
-              try {
-                const updated = await cancelMyBooking(booking.id);
-                setBookings((current) =>
-                  current.map((item) =>
-                    item.id === updated.id ? updated : item,
-                  ),
-                );
-              } catch (error) {
-                Alert.alert(
-                  "Could not cancel",
-                  getCustomerBookingErrorMessage(error),
-                );
-              } finally {
-                setCancellingId(null);
-              }
-            })();
-          },
-        },
-      ],
-    );
-  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -193,14 +156,36 @@ export default function CustomerHistoryScreen() {
                 {bookings.length}{" "}
                 {bookings.length === 1 ? "booking" : "bookings"} so far
               </Text>
+              <Text style={styles.hint}>
+                Tap a request to see full details and status.
+              </Text>
 
               {bookings.map((booking) => {
                 const meta = statusMeta(booking.status);
                 return (
-                  <View key={booking.id} style={styles.bookingRow}>
-                    <Text style={styles.dateText}>
-                      {formatBookingDate(booking.date)}
-                    </Text>
+                  <TouchableOpacity
+                    key={booking.id}
+                    style={styles.bookingRow}
+                    activeOpacity={0.85}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/history/[id]",
+                        params: { id: booking.id },
+                      })
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open details for ${booking.shopName}`}
+                  >
+                    <View style={styles.bookingTop}>
+                      <Text style={styles.dateText}>
+                        {formatBookingDate(booking.date)}
+                      </Text>
+                      <Ionicons
+                        name="chevron-forward"
+                        size={18}
+                        color="#8B8BA7"
+                      />
+                    </View>
 
                     <Text style={styles.detailLine}>
                       <Text style={styles.detailIcon}>🕐 </Text>
@@ -239,26 +224,7 @@ export default function CustomerHistoryScreen() {
                         </Text>
                       </View>
                     </View>
-
-                    {booking.status === "PENDING" ||
-                    booking.status === "CONFIRMED" ? (
-                      <TouchableOpacity
-                        style={styles.cancelButton}
-                        disabled={cancellingId === booking.id}
-                        onPress={() => confirmCancel(booking)}
-                        accessibilityRole="button"
-                        accessibilityLabel="Cancel booking"
-                      >
-                        {cancellingId === booking.id ? (
-                          <ActivityIndicator color="#F87171" />
-                        ) : (
-                          <Text style={styles.cancelButtonText}>
-                            Cancel booking
-                          </Text>
-                        )}
-                      </TouchableOpacity>
-                    ) : null}
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </>
@@ -320,6 +286,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
+  hint: {
+    color: "#6B6B84",
+    fontSize: 13,
+    marginBottom: 8,
+  },
+
   loader: {
     marginTop: 32,
     marginBottom: 16,
@@ -363,11 +335,19 @@ const styles = StyleSheet.create({
     borderBottomColor: "rgba(255,255,255,0.1)",
   },
 
+  bookingTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+    gap: 8,
+  },
+
   dateText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "700",
-    marginBottom: 10,
+    flex: 1,
   },
 
   detailLine: {
@@ -413,21 +393,5 @@ const styles = StyleSheet.create({
   statusValue: {
     fontSize: 13,
     fontWeight: "700",
-  },
-
-  cancelButton: {
-    marginTop: 12,
-    alignSelf: "flex-start",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "rgba(248,113,113,0.45)",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-
-  cancelButtonText: {
-    color: "#F87171",
-    fontWeight: "700",
-    fontSize: 13,
   },
 });

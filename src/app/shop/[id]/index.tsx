@@ -181,6 +181,7 @@ export default function ShopBookAppointmentScreen() {
   );
   const [confirming, setConfirming] = useState(false);
   const [successVisible, setSuccessVisible] = useState(false);
+  const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
   const [occupiedSlots, setOccupiedSlots] = useState<OccupiedSlotInterval[]>(
     [],
   );
@@ -418,7 +419,7 @@ export default function ShopBookAppointmentScreen() {
 
     setConfirming(true);
     try {
-      await createCustomerBooking(shop.id, {
+      const created = await createCustomerBooking(shop.id, {
         serviceName: selectedServices.map((service) => service.name).join(" + "),
         staffId: prefersAnyStaff ? null : selectedStaffId,
         priceInr: totalAmount,
@@ -427,6 +428,7 @@ export default function ShopBookAppointmentScreen() {
         endTime,
       });
 
+      setCreatedBookingId(created.id);
       setSuccessVisible(true);
       void loadBookingLimit();
     } catch (err) {
@@ -437,13 +439,15 @@ export default function ShopBookAppointmentScreen() {
     }
   };
 
-  const closeSuccessAndGoBack = () => {
+  const closeSuccessAndViewRequest = () => {
     setSuccessVisible(false);
-    router.back();
-  };
-
-  const closeSuccessAndViewHistory = () => {
-    setSuccessVisible(false);
+    if (createdBookingId) {
+      router.replace({
+        pathname: "/history/[id]",
+        params: { id: createdBookingId },
+      });
+      return;
+    }
     router.replace("/history");
   };
 
@@ -945,8 +949,7 @@ export default function ShopBookAppointmentScreen() {
       <BookingSuccessDialog
         visible={successVisible}
         shopName={shop.name}
-        onViewHistory={closeSuccessAndViewHistory}
-        onOk={closeSuccessAndGoBack}
+        onViewRequest={closeSuccessAndViewRequest}
       />
     </View>
   );

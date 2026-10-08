@@ -142,6 +142,28 @@ export class CustomerService {
     return { completedBookings, totalBookings };
   }
 
+  /** Single booking detail for the signed-in customer. */
+  async getMyAppointment(userId: string, appointmentId: string) {
+    const owned = await this.buildOwnedAppointmentsFilter(userId);
+
+    const appointment = await this.prisma.appointment.findFirst({
+      where: {
+        id: appointmentId,
+        ...owned,
+      },
+      include: {
+        shop: { select: { id: true, name: true } },
+        staff: { select: { id: true, name: true } },
+      },
+    });
+
+    if (!appointment) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    return serializeCustomerAppointment(appointment);
+  }
+
   /** Customer cancels their own booking (PENDING or CONFIRMED only). */
   async cancelMyAppointment(userId: string, appointmentId: string) {
     const owned = await this.buildOwnedAppointmentsFilter(userId);

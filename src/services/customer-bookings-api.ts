@@ -35,6 +35,13 @@ export async function fetchMyBookings(params?: { status?: AppointmentStatus }) {
   return response.data;
 }
 
+export async function fetchMyBooking(appointmentId: string) {
+  const response = await api.get<CustomerBooking>(
+    `/customers/me/appointments/${appointmentId}`,
+  );
+  return response.data;
+}
+
 export async function fetchMyBookingStats() {
   const response = await api.get<CustomerBookingStats>("/customers/me/stats");
   return response.data;

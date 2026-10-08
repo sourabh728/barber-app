@@ -45,6 +45,18 @@ export class CustomerController {
     return this.customerService.getMyStats(req.user.userId);
   }
 
+  @Get('me/appointments/:id')
+  @UseGuards(JwtAuthGuard)
+  getMyAppointment(
+    @Param('id') appointmentId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.customerService.getMyAppointment(
+      req.user.userId,
+      appointmentId,
+    );
+  }
+
   /** Customer cancels their booking → CANCELLED. */
   @Patch('me/appointments/:id/cancel')
   @UseGuards(JwtAuthGuard)

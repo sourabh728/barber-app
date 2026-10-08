@@ -13,15 +13,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 type BookingSuccessDialogProps = {
   visible: boolean;
   shopName?: string;
-  onViewHistory: () => void;
-  onOk: () => void;
+  /** Opens the request details / waiting status screen. */
+  onViewRequest: () => void;
 };
 
 export function BookingSuccessDialog({
   visible,
   shopName,
-  onViewHistory,
-  onOk,
+  onViewRequest,
 }: BookingSuccessDialogProps) {
   const insets = useSafeAreaInsets();
 
@@ -30,9 +29,9 @@ export function BookingSuccessDialog({
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onOk}
+      onRequestClose={onViewRequest}
     >
-      <Pressable style={styles.backdrop} onPress={onOk}>
+      <Pressable style={styles.backdrop} onPress={onViewRequest}>
         <Pressable
           style={[styles.card, { marginBottom: Math.max(insets.bottom, 16) }]}
           onPress={(event) => event.stopPropagation()}
@@ -46,8 +45,8 @@ export function BookingSuccessDialog({
             {shopName
               ? `Your booking request was sent to ${shopName}.`
               : "Your booking request was sent to the shop."}{" "}
-            It’s waiting for approval — you’ll be notified when they confirm or
-            reject it.
+            Please wait for the barber to accept or decline — don’t book
+            elsewhere until you see the result.
           </Text>
 
           <View style={styles.statusPill}>
@@ -57,17 +56,17 @@ export function BookingSuccessDialog({
 
           <TouchableOpacity
             style={styles.primaryButton}
-            onPress={onViewHistory}
+            onPress={onViewRequest}
             accessibilityRole="button"
-            accessibilityLabel="View history"
+            accessibilityLabel="View request status"
           >
             <Ionicons name="time-outline" size={18} color="#FFFFFF" />
-            <Text style={styles.primaryButtonText}>View history</Text>
+            <Text style={styles.primaryButtonText}>View request status</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.secondaryButton}
-            onPress={onOk}
+            onPress={onViewRequest}
             accessibilityRole="button"
             accessibilityLabel="OK"
           >
