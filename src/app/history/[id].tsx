@@ -27,7 +27,16 @@ import {
   type CustomerBooking,
 } from "@/services/customer-bookings-api";
 import type { AppointmentStatus } from "@/services/shop-appointments-api";
+import {
+  fetchBookingVerification,
+  getVerificationErrorMessage,
+  issueServiceStartQr,
+  type BookingVerification,
+  type ServiceStartQrResponse,
+} from "@/services/verification-api";
 import { showAppAlert } from "@/utils/app-alert";
+import QRCode from "react-native-qrcode-svg";
+
 
 function toDateKey(date: Date) {
   const year = date.getFullYear();
@@ -165,6 +174,13 @@ export default function BookingRequestDetailScreen() {
   const [errorMessage, setErrorMessage] = useState("");
   const [cancelling, setCancelling] = useState(false);
   const [cancelDialogVisible, setCancelDialogVisible] = useState(false);
+  const [verification, setVerification] = useState<BookingVerification | null>(
+    null,
+  );
+  const [serviceQr, setServiceQr] = useState<ServiceStartQrResponse | null>(
+    null,
+  );
+  const [serviceQrLoading, setServiceQrLoading] = useState(false);
 
   const loadBooking = useCallback(async () => {
     if (!bookingId) {
@@ -179,6 +195,12 @@ export default function BookingRequestDetailScreen() {
     try {
       const data = await fetchMyBooking(bookingId);
       setBooking(data);
+      try {
+        const v = await fetchBookingVerification(bookingId);
+        setVerification(v);
+      } catch {
+        setVerification(null);
+      }
     } catch (error) {
       setBooking(null);
       setErrorMessage(getCustomerBookingErrorMessage(error));
@@ -327,6 +349,90 @@ export default function BookingRequestDetailScreen() {
                 styles={styles}
                 accentColor={colors.accent}
               />
+
+              {booking.status === "CONFIRMED" ||
+              booking.status === "IN_PROGRESS" ||
+              booking.status === "COMPLETED" ? (
+                <View style={styles.verifyBox}>
+                  <Text style={styles.sectionTitle}>Check-in & service</Text>
+                  <Text style={styles.verifyHint}>
+                    {verification?.arrivedAt
+                      ? `Checked in · ${new Date(verification.arrivedAt).toLocaleTimeString()}`
+                      : "At the shop, scan the shop QR to check in."}
+                  </Text>
+                  {!verification?.arrivedAt &&
+                  booking.status === "CONFIRMED" ? (
+                    <TouchableOpacity
+                      style={styles.verifyButton}
+                      onPress={() => router.push("/scan-shop-qr")}
+                    >
+                      <Text style={styles.verifyButtonText}>
+                        Scan shop QR
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  {verification?.arrivedAt && !verification.actualStartAt ? (
+                    <>
+                      <TouchableOpacity
+                        style={styles.verifyButton}
+                        disabled={serviceQrLoading}
+                        onPress={() => {
+                          void (async () => {
+                            setServiceQrLoading(true);
+                            try {
+                              const qr = await issueServiceStartQr(booking.id);
+                              setServiceQr(qr);
+                            } catch (error) {
+                              showAppAlert(
+                                "Could not create QR",
+                                getVerificationErrorMessage(error),
+                              );
+                            } finally {
+                              setServiceQrLoading(false);
+                            }
+                          })();
+                        }}
+                      >
+                        {serviceQrLoading ? (
+                          <ActivityIndicator color="#fff" />
+                        ) : (
+                          <Text style={styles.verifyButtonText}>
+                            {serviceQr
+                              ? "Refresh service QR"
+                              : "Show service QR"}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                      {serviceQr ? (
+                        <View style={styles.qrWrap}>
+                          <QRCode
+                            value={serviceQr.qrPayload}
+                            size={180}
+                            backgroundColor="#fff"
+                          />
+                          <Text style={styles.verifyHint}>
+                            Show this to your barber · expires{" "}
+                            {new Date(serviceQr.expiresAt).toLocaleTimeString()}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </>
+                  ) : null}
+                  {verification?.actualStartAt ? (
+                    <Text style={styles.verifyHint}>
+                      Service started ·{" "}
+                      {new Date(verification.actualStartAt).toLocaleTimeString()}
+                    </Text>
+                  ) : null}
+                  {verification?.bookingScore != null ? (
+                    <Text style={styles.scoreText}>
+                      Score: {verification.bookingScore}/10 (
+                      {verification.basePoints} base +{" "}
+                      {verification.punctualityPoints} punctuality)
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
 
               {canCancel ? (
                 <TouchableOpacity
@@ -538,6 +644,50 @@ function createStyles(colors: AppColors) {
     color: colors.text,
     fontSize: 15,
     fontWeight: "700",
+  },
+
+  verifyBox: {
+    marginTop: 20,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+
+  verifyHint: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+
+  verifyButton: {
+    borderRadius: 14,
+    backgroundColor: colors.accent,
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+
+  verifyButtonText: {
+    color: colors.accentText,
+    fontWeight: "800",
+    fontSize: 15,
+  },
+
+  qrWrap: {
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 8,
+  },
+
+  scoreText: {
+    color: colors.text,
+    fontWeight: "700",
+    fontSize: 14,
+    marginTop: 4,
   },
 
   cancelButton: {

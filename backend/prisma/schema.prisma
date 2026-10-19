@@ -82,6 +82,8 @@ model Shop {
 
   ownerId     String
   owner       User     @relation(fields: [ownerId], references: [id])
+  /// Opaque token embedded in the shop's static arrival QR (not the shop UUID).
+  qrToken     String   @unique @default(uuid())
   holidays     ShopHoliday[]
   staff        ShopStaff[]
   services     ShopService[]
@@ -167,6 +169,24 @@ model Appointment {
   endTime       String
   isWalkIn      Boolean           @default(false)
 
+  /// Server time when customer arrival was verified at the shop.
+  arrivedAt                 DateTime?
+  /// Server time when barber verified service start via customer QR.
+  actualStartAt             DateTime?
+  /// Single-use jti for the current service-start QR (null when none issued).
+  serviceStartQrJti         String?   @unique
+  serviceStartQrExpiresAt   DateTime?
+  serviceStartQrConsumedAt  DateTime?
+
+  /// Idempotent scoring fields (set once when COMPLETED + actualStartAt).
+  basePoints         Int?
+  punctualityPoints  Int?
+  bookingScore       Int?
+  scoredAt           DateTime?
+
+  arrival            AppointmentArrival?
+  verificationAudits VerificationAuditLog[]
+
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 
@@ -174,6 +194,41 @@ model Appointment {
   @@index([shopId, status])
   @@index([staffId])
   @@index([customerId, date])
+  @@index([staffId, actualStartAt])
+  @@index([scoredAt])
+}
+
+/// One arrival verification per booking (prevents duplicate arrival records).
+model AppointmentArrival {
+  id            String   @id @default(uuid())
+  appointmentId String   @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  customerId    String
+  shopId        String
+  /// Server timestamp of successful arrival verification
+  arrivedAt     DateTime @default(now())
+  status        String   @default("VERIFIED")
+
+  createdAt     DateTime @default(now())
+
+  @@index([shopId, arrivedAt])
+  @@index([customerId])
+}
+
+model VerificationAuditLog {
+  id            String   @id @default(uuid())
+  appointmentId String?
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  shopId        String?
+  actorUserId   String?
+  /// ARRIVAL_SCAN | SERVICE_START_SCAN
+  action        String
+  success       Boolean
+  detail        String?
+  createdAt     DateTime @default(now())
+
+  @@index([appointmentId, createdAt])
+  @@index([shopId, createdAt])
 }
 
 enum UserRole {

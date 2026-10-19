@@ -51,6 +51,14 @@
       "expo-image",
       "expo-secure-store",
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Trimshim to use the camera to scan shop and service QR codes.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "Allow Trimshim to access your photos so you can set a profile or shop picture.",

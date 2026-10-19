@@ -8,6 +8,7 @@ import { CustomerModule } from './customers/customer.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ShopModule } from './shops/shop.module';
+import { VerificationModule } from './verification/verification.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -18,6 +19,7 @@ import { ShopModule } from './shops/shop.module';
     NotificationsModule,
     PrismaModule,
     ShopModule,
+    VerificationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

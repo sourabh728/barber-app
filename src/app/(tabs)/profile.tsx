@@ -268,6 +268,38 @@ export default function Profile() {
             <MenuItem
               colors={colors}
               styles={styles}
+              icon={<Ionicons name="qr-code-outline" size={22} color="#0EA5E9" />}
+              title="Shop QR code"
+              onPress={() => {
+                router.push("/barber/shop-qr");
+              }}
+            />
+
+            <MenuItem
+              colors={colors}
+              styles={styles}
+              icon={
+                <Ionicons name="scan-outline" size={22} color="#8B5CF6" />
+              }
+              title="Scan service QR"
+              onPress={() => {
+                router.push("/barber/scan-service-qr");
+              }}
+            />
+
+            <MenuItem
+              colors={colors}
+              styles={styles}
+              icon={<Ionicons name="trophy-outline" size={22} color="#EAB308" />}
+              title="Weekly leaderboard"
+              onPress={() => {
+                router.push("/barber/leaderboard");
+              }}
+            />
+
+            <MenuItem
+              colors={colors}
+              styles={styles}
               icon={<Ionicons name="notifications" size={22} color="#F59E0B" />}
               title={
                 unreadNotifications > 0
@@ -318,6 +350,16 @@ export default function Profile() {
               title="History"
               onPress={() => {
                 router.push("/history");
+              }}
+            />
+
+            <MenuItem
+              colors={colors}
+              styles={styles}
+              icon={<Ionicons name="scan-outline" size={22} color="#0EA5E9" />}
+              title="Check in (scan shop QR)"
+              onPress={() => {
+                router.push("/scan-shop-qr");
               }}
             />
 

@@ -13,6 +13,7 @@ import {
 
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { VerificationService } from '../verification/verification.service';
 import {
   publicUploadPath,
   tryDeleteUpload,
@@ -377,6 +378,7 @@ export class ShopService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
+    private readonly verificationService: VerificationService,
   ) {}
 
   createShop(createShopDto: CreateShopDto, ownerId: string) {
@@ -1813,6 +1815,13 @@ export class ShopService {
         href: '/history',
         appointmentId: appointment.id,
       });
+    }
+
+    if (
+      statusChanged &&
+      appointment.status === AppointmentStatus.COMPLETED
+    ) {
+      await this.verificationService.scoreAppointmentIfEligible(appointment.id);
     }
 
     return serializeAppointment(appointment);
