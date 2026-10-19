@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
 
 import { QrScannerScreen } from "@/components/qr-scanner-screen";
@@ -6,25 +6,31 @@ import {
   getVerificationErrorMessage,
   scanShopArrival,
 } from "@/services/verification-api";
-import { showAppAlert } from "@/utils/app-alert";
 
 export default function ScanShopQrScreen() {
   const router = useRouter();
+  const { appointmentId } = useLocalSearchParams<{ appointmentId?: string }>();
 
   return (
     <QrScannerScreen
-      title="Check in"
-      subtitle="Scan the shop QR code when you arrive"
+      title="Scan shop QR"
+      subtitle="Your appointment is confirmed. Scan the shop QR when you arrive to check in."
       onScan={async (data) => {
         try {
           const result = await scanShopArrival(data);
-          showAppAlert(
-            "Checked in",
-            `Arrived for ${result.serviceName} at ${result.startTime}. Show your service QR to the barber when ready.`,
-          );
-          router.replace(`/history/${result.appointmentId}`);
+          // After arrival, show the service QR the barber will scan at start.
+          router.replace(`/service-start-qr?id=${result.appointmentId}`);
         } catch (error) {
-          throw new Error(getVerificationErrorMessage(error));
+          const message = getVerificationErrorMessage(error);
+          // If already checked in, open service QR for that booking when known.
+          if (
+            appointmentId &&
+            /already recorded|already/i.test(message)
+          ) {
+            router.replace(`/service-start-qr?id=${appointmentId}`);
+            return;
+          }
+          throw new Error(message);
         }
       }}
     />

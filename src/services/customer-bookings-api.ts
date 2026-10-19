@@ -18,6 +18,10 @@ export type CustomerBooking = {
   startTime: string;
   endTime: string;
   isWalkIn: boolean;
+  /** ISO timestamp when customer checked in via shop QR */
+  arrivedAt?: string | null;
+  /** ISO timestamp when barber started service via customer QR */
+  actualStartAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };

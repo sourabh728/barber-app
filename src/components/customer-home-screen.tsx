@@ -296,38 +296,83 @@ export function CustomerHomeScreen() {
             <Text style={styles.customerName}>{firstName}</Text>
 
             {acceptedReminder ? (
-              <TouchableOpacity
-                style={styles.reminderCard}
-                activeOpacity={0.9}
-                onPress={() => router.push("/history")}
-                accessibilityRole="button"
-                accessibilityLabel={`Reminder: appointment at ${acceptedReminder.shopName} on ${acceptedReminder.date} at ${acceptedReminder.startTime}`}
-              >
-                <View style={styles.reminderIconWrap}>
-                  <Ionicons name="notifications" size={18} color="#0B5A47" />
-                </View>
-                <View style={styles.reminderCopy}>
-                  <Text style={styles.reminderEyebrow}>
-                    {acceptedReminder.status === "IN_PROGRESS"
-                      ? "In progress now"
-                      : "Appointment confirmed"}
-                  </Text>
-                  <Text style={styles.reminderTitle} numberOfLines={1}>
-                    {acceptedReminder.shopName}
-                  </Text>
-                  <Text style={styles.reminderMeta} numberOfLines={2}>
-                    {formatReminderDate(acceptedReminder.date)} ·{" "}
-                    {formatTime12h(acceptedReminder.startTime)}
-                    {acceptedReminder.serviceName
-                      ? ` · ${acceptedReminder.serviceName}`
-                      : ""}
-                    {acceptedReminder.staffName
-                      ? ` · ${acceptedReminder.staffName}`
-                      : ""}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color="#0B5A47" />
-              </TouchableOpacity>
+              <View style={styles.reminderCard}>
+                <TouchableOpacity
+                  style={styles.reminderMain}
+                  activeOpacity={0.9}
+                  onPress={() =>
+                    router.push(`/history/${acceptedReminder.id}`)
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={`Appointment confirmed at ${acceptedReminder.shopName}`}
+                >
+                  <View style={styles.reminderIconWrap}>
+                    <Ionicons name="checkmark-circle" size={18} color="#0B5A47" />
+                  </View>
+                  <View style={styles.reminderCopy}>
+                    <Text style={styles.reminderEyebrow}>
+                      {acceptedReminder.status === "IN_PROGRESS"
+                        ? "In progress now"
+                        : acceptedReminder.arrivedAt
+                          ? "Checked in — show service QR"
+                          : "Appointment confirmed"}
+                    </Text>
+                    <Text style={styles.reminderTitle} numberOfLines={1}>
+                      {acceptedReminder.shopName}
+                    </Text>
+                    <Text style={styles.reminderMeta} numberOfLines={2}>
+                      {formatReminderDate(acceptedReminder.date)} ·{" "}
+                      {formatTime12h(acceptedReminder.startTime)}
+                      {acceptedReminder.serviceName
+                        ? ` · ${acceptedReminder.serviceName}`
+                        : ""}
+                      {acceptedReminder.staffName
+                        ? ` · ${acceptedReminder.staffName}`
+                        : ""}
+                    </Text>
+                    {acceptedReminder.status === "CONFIRMED" &&
+                    !acceptedReminder.arrivedAt ? (
+                      <Text style={styles.reminderHint}>
+                        At the shop? Tap the scan icon to check in.
+                      </Text>
+                    ) : null}
+                  </View>
+                </TouchableOpacity>
+                {acceptedReminder.status === "CONFIRMED" &&
+                !acceptedReminder.actualStartAt ? (
+                  <TouchableOpacity
+                    style={styles.scanIconBtn}
+                    onPress={() => {
+                      if (acceptedReminder.arrivedAt) {
+                        router.push(
+                          `/service-start-qr?id=${acceptedReminder.id}`,
+                        );
+                      } else {
+                        router.push({
+                          pathname: "/scan-shop-qr",
+                          params: { appointmentId: acceptedReminder.id },
+                        });
+                      }
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      acceptedReminder.arrivedAt
+                        ? "Show service QR for barber"
+                        : "Scan shop QR to check in"
+                    }
+                  >
+                    <Ionicons
+                      name={
+                        acceptedReminder.arrivedAt ? "qr-code" : "scan-outline"
+                      }
+                      size={22}
+                      color="#fff"
+                    />
+                  </TouchableOpacity>
+                ) : (
+                  <Ionicons name="chevron-forward" size={18} color="#0B5A47" />
+                )}
+              </View>
             ) : null}
 
             <View style={styles.searchWrap}>
@@ -609,6 +654,30 @@ function createStyles(colors: AppColors) {
     color: colors.text,
     marginTop: 0,
     marginBottom: 12,
+  },
+
+  reminderMain: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  scanIconBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#0B5A47",
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+  },
+
+  reminderHint: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#0B5A47",
+    fontWeight: "600",
   },
 
   reminderCard: {

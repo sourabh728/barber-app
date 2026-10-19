@@ -70,6 +70,8 @@ function RootNavigator() {
         <Stack.Screen name="history/index" />
         <Stack.Screen name="history/[id]" />
         <Stack.Screen name="notifications" />
+        <Stack.Screen name="scan-shop-qr" />
+        <Stack.Screen name="service-start-qr" />
         <Stack.Screen name="shop/[id]/index" />
         <Stack.Screen name="shop/[id]/reviews" />
       </Stack.Protected>
