@@ -561,7 +561,7 @@ export function BarberHomeScreen() {
         <Text style={[styles.slotTime, textStyle]}>{labelTime}</Text>
         <Text style={[styles.slotSubtitle, textStyle]} numberOfLines={2}>
           {subtitle}
-          {block.status === "available" ? " · hold 2s" : ""}
+          {block.status === "available" ? " · hold 1s" : ""}
         </Text>
       </Pressable>
     );

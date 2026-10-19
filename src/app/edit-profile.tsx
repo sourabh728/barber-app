@@ -604,6 +604,8 @@ export default function EditProfileScreen() {
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
+  const colors = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return <Text style={styles.label}>{children}</Text>;
 }
 
