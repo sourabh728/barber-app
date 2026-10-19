@@ -16,17 +16,40 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useSession } from "@/context/session-provider";
 import {
+  fetchAdminBookingsReport,
   fetchAdminOverview,
   fetchAdminSettings,
   getAdminErrorMessage,
   updateAdminSettings,
+  type AdminBookingsReport,
   type AdminOverview,
   type AdminSettings,
 } from "@/services/admin-api";
 import type { PaymentMode } from "@/services/public-settings-api";
 import { showAppAlert } from "@/utils/app-alert";
 
-type TabId = "overview" | "payments" | "maintenance";
+type TabId = "report" | "shops" | "points" | "payments" | "takedown";
+
+function todayKey() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function daysAgoKey(days: number) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function formatInr(amount: number) {
+  return `₹${amount.toLocaleString("en-IN")}`;
+}
 
 function StatCard({
   label,
@@ -56,16 +79,19 @@ function StatCard({
 
 export default function AdminDashboardScreen() {
   const { user, signOut } = useSession();
-  const [tab, setTab] = useState<TabId>("overview");
+  const [tab, setTab] = useState<TabId>("report");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
   const [error, setError] = useState("");
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [settings, setSettings] = useState<AdminSettings | null>(null);
+  const [report, setReport] = useState<AdminBookingsReport | null>(null);
   const [shopQuery, setShopQuery] = useState("");
+  const [fromDate, setFromDate] = useState(daysAgoKey(7));
+  const [toDate, setToDate] = useState(todayKey());
 
-  // Editable fields
   const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
   const [maintenanceUntil, setMaintenanceUntil] = useState("");
@@ -95,6 +121,18 @@ export default function AdminDashboardScreen() {
     setPayoutIfsc(s.payoutIfsc ?? "");
   }, []);
 
+  const loadReport = useCallback(async (from: string, to: string) => {
+    setReportLoading(true);
+    try {
+      const data = await fetchAdminBookingsReport(from.trim(), to.trim());
+      setReport(data);
+    } catch (err) {
+      showAppAlert("Report error", getAdminErrorMessage(err));
+    } finally {
+      setReportLoading(false);
+    }
+  }, []);
+
   const load = useCallback(
     async (mode: "initial" | "refresh" = "initial") => {
       if (mode === "refresh") {
@@ -110,6 +148,7 @@ export default function AdminDashboardScreen() {
         ]);
         setOverview(ov);
         applySettings(st);
+        await loadReport(fromDate, toDate);
       } catch (err) {
         setError(getAdminErrorMessage(err, "Could not load admin dashboard."));
       } finally {
@@ -117,13 +156,15 @@ export default function AdminDashboardScreen() {
         setRefreshing(false);
       }
     },
-    [applySettings],
+    [applySettings, fromDate, toDate, loadReport],
   );
 
   useFocusEffect(
     useCallback(() => {
       void load("initial");
-    }, [load]),
+      // Intentionally only on focus — date changes use Run report.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
   );
 
   const filteredShops = useMemo(() => {
@@ -140,6 +181,13 @@ export default function AdminDashboardScreen() {
   }, [overview, shopQuery]);
 
   async function saveMaintenance() {
+    if (maintenanceEnabled && !maintenanceMessage.trim()) {
+      showAppAlert(
+        "Reason required",
+        "Enter a reason / message customers will see while the app is down.",
+      );
+      return;
+    }
     setSaving(true);
     try {
       const updated = await updateAdminSettings({
@@ -153,8 +201,8 @@ export default function AdminDashboardScreen() {
       showAppAlert(
         "Saved",
         maintenanceEnabled
-          ? "Maintenance mode is on. Customers and barbers will see your message."
-          : "Maintenance mode is off. The app is live.",
+          ? "App is down for maintenance. Users will see your reason."
+          : "App is live again.",
       );
     } catch (err) {
       showAppAlert("Error", getAdminErrorMessage(err));
@@ -208,12 +256,18 @@ export default function AdminDashboardScreen() {
     return (
       <SafeAreaView style={styles.centered} edges={["top", "bottom"]}>
         <ActivityIndicator color="#0B5A47" size="large" />
-        <Text style={styles.muted}>Loading platform overview…</Text>
+        <Text style={styles.muted}>Loading admin dashboard…</Text>
       </SafeAreaView>
     );
   }
 
-  const by = overview?.bookings.byStatus ?? {};
+  const tabs: { id: TabId; label: string }[] = [
+    { id: "report", label: "Report" },
+    { id: "shops", label: "Shops" },
+    { id: "points", label: "Points" },
+    { id: "payments", label: "Pay" },
+    { id: "takedown", label: "Down" },
+  ];
 
   return (
     <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
@@ -238,14 +292,12 @@ export default function AdminDashboardScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.tabs}>
-        {(
-          [
-            ["overview", "Overview"],
-            ["payments", "Payments"],
-            ["maintenance", "Maintenance"],
-          ] as const
-        ).map(([id, label]) => (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tabsScroll}
+      >
+        {tabs.map(({ id, label }) => (
           <TouchableOpacity
             key={id}
             style={[styles.tab, tab === id ? styles.tabActive : null]}
@@ -258,7 +310,7 @@ export default function AdminDashboardScreen() {
             </Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
       {error ? (
         <View style={styles.errorBanner}>
@@ -276,39 +328,207 @@ export default function AdminDashboardScreen() {
           />
         }
       >
-        {tab === "overview" && overview ? (
+        {tab === "report" ? (
           <>
-            <Text style={styles.sectionTitle}>Platform pulse</Text>
+            <Text style={styles.sectionTitle}>Date-wise booking report</Text>
+            <Text style={styles.help}>
+              Pick a from / to date (YYYY-MM-DD) to see shop-wise bookings and
+              payment totals.
+            </Text>
+
+            <View style={styles.dateRow}>
+              <View style={styles.dateField}>
+                <Text style={styles.label}>From</Text>
+                <TextInput
+                  style={styles.input}
+                  value={fromDate}
+                  onChangeText={setFromDate}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor="#94A3B8"
+                  autoCapitalize="none"
+                />
+              </View>
+              <View style={styles.dateField}>
+                <Text style={styles.label}>To</Text>
+                <TextInput
+                  style={styles.input}
+                  value={toDate}
+                  onChangeText={setToDate}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor="#94A3B8"
+                  autoCapitalize="none"
+                />
+              </View>
+            </View>
+
+            <View style={styles.presetRow}>
+              {(
+                [
+                  ["7d", 7],
+                  ["30d", 30],
+                  ["Today", 0],
+                ] as const
+              ).map(([label, days]) => (
+                <TouchableOpacity
+                  key={label}
+                  style={styles.presetChip}
+                  onPress={() => {
+                    const to = todayKey();
+                    const from = days === 0 ? to : daysAgoKey(days);
+                    setFromDate(from);
+                    setToDate(to);
+                    void loadReport(from, to);
+                  }}
+                >
+                  <Text style={styles.presetChipText}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={[styles.primaryBtn, reportLoading && styles.btnDisabled]}
+              disabled={reportLoading}
+              onPress={() => void loadReport(fromDate, toDate)}
+            >
+              {reportLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.primaryBtnText}>Run report</Text>
+              )}
+            </TouchableOpacity>
+
+            {report ? (
+              <>
+                <Text style={styles.sectionTitle}>
+                  {report.from} → {report.to}
+                </Text>
+                <View style={styles.statGrid}>
+                  <StatCard label="Bookings" value={report.totals.bookings} />
+                  <StatCard
+                    label="Shops active"
+                    value={report.totals.shopsWithBookings}
+                  />
+                  <StatCard
+                    label="Payment total"
+                    value={formatInr(report.totals.paymentTotalInr)}
+                    tone="good"
+                  />
+                  <StatCard
+                    label="Online fees (est.)"
+                    value={formatInr(report.totals.estimatedOnlineFeesInr)}
+                  />
+                  <StatCard label="Points" value={report.totals.points} />
+                  <StatCard
+                    label="Confirmed"
+                    value={report.totals.byStatus.CONFIRMED ?? 0}
+                    tone="good"
+                  />
+                  <StatCard
+                    label="Rejected"
+                    value={report.totals.byStatus.REJECTED ?? 0}
+                    tone="bad"
+                  />
+                  <StatCard
+                    label="Pending"
+                    value={report.totals.byStatus.PENDING ?? 0}
+                    tone="warn"
+                  />
+                </View>
+                <Text style={styles.help}>
+                  Payment mode:{" "}
+                  {report.paymentMode === "ONLINE_FEE_REST_AT_SHOP"
+                    ? `₹${report.bookingFeeInr} online + rest at shop`
+                    : "Pay at shop"}
+                </Text>
+
+                <Text style={styles.sectionTitle}>By shop</Text>
+                {report.shops.length === 0 ? (
+                  <Text style={styles.muted}>No bookings in this range.</Text>
+                ) : (
+                  report.shops.map((shop) => (
+                    <View key={shop.shopId} style={styles.shopRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.shopName}>{shop.shopName}</Text>
+                        <Text style={styles.shopMeta}>
+                          {[shop.city, shop.state].filter(Boolean).join(", ") ||
+                            "—"}
+                        </Text>
+                        <Text style={styles.shopMeta}>
+                          Confirmed {shop.byStatus.CONFIRMED ?? 0} · Rejected{" "}
+                          {shop.byStatus.REJECTED ?? 0} · Pending{" "}
+                          {shop.byStatus.PENDING ?? 0} · Done{" "}
+                          {shop.byStatus.COMPLETED ?? 0}
+                        </Text>
+                      </View>
+                      <View style={styles.shopStats}>
+                        <Text style={styles.shopStatNum}>{shop.bookings}</Text>
+                        <Text style={styles.shopStatLabel}>bookings</Text>
+                        <Text style={styles.shopStatNum}>
+                          {formatInr(shop.paymentTotalInr)}
+                        </Text>
+                        <Text style={styles.shopStatLabel}>payment</Text>
+                        <Text style={styles.shopStatNum}>{shop.points}</Text>
+                        <Text style={styles.shopStatLabel}>points</Text>
+                      </View>
+                    </View>
+                  ))
+                )}
+              </>
+            ) : null}
+          </>
+        ) : null}
+
+        {tab === "shops" && overview ? (
+          <>
+            <Text style={styles.sectionTitle}>All listed shops</Text>
             <View style={styles.statGrid}>
               <StatCard label="Shops" value={overview.shops} />
-              <StatCard label="Bookings" value={overview.bookings.total} />
               <StatCard label="Customers" value={overview.customers} />
               <StatCard label="Barbers" value={overview.barbers} />
+              <StatCard label="Bookings" value={overview.bookings.total} />
             </View>
+            <TextInput
+              style={styles.input}
+              placeholder="Search shops, city, owner…"
+              placeholderTextColor="#94A3B8"
+              value={shopQuery}
+              onChangeText={setShopQuery}
+            />
+            {filteredShops.length === 0 ? (
+              <Text style={styles.muted}>No shops match.</Text>
+            ) : (
+              filteredShops.map((shop) => (
+                <View key={shop.id} style={styles.shopRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.shopName}>{shop.name}</Text>
+                    <Text style={styles.shopMeta}>
+                      {[shop.city, shop.state].filter(Boolean).join(", ") ||
+                        "Location n/a"}
+                    </Text>
+                    {shop.address ? (
+                      <Text style={styles.shopMeta}>{shop.address}</Text>
+                    ) : null}
+                    <Text style={styles.shopMeta}>
+                      {shop.ownerName} · {shop.ownerEmail}
+                    </Text>
+                  </View>
+                  <View style={styles.shopStats}>
+                    <Text style={styles.shopStatNum}>{shop.bookings}</Text>
+                    <Text style={styles.shopStatLabel}>bookings</Text>
+                    <Text style={styles.shopStatNum}>{shop.staff}</Text>
+                    <Text style={styles.shopStatLabel}>staff</Text>
+                    <Text style={styles.shopStatNum}>{shop.totalPoints}</Text>
+                    <Text style={styles.shopStatLabel}>points</Text>
+                  </View>
+                </View>
+              ))
+            )}
+          </>
+        ) : null}
 
-            <Text style={styles.sectionTitle}>Booking status</Text>
-            <View style={styles.statGrid}>
-              <StatCard
-                label="Confirmed"
-                value={by.CONFIRMED ?? 0}
-                tone="good"
-              />
-              <StatCard
-                label="Pending"
-                value={by.PENDING ?? 0}
-                tone="warn"
-              />
-              <StatCard
-                label="Rejected"
-                value={by.REJECTED ?? 0}
-                tone="bad"
-              />
-              <StatCard label="Completed" value={by.COMPLETED ?? 0} />
-              <StatCard label="In progress" value={by.IN_PROGRESS ?? 0} />
-              <StatCard label="Cancelled" value={by.CANCELLED ?? 0} />
-            </View>
-
-            <Text style={styles.sectionTitle}>Points across the network</Text>
+        {tab === "points" && overview ? (
+          <>
+            <Text style={styles.sectionTitle}>Network points</Text>
             <View style={styles.statGrid}>
               <StatCard
                 label="Total points"
@@ -328,59 +548,23 @@ export default function AdminDashboardScreen() {
               />
             </View>
 
-            <Text style={styles.sectionTitle}>Shops</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Search shops, city, owner…"
-              placeholderTextColor="#94A3B8"
-              value={shopQuery}
-              onChangeText={setShopQuery}
-            />
-            {filteredShops.length === 0 ? (
-              <Text style={styles.muted}>No shops match.</Text>
+            <Text style={styles.sectionTitle}>Shop points leaderboard</Text>
+            {overview.shopPointsLeaderboard.length === 0 ? (
+              <Text style={styles.muted}>No scored bookings yet.</Text>
             ) : (
-              filteredShops.map((shop) => (
-                <View key={shop.id} style={styles.shopRow}>
+              overview.shopPointsLeaderboard.map((row) => (
+                <View key={row.id} style={styles.shopRow}>
+                  <View style={styles.rankBadge}>
+                    <Text style={styles.rankText}>#{row.rank}</Text>
+                  </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.shopName}>{shop.name}</Text>
+                    <Text style={styles.shopName}>{row.name}</Text>
                     <Text style={styles.shopMeta}>
-                      {[shop.city, shop.state].filter(Boolean).join(", ") ||
-                        "Location n/a"}
-                    </Text>
-                    <Text style={styles.shopMeta}>
-                      {shop.ownerName} · {shop.ownerEmail}
+                      {row.city || "—"} · {row.scoredBookings} scored ·{" "}
+                      {row.bookings} total bookings
                     </Text>
                   </View>
-                  <View style={styles.shopStats}>
-                    <Text style={styles.shopStatNum}>{shop.bookings}</Text>
-                    <Text style={styles.shopStatLabel}>bookings</Text>
-                    <Text style={styles.shopStatNum}>{shop.staff}</Text>
-                    <Text style={styles.shopStatLabel}>staff</Text>
-                  </View>
-                </View>
-              ))
-            )}
-
-            <Text style={styles.sectionTitle}>Recent activity</Text>
-            {overview.recentActivity.length === 0 ? (
-              <Text style={styles.muted}>No bookings yet.</Text>
-            ) : (
-              overview.recentActivity.map((item) => (
-                <View key={item.id} style={styles.activityRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.shopName}>
-                      {item.customerName} · {item.serviceName}
-                    </Text>
-                    <Text style={styles.shopMeta}>
-                      {item.shopName} · {item.date} {item.startTime}
-                    </Text>
-                  </View>
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{item.status}</Text>
-                  </View>
-                  {item.bookingScore != null ? (
-                    <Text style={styles.scorePill}>{item.bookingScore} pts</Text>
-                  ) : null}
+                  <Text style={styles.pointsBig}>{row.totalPoints}</Text>
                 </View>
               ))
             )}
@@ -389,15 +573,21 @@ export default function AdminDashboardScreen() {
 
         {tab === "payments" && settings ? (
           <>
-            <Text style={styles.sectionTitle}>Payment mode for all bookings</Text>
+            <Text style={styles.sectionTitle}>
+              Payment mode for all bookings
+            </Text>
             <Text style={styles.help}>
-              Changes apply platform-wide. Customers see the selected option on
-              booking review and history.
+              Changes apply platform-wide. Customers see this on booking review
+              and history.
             </Text>
 
             {(
               [
-                ["PAY_AT_SHOP", "Pay at shop", "Full amount collected at the shop."],
+                [
+                  "PAY_AT_SHOP",
+                  "Pay at shop",
+                  "Full amount collected at the shop.",
+                ],
                 [
                   "ONLINE_FEE_REST_AT_SHOP",
                   "₹11 online + rest at shop",
@@ -441,12 +631,7 @@ export default function AdminDashboardScreen() {
               </>
             ) : null}
 
-            <Text style={styles.sectionTitle}>Receive money in your account</Text>
-            <Text style={styles.help}>
-              Shown to customers when online fee mode is active. You can change
-              the account anytime.
-            </Text>
-
+            <Text style={styles.sectionTitle}>Receive money account</Text>
             <Text style={styles.label}>Account holder name</Text>
             <TextInput
               style={styles.input}
@@ -505,30 +690,30 @@ export default function AdminDashboardScreen() {
           </>
         ) : null}
 
-        {tab === "maintenance" && settings ? (
+        {tab === "takedown" && settings ? (
           <>
-            <Text style={styles.sectionTitle}>App maintenance</Text>
+            <Text style={styles.sectionTitle}>Take the app down</Text>
             <Text style={styles.help}>
-              When on, customers and barbers see a full-screen message and API
-              access is paused. You stay signed in as admin.
+              When on, customers and barbers see a full-screen screen with your
+              reason. You stay signed in as admin.
             </Text>
 
             <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>Maintenance mode</Text>
+              <Text style={styles.switchLabel}>App under maintenance</Text>
               <Switch
                 value={maintenanceEnabled}
                 onValueChange={setMaintenanceEnabled}
-                trackColor={{ true: "#0B5A47", false: "#CBD5E1" }}
+                trackColor={{ true: "#B91C1C", false: "#CBD5E1" }}
               />
             </View>
 
-            <Text style={styles.label}>Custom message</Text>
+            <Text style={styles.label}>Reason / message (shown to users)</Text>
             <TextInput
               style={[styles.input, styles.multiline]}
               multiline
               value={maintenanceMessage}
               onChangeText={setMaintenanceMessage}
-              placeholder="We’ll be back soon…"
+              placeholder="We’ll be back soon — upgrading servers…"
               placeholderTextColor="#94A3B8"
             />
 
@@ -541,20 +726,24 @@ export default function AdminDashboardScreen() {
               placeholderTextColor="#94A3B8"
               autoCapitalize="none"
             />
-            <Text style={styles.help}>
-              Use local ISO-like time, e.g. 2026-10-20T18:30. Leave blank for
-              indefinite.
-            </Text>
 
             <TouchableOpacity
-              style={[styles.primaryBtn, saving && styles.btnDisabled]}
+              style={[
+                styles.primaryBtn,
+                maintenanceEnabled ? styles.dangerBtn : null,
+                saving && styles.btnDisabled,
+              ]}
               disabled={saving}
               onPress={() => void saveMaintenance()}
             >
               {saving ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.primaryBtnText}>Save maintenance</Text>
+                <Text style={styles.primaryBtnText}>
+                  {maintenanceEnabled
+                    ? "Take app down now"
+                    : "Save — keep app live"}
+                </Text>
               )}
             </TouchableOpacity>
 
@@ -562,10 +751,17 @@ export default function AdminDashboardScreen() {
               <View style={styles.liveBanner}>
                 <Ionicons name="warning" size={18} color="#92400E" />
                 <Text style={styles.liveBannerText}>
-                  Maintenance is currently ON for non-admin users.
+                  App is currently DOWN for non-admin users.
                 </Text>
               </View>
-            ) : null}
+            ) : (
+              <View style={[styles.liveBanner, styles.liveOk]}>
+                <Ionicons name="checkmark-circle" size={18} color="#166534" />
+                <Text style={[styles.liveBannerText, styles.liveOkText]}>
+                  App is live for customers and barbers.
+                </Text>
+              </View>
+            )}
           </>
         ) : null}
       </ScrollView>
@@ -616,34 +812,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  tabs: {
-    flexDirection: "row",
-    marginHorizontal: 16,
-    backgroundColor: "#D1E7DD",
-    borderRadius: 12,
-    padding: 4,
-    gap: 4,
+  tabsScroll: {
+    paddingHorizontal: 12,
+    gap: 8,
+    paddingBottom: 8,
   },
   tab: {
-    flex: 1,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 10,
-    alignItems: "center",
+    backgroundColor: "#D1E7DD",
   },
   tabActive: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#0B5A47",
   },
   tabText: {
     fontSize: 13,
-    fontWeight: "600",
-    color: "#64748B",
+    fontWeight: "700",
+    color: "#334155",
   },
   tabTextActive: {
-    color: "#0B5A47",
+    color: "#FFFFFF",
   },
   errorBanner: {
     marginHorizontal: 16,
-    marginTop: 10,
+    marginTop: 4,
     backgroundColor: "#FEE2E2",
     borderRadius: 10,
     padding: 10,
@@ -673,6 +866,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#64748B",
   },
+  dateRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  dateField: {
+    flex: 1,
+  },
+  presetRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 4,
+  },
+  presetChip: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#D1E7DD",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  presetChipText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#0B5A47",
+  },
   statGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -694,7 +912,7 @@ const styles = StyleSheet.create({
   },
   statValue: {
     marginTop: 6,
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "800",
   },
   input: {
@@ -720,6 +938,7 @@ const styles = StyleSheet.create({
   shopRow: {
     flexDirection: "row",
     gap: 12,
+    alignItems: "center",
     backgroundColor: "#FFFFFF",
     borderRadius: 14,
     padding: 14,
@@ -738,10 +957,10 @@ const styles = StyleSheet.create({
   },
   shopStats: {
     alignItems: "flex-end",
-    minWidth: 64,
+    minWidth: 72,
   },
   shopStatNum: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "800",
     color: "#0B5A47",
   },
@@ -750,30 +969,22 @@ const styles = StyleSheet.create({
     color: "#94A3B8",
     marginBottom: 4,
   },
-  activityRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#D1E7DD",
-  },
-  badge: {
+  rankBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     backgroundColor: "#ECFDF5",
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: "700",
+  rankText: {
+    fontSize: 12,
+    fontWeight: "800",
     color: "#0B5A47",
   },
-  scorePill: {
-    fontSize: 12,
-    fontWeight: "700",
+  pointsBig: {
+    fontSize: 20,
+    fontWeight: "800",
     color: "#B45309",
   },
   choice: {
@@ -816,11 +1027,14 @@ const styles = StyleSheet.create({
     color: "#0F172A",
   },
   primaryBtn: {
-    marginTop: 16,
+    marginTop: 12,
     backgroundColor: "#0B5A47",
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: "center",
+  },
+  dangerBtn: {
+    backgroundColor: "#B91C1C",
   },
   primaryBtnText: {
     color: "#FFFFFF",
@@ -844,5 +1058,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#92400E",
     fontWeight: "600",
+  },
+  liveOk: {
+    backgroundColor: "#DCFCE7",
+  },
+  liveOkText: {
+    color: "#166534",
   },
 });

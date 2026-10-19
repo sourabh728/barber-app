@@ -18,6 +18,23 @@ export type AdminSettings = {
   updatedAt: string;
 };
 
+export type AdminShopRow = {
+  id: string;
+  name: string;
+  city: string | null;
+  state: string | null;
+  address?: string;
+  ownerName: string;
+  ownerEmail: string;
+  ownerPhone?: string | null;
+  bookings: number;
+  staff: number;
+  totalPoints: number;
+  basePoints?: number;
+  punctualityPoints?: number;
+  scoredBookings: number;
+};
+
 export type AdminOverview = {
   shops: number;
   customers: number;
@@ -34,15 +51,15 @@ export type AdminOverview = {
     averageBookingScore: number;
     averagePunctuality: number;
   };
-  shopList: {
+  shopList: AdminShopRow[];
+  shopPointsLeaderboard: {
+    rank: number;
     id: string;
     name: string;
     city: string | null;
-    state: string | null;
-    ownerName: string;
-    ownerEmail: string;
+    totalPoints: number;
+    scoredBookings: number;
     bookings: number;
-    staff: number;
   }[];
   recentActivity: {
     id: string;
@@ -62,6 +79,32 @@ export type AdminOverview = {
   statuses: string[];
 };
 
+export type AdminBookingsReport = {
+  from: string;
+  to: string;
+  paymentMode: PaymentMode;
+  bookingFeeInr: number;
+  totals: {
+    bookings: number;
+    byStatus: Record<string, number>;
+    paymentTotalInr: number;
+    estimatedOnlineFeesInr: number;
+    points: number;
+    shopsWithBookings: number;
+  };
+  shops: {
+    shopId: string;
+    shopName: string;
+    city: string;
+    state: string;
+    bookings: number;
+    byStatus: Record<string, number>;
+    paymentTotalInr: number;
+    points: number;
+    scoredBookings: number;
+  }[];
+};
+
 export type UpdateAdminSettingsInput = {
   maintenanceEnabled?: boolean;
   maintenanceMessage?: string;
@@ -77,6 +120,13 @@ export type UpdateAdminSettingsInput = {
 
 export async function fetchAdminOverview() {
   const response = await api.get<AdminOverview>("/admin/overview");
+  return response.data;
+}
+
+export async function fetchAdminBookingsReport(from: string, to: string) {
+  const response = await api.get<AdminBookingsReport>("/admin/bookings-report", {
+    params: { from, to },
+  });
   return response.data;
 }
 

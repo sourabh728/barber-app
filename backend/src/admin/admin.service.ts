@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Injectable, OnModuleInit } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import {
   AppointmentStatus,
@@ -13,6 +13,16 @@ import {
   PLATFORM_ADMIN_PASSWORD,
 } from './admin.constants';
 import { UpdateAdminSettingsDto } from './dto/update-admin-settings.dto';
+
+function toDateOnlyUtc(dateKey: string): Date {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey.slice(0, 10));
+  if (!match) {
+    throw new BadRequestException('Dates must be YYYY-MM-DD.');
+  }
+  return new Date(
+    Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])),
+  );
+}
 
 @Injectable()
 export class AdminService implements OnModuleInit {
@@ -188,11 +198,30 @@ export class AdminService implements OnModuleInit {
           name: true,
           city: true,
           state: true,
-          owner: { select: { name: true, email: true } },
+          address: true,
+          owner: { select: { name: true, email: true, phone: true } },
           _count: { select: { appointments: true, staff: true } },
         },
       }),
     ]);
+
+    const shopPoints = await this.prisma.appointment.groupBy({
+      by: ['shopId'],
+      where: { bookingScore: { not: null } },
+      _sum: { bookingScore: true, basePoints: true, punctualityPoints: true },
+      _count: { _all: true },
+    });
+    const pointsByShop = new Map(
+      shopPoints.map((row) => [
+        row.shopId,
+        {
+          totalPoints: row._sum.bookingScore ?? 0,
+          basePoints: row._sum.basePoints ?? 0,
+          punctualityPoints: row._sum.punctualityPoints ?? 0,
+          scoredBookings: row._count._all,
+        },
+      ]),
+    );
 
     const byStatus: Record<string, number> = {
       PENDING: 0,
@@ -207,6 +236,31 @@ export class AdminService implements OnModuleInit {
       byStatus[row.status] = row._count._all;
       totalBookings += row._count._all;
     }
+
+    const shopList = shops.map((s) => {
+      const pts = pointsByShop.get(s.id) ?? {
+        totalPoints: 0,
+        basePoints: 0,
+        punctualityPoints: 0,
+        scoredBookings: 0,
+      };
+      return {
+        id: s.id,
+        name: s.name,
+        city: s.city,
+        state: s.state,
+        address: s.address,
+        ownerName: s.owner.name,
+        ownerEmail: s.owner.email,
+        ownerPhone: s.owner.phone,
+        bookings: s._count.appointments,
+        staff: s._count.staff,
+        totalPoints: pts.totalPoints,
+        basePoints: pts.basePoints,
+        punctualityPoints: pts.punctualityPoints,
+        scoredBookings: pts.scoredBookings,
+      };
+    });
 
     return {
       shops: shopCount,
@@ -228,16 +282,18 @@ export class AdminService implements OnModuleInit {
           ? Math.round(scoredAgg._avg.punctualityPoints * 10) / 10
           : 0,
       },
-      shopList: shops.map((s) => ({
-        id: s.id,
-        name: s.name,
-        city: s.city,
-        state: s.state,
-        ownerName: s.owner.name,
-        ownerEmail: s.owner.email,
-        bookings: s._count.appointments,
-        staff: s._count.staff,
-      })),
+      shopList,
+      shopPointsLeaderboard: [...shopList]
+        .sort((a, b) => b.totalPoints - a.totalPoints)
+        .map((s, index) => ({
+          rank: index + 1,
+          id: s.id,
+          name: s.name,
+          city: s.city,
+          totalPoints: s.totalPoints,
+          scoredBookings: s.scoredBookings,
+          bookings: s.bookings,
+        })),
       recentActivity: recentBookings.map((b) => ({
         id: b.id,
         status: b.status,
@@ -254,6 +310,119 @@ export class AdminService implements OnModuleInit {
       })),
       paymentModes: Object.values(PaymentMode),
       statuses: Object.values(AppointmentStatus),
+    };
+  }
+
+  /** Date-range report: shop names, booking counts, payment totals, points. */
+  async getBookingsReport(fromKey: string, toKey: string) {
+    const from = toDateOnlyUtc(fromKey);
+    const to = toDateOnlyUtc(toKey);
+    if (from.getTime() > to.getTime()) {
+      throw new BadRequestException('"from" must be on or before "to".');
+    }
+
+    const settings = await this.ensureAndGetSettings();
+    const appointments = await this.prisma.appointment.findMany({
+      where: {
+        date: { gte: from, lte: to },
+      },
+      select: {
+        id: true,
+        shopId: true,
+        status: true,
+        priceInr: true,
+        bookingScore: true,
+        shop: { select: { id: true, name: true, city: true, state: true } },
+      },
+    });
+
+    type ShopAgg = {
+      shopId: string;
+      shopName: string;
+      city: string;
+      state: string;
+      bookings: number;
+      byStatus: Record<string, number>;
+      paymentTotalInr: number;
+      points: number;
+      scoredBookings: number;
+    };
+
+    const byShop = new Map<string, ShopAgg>();
+    const emptyStatus = (): Record<string, number> => ({
+      PENDING: 0,
+      CONFIRMED: 0,
+      IN_PROGRESS: 0,
+      COMPLETED: 0,
+      CANCELLED: 0,
+      REJECTED: 0,
+    });
+
+    let totalBookings = 0;
+    let paymentTotalInr = 0;
+    let totalPoints = 0;
+    const totalsByStatus = emptyStatus();
+
+    for (const appt of appointments) {
+      totalBookings += 1;
+      paymentTotalInr += appt.priceInr;
+      totalsByStatus[appt.status] = (totalsByStatus[appt.status] ?? 0) + 1;
+      if (appt.bookingScore != null) {
+        totalPoints += appt.bookingScore;
+      }
+
+      let row = byShop.get(appt.shopId);
+      if (!row) {
+        row = {
+          shopId: appt.shop.id,
+          shopName: appt.shop.name,
+          city: appt.shop.city,
+          state: appt.shop.state,
+          bookings: 0,
+          byStatus: emptyStatus(),
+          paymentTotalInr: 0,
+          points: 0,
+          scoredBookings: 0,
+        };
+        byShop.set(appt.shopId, row);
+      }
+      row.bookings += 1;
+      row.byStatus[appt.status] = (row.byStatus[appt.status] ?? 0) + 1;
+      row.paymentTotalInr += appt.priceInr;
+      if (appt.bookingScore != null) {
+        row.points += appt.bookingScore;
+        row.scoredBookings += 1;
+      }
+    }
+
+    const billableCount =
+      (totalsByStatus.PENDING ?? 0) +
+      (totalsByStatus.CONFIRMED ?? 0) +
+      (totalsByStatus.IN_PROGRESS ?? 0) +
+      (totalsByStatus.COMPLETED ?? 0);
+
+    const onlineFeePerBooking =
+      settings.paymentMode === PaymentMode.ONLINE_FEE_REST_AT_SHOP
+        ? settings.bookingFeeInr
+        : 0;
+    const estimatedOnlineFeesInr = onlineFeePerBooking * billableCount;
+
+    const shops = [...byShop.values()].sort((a, b) => b.bookings - a.bookings);
+
+    return {
+      from: fromKey.slice(0, 10),
+      to: toKey.slice(0, 10),
+      paymentMode: settings.paymentMode,
+      bookingFeeInr: settings.bookingFeeInr,
+      totals: {
+        bookings: totalBookings,
+        byStatus: totalsByStatus,
+        paymentTotalInr,
+        estimatedOnlineFeesInr,
+        points: totalPoints,
+        shopsWithBookings: shops.length,
+      },
+      shops,
     };
   }
 
