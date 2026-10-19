@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -115,20 +115,12 @@ async function pickImage(aspect: [number, number]) {
   return result.assets[0].uri;
 }
 
-function FieldLabel({
-  children,
-  style,
-}: {
-  children: React.ReactNode;
-  style: object;
-}) {
-  return <Text style={style}>{children}</Text>;
-}
-
 export default function EditProfileScreen() {
   const router = useRouter();
   const colors = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  // Build styles each render — avoids stale Fast Refresh / compiler edge cases
+  // that previously left FieldLabel referencing an out-of-scope `styles`.
+  const styles = createEditProfileStyles(colors);
   const { user, updateUser } = useSession();
   const isBarber = user?.role === "BARBER";
 
@@ -380,7 +372,7 @@ export default function EditProfileScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <FieldLabel style={styles.label}>Name</FieldLabel>
+                <Text style={styles.label}>Name</Text>
                 <TextInput
                   style={styles.input}
                   value={form.name}
@@ -391,7 +383,7 @@ export default function EditProfileScreen() {
                   autoCapitalize="words"
                 />
 
-                <FieldLabel style={styles.label}>Email</FieldLabel>
+                <Text style={styles.label}>Email</Text>
                 <TextInput
                   style={styles.input}
                   value={form.email}
@@ -404,7 +396,7 @@ export default function EditProfileScreen() {
                   autoCorrect={false}
                 />
 
-                <FieldLabel style={styles.label}>Phone</FieldLabel>
+                <Text style={styles.label}>Phone</Text>
                 <TextInput
                   style={styles.input}
                   value={form.phone}
@@ -418,7 +410,7 @@ export default function EditProfileScreen() {
                   maxLength={10}
                 />
 
-                <FieldLabel style={styles.label}>New password (optional)</FieldLabel>
+                <Text style={styles.label}>New password (optional)</Text>
                 <View style={styles.passwordContainer}>
                   <TextInput
                     style={styles.passwordInput}
@@ -488,7 +480,7 @@ export default function EditProfileScreen() {
                       </TouchableOpacity>
                     </View>
 
-                    <FieldLabel style={styles.label}>Shop name</FieldLabel>
+                    <Text style={styles.label}>Shop name</Text>
                     <TextInput
                       style={styles.input}
                       value={form.shopName}
@@ -498,7 +490,7 @@ export default function EditProfileScreen() {
                       editable={!busy}
                     />
 
-                    <FieldLabel style={styles.label}>Description</FieldLabel>
+                    <Text style={styles.label}>Description</Text>
                     <TextInput
                       style={[styles.input, styles.multiline]}
                       value={form.shopDescription}
@@ -512,7 +504,7 @@ export default function EditProfileScreen() {
                       textAlignVertical="top"
                     />
 
-                    <FieldLabel style={styles.label}>Shop phone</FieldLabel>
+                    <Text style={styles.label}>Shop phone</Text>
                     <TextInput
                       style={styles.input}
                       value={form.shopPhone}
@@ -526,7 +518,7 @@ export default function EditProfileScreen() {
                       maxLength={10}
                     />
 
-                    <FieldLabel style={styles.label}>Shop email</FieldLabel>
+                    <Text style={styles.label}>Shop email</Text>
                     <TextInput
                       style={styles.input}
                       value={form.shopEmail}
@@ -539,7 +531,7 @@ export default function EditProfileScreen() {
                       autoCorrect={false}
                     />
 
-                    <FieldLabel style={styles.label}>Address</FieldLabel>
+                    <Text style={styles.label}>Address</Text>
                     <TextInput
                       style={styles.input}
                       value={form.shopAddress}
@@ -549,7 +541,7 @@ export default function EditProfileScreen() {
                       editable={!busy}
                     />
 
-                    <FieldLabel style={styles.label}>City</FieldLabel>
+                    <Text style={styles.label}>City</Text>
                     <TextInput
                       style={styles.input}
                       value={form.shopCity}
@@ -559,7 +551,7 @@ export default function EditProfileScreen() {
                       editable={!busy}
                     />
 
-                    <FieldLabel style={styles.label}>State</FieldLabel>
+                    <Text style={styles.label}>State</Text>
                     <TextInput
                       style={styles.input}
                       value={form.shopState}
@@ -569,7 +561,7 @@ export default function EditProfileScreen() {
                       editable={!busy}
                     />
 
-                    <FieldLabel style={styles.label}>Pincode</FieldLabel>
+                    <Text style={styles.label}>Pincode</Text>
                     <TextInput
                       style={styles.input}
                       value={form.shopPincode}
@@ -613,7 +605,7 @@ export default function EditProfileScreen() {
   );
 }
 
-function createStyles(colors: AppColors) {
+function createEditProfileStyles(colors: AppColors) {
   return StyleSheet.create({
   container: {
     flex: 1,
