@@ -10,6 +10,7 @@ import {
 } from "react";
 import { isAxiosError } from "axios";
 
+import { PLATFORM_ADMIN_EMAIL } from "@/constants/platform-admin";
 import { api, clearApiAccessToken, setApiAccessToken } from "@/services/api";
 import {
   fetchCurrentUser,
@@ -44,6 +45,10 @@ function parseStoredUser(raw: string | null): SessionUser | null {
         parsed.role === "BARBER" ||
         parsed.role === "ADMIN")
     ) {
+      // Upgrade stale cached customer sessions for the platform admin email.
+      if (parsed.email.trim().toLowerCase() === PLATFORM_ADMIN_EMAIL) {
+        return { ...parsed, role: "ADMIN" };
+      }
       return parsed;
     }
   } catch {

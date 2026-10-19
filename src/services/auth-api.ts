@@ -1,3 +1,5 @@
+import { PLATFORM_ADMIN_EMAIL } from "@/constants/platform-admin";
+
 import { api, LoginResponse } from "./api";
 
 export type AuthRole = "CUSTOMER" | "BARBER" | "ADMIN";
@@ -251,11 +253,23 @@ function guessImageMime(filename: string) {
   return "image/jpeg";
 }
 
+function normalizeSessionRole(email: string, role: string): AuthRole {
+  if (
+    email.trim().toLowerCase() === PLATFORM_ADMIN_EMAIL ||
+    role === "ADMIN"
+  ) {
+    return "ADMIN";
+  }
+  if (role === "BARBER") return "BARBER";
+  return "CUSTOMER";
+}
+
 export function sessionUserFromLogin(user: LoginResponse["user"]): SessionUser {
+  const email = user.email;
   return {
     id: user.id,
-    email: user.email,
-    role: user.role as AuthRole,
+    email,
+    role: normalizeSessionRole(email, user.role),
     name: user.name,
     phone: user.phone,
     photoUrl: user.photoUrl ?? null,
@@ -263,10 +277,11 @@ export function sessionUserFromLogin(user: LoginResponse["user"]): SessionUser {
 }
 
 export function sessionUserFromMe(user: CurrentUserResponse): SessionUser {
+  const email = user.email;
   return {
     id: user.userId,
-    email: user.email,
-    role: user.role,
+    email,
+    role: normalizeSessionRole(email, user.role),
     name: user.name,
     phone: user.phone,
     photoUrl: user.photoUrl,

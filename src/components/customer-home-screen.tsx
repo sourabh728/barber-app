@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useRouter } from "expo-router";
+import { Redirect, useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { isPlatformAdminUser } from "@/constants/platform-admin";
 import { useSession } from "@/context/session-provider";
 import type { AppColors } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
@@ -282,6 +283,10 @@ export function CustomerHomeScreen() {
       </View>
     );
   };
+
+  if (isPlatformAdminUser(user)) {
+    return <Redirect href="/admin" />;
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

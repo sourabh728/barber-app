@@ -7,6 +7,7 @@ import {
 } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
+import { ActivityIndicator, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { MaintenanceGate } from "@/components/maintenance-gate";
@@ -58,40 +59,59 @@ export default function RootLayout() {
 }
 
 function RootNavigator() {
-  const { session, user } = useSession();
+  const { session, user, isLoading } = useSession();
   const isBarber = user?.role === "BARBER";
   const isAdmin = isPlatformAdminUser(user);
 
+  // Never mount customer booking routes until we know who the user is.
+  // Otherwise a brief null user + valid session opens the booking home.
+  if (session && (isLoading || !user)) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "#EAF6F1",
+        }}
+      >
+        <ActivityIndicator color="#0B5A47" size="large" />
+      </View>
+    );
+  }
+
+  if (!session) {
+    return (
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="auth" />
+      </Stack>
+    );
+  }
+
+  // Exclusive admin shell — customer/shop/book routes are not registered.
+  if (isAdmin) {
+    return (
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="admin" />
+      </Stack>
+    );
+  }
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      {/* Admin: only the admin console — no booking / shop / history routes. */}
-      <Stack.Protected guard={!!session && isAdmin}>
-        <Stack.Screen name="admin" />
-      </Stack.Protected>
-
-      {/* Everyone else signed in */}
-      <Stack.Protected guard={!!session && !isAdmin}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="edit-profile" />
-        <Stack.Screen name="settings" />
-        <Stack.Screen name="help-support" />
-        <Stack.Screen name="payment-methods" />
-        <Stack.Screen name="history/index" />
-        <Stack.Screen name="history/[id]" />
-        <Stack.Screen name="notifications" />
-        <Stack.Screen name="scan-shop-qr" />
-        <Stack.Screen name="service-start-qr" />
-        <Stack.Screen name="shop/[id]/index" />
-        <Stack.Screen name="shop/[id]/reviews" />
-      </Stack.Protected>
-
-      <Stack.Protected guard={!!session && isBarber && !isAdmin}>
-        <Stack.Screen name="barber" />
-      </Stack.Protected>
-
-      <Stack.Protected guard={!session}>
-        <Stack.Screen name="auth" />
-      </Stack.Protected>
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="edit-profile" />
+      <Stack.Screen name="settings" />
+      <Stack.Screen name="help-support" />
+      <Stack.Screen name="payment-methods" />
+      <Stack.Screen name="history/index" />
+      <Stack.Screen name="history/[id]" />
+      <Stack.Screen name="notifications" />
+      <Stack.Screen name="scan-shop-qr" />
+      <Stack.Screen name="service-start-qr" />
+      <Stack.Screen name="shop/[id]/index" />
+      <Stack.Screen name="shop/[id]/reviews" />
+      {isBarber ? <Stack.Screen name="barber" /> : null}
     </Stack>
   );
 }

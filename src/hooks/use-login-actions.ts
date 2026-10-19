@@ -93,10 +93,14 @@ export function useLoginActions(options: UseLoginActionsOptions = {}) {
     accessToken: string,
     user: Parameters<typeof sessionUserFromLogin>[0],
   ) {
-    await signIn(accessToken, sessionUserFromLogin(user));
+    const sessionUser = sessionUserFromLogin(user);
+    await signIn(accessToken, sessionUser);
 
-    if (isPlatformAdminUser(user)) {
-      router.replace("/admin");
+    if (isPlatformAdminUser(sessionUser)) {
+      // Ensure admin stack is mounted before navigating.
+      requestAnimationFrame(() => {
+        router.replace("/admin");
+      });
       return;
     }
 
