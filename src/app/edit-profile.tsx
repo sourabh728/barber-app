@@ -370,7 +370,7 @@ export default function EditProfileScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <FieldLabel>Name</FieldLabel>
+                <Text style={styles.label}>Name</Text>
                 <TextInput
                   style={styles.input}
                   value={form.name}
@@ -381,7 +381,7 @@ export default function EditProfileScreen() {
                   autoCapitalize="words"
                 />
 
-                <FieldLabel>Email</FieldLabel>
+                <Text style={styles.label}>Email</Text>
                 <TextInput
                   style={styles.input}
                   value={form.email}
@@ -394,7 +394,7 @@ export default function EditProfileScreen() {
                   autoCorrect={false}
                 />
 
-                <FieldLabel>Phone</FieldLabel>
+                <Text style={styles.label}>Phone</Text>
                 <TextInput
                   style={styles.input}
                   value={form.phone}
@@ -408,7 +408,7 @@ export default function EditProfileScreen() {
                   maxLength={10}
                 />
 
-                <FieldLabel>New password (optional)</FieldLabel>
+                <Text style={styles.label}>New password (optional)</Text>
                 <View style={styles.passwordContainer}>
                   <TextInput
                     style={styles.passwordInput}
@@ -478,7 +478,7 @@ export default function EditProfileScreen() {
                       </TouchableOpacity>
                     </View>
 
-                    <FieldLabel>Shop name</FieldLabel>
+                    <Text style={styles.label}>Shop name</Text>
                     <TextInput
                       style={styles.input}
                       value={form.shopName}
@@ -488,7 +488,7 @@ export default function EditProfileScreen() {
                       editable={!busy}
                     />
 
-                    <FieldLabel>Description</FieldLabel>
+                    <Text style={styles.label}>Description</Text>
                     <TextInput
                       style={[styles.input, styles.multiline]}
                       value={form.shopDescription}
@@ -502,7 +502,7 @@ export default function EditProfileScreen() {
                       textAlignVertical="top"
                     />
 
-                    <FieldLabel>Shop phone</FieldLabel>
+                    <Text style={styles.label}>Shop phone</Text>
                     <TextInput
                       style={styles.input}
                       value={form.shopPhone}
@@ -516,7 +516,7 @@ export default function EditProfileScreen() {
                       maxLength={10}
                     />
 
-                    <FieldLabel>Shop email</FieldLabel>
+                    <Text style={styles.label}>Shop email</Text>
                     <TextInput
                       style={styles.input}
                       value={form.shopEmail}
@@ -529,7 +529,7 @@ export default function EditProfileScreen() {
                       autoCorrect={false}
                     />
 
-                    <FieldLabel>Address</FieldLabel>
+                    <Text style={styles.label}>Address</Text>
                     <TextInput
                       style={styles.input}
                       value={form.shopAddress}
@@ -539,7 +539,7 @@ export default function EditProfileScreen() {
                       editable={!busy}
                     />
 
-                    <FieldLabel>City</FieldLabel>
+                    <Text style={styles.label}>City</Text>
                     <TextInput
                       style={styles.input}
                       value={form.shopCity}
@@ -549,7 +549,7 @@ export default function EditProfileScreen() {
                       editable={!busy}
                     />
 
-                    <FieldLabel>State</FieldLabel>
+                    <Text style={styles.label}>State</Text>
                     <TextInput
                       style={styles.input}
                       value={form.shopState}
@@ -559,7 +559,7 @@ export default function EditProfileScreen() {
                       editable={!busy}
                     />
 
-                    <FieldLabel>Pincode</FieldLabel>
+                    <Text style={styles.label}>Pincode</Text>
                     <TextInput
                       style={styles.input}
                       value={form.shopPincode}
@@ -601,12 +601,6 @@ export default function EditProfileScreen() {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
-}
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  const colors = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return <Text style={styles.label}>{children}</Text>;
 }
 
 function createStyles(colors: AppColors) {
