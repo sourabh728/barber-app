@@ -546,7 +546,7 @@ export function BarberHomeScreen() {
         key={`${block.startTime}-${index}`}
         style={[styles.slotBlock, slotStyle]}
         disabled={block.status !== "available"}
-        delayLongPress={2000}
+        delayLongPress={1000}
         onLongPress={() => {
           if (block.status !== "available") return;
           if (Platform.OS !== "web") {
@@ -714,7 +714,7 @@ export function BarberHomeScreen() {
           <Text style={styles.slotStatusLabel}>Slot Status</Text>
         </View>
         <Text style={styles.walkInHint}>
-          Long-press an Available slot (2 seconds) to add a walk-in booking.
+          Long-press an Available slot (1 second) to add a walk-in booking.
         </Text>
 
         {!schedule ? (
