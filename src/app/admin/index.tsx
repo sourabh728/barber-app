@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -78,6 +78,7 @@ function StatCard({
 }
 
 export default function AdminDashboardScreen() {
+  const router = useRouter();
   const { user, signOut } = useSession();
   const [tab, setTab] = useState<TabId>("report");
   const [loading, setLoading] = useState(true);
@@ -285,7 +286,12 @@ export default function AdminDashboardScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.iconBtn}
-          onPress={() => void signOut()}
+          onPress={() => {
+            void (async () => {
+              await signOut();
+              router.replace("/auth");
+            })();
+          }}
           accessibilityLabel="Sign out"
         >
           <Ionicons name="log-out-outline" size={20} color="#B91C1C" />

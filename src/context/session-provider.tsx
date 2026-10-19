@@ -9,6 +9,7 @@ import {
   type PropsWithChildren,
 } from "react";
 import { isAxiosError } from "axios";
+import { router } from "expo-router";
 
 import { PLATFORM_ADMIN_EMAIL } from "@/constants/platform-admin";
 import { api, clearApiAccessToken, setApiAccessToken } from "@/services/api";
@@ -177,6 +178,12 @@ export function SessionProvider({ children }: PropsWithChildren) {
     setUser(null);
     setSession(null);
     setStoredUserJson(null);
+    // Leave admin/customer stacks — otherwise Expo keeps the old URL (e.g. /admin).
+    try {
+      router.replace("/auth");
+    } catch {
+      // Router may not be ready during early boot; storage clear is enough.
+    }
   }, [setSession, setStoredUserJson]);
 
   const updateUser = useCallback(

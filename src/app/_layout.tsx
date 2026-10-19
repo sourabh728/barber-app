@@ -2,8 +2,10 @@ import { useEffect } from "react";
 import {
   DarkTheme,
   DefaultTheme,
+  Redirect,
   Stack,
   ThemeProvider,
+  usePathname,
 } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -58,13 +60,39 @@ export default function RootLayout() {
   );
 }
 
+function SessionRedirects() {
+  const { session, user, isLoading } = useSession();
+  const pathname = usePathname();
+  const isAdmin = isPlatformAdminUser(user);
+
+  if (isLoading) {
+    return null;
+  }
+
+  if (!session && !pathname.startsWith("/auth")) {
+    return <Redirect href="/auth" />;
+  }
+
+  if (session && isAdmin && !pathname.startsWith("/admin")) {
+    return <Redirect href="/admin" />;
+  }
+
+  if (
+    session &&
+    !isAdmin &&
+    (pathname.startsWith("/admin") || pathname.startsWith("/auth"))
+  ) {
+    return <Redirect href="/" />;
+  }
+
+  return null;
+}
+
 function RootNavigator() {
   const { session, user, isLoading } = useSession();
   const isBarber = user?.role === "BARBER";
   const isAdmin = isPlatformAdminUser(user);
 
-  // Never mount customer booking routes until we know who the user is.
-  // Otherwise a brief null user + valid session opens the booking home.
   if (session && (isLoading || !user)) {
     return (
       <View
@@ -80,38 +108,37 @@ function RootNavigator() {
     );
   }
 
-  if (!session) {
-    return (
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="auth" />
-      </Stack>
-    );
-  }
-
-  // Exclusive admin shell — customer/shop/book routes are not registered.
-  if (isAdmin) {
-    return (
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="admin" />
-      </Stack>
-    );
-  }
-
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="edit-profile" />
-      <Stack.Screen name="settings" />
-      <Stack.Screen name="help-support" />
-      <Stack.Screen name="payment-methods" />
-      <Stack.Screen name="history/index" />
-      <Stack.Screen name="history/[id]" />
-      <Stack.Screen name="notifications" />
-      <Stack.Screen name="scan-shop-qr" />
-      <Stack.Screen name="service-start-qr" />
-      <Stack.Screen name="shop/[id]/index" />
-      <Stack.Screen name="shop/[id]/reviews" />
-      {isBarber ? <Stack.Screen name="barber" /> : null}
-    </Stack>
+    <>
+      <SessionRedirects />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Protected guard={!session}>
+          <Stack.Screen name="auth" />
+        </Stack.Protected>
+
+        <Stack.Protected guard={!!session && isAdmin}>
+          <Stack.Screen name="admin" />
+        </Stack.Protected>
+
+        <Stack.Protected guard={!!session && !isAdmin}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="edit-profile" />
+          <Stack.Screen name="settings" />
+          <Stack.Screen name="help-support" />
+          <Stack.Screen name="payment-methods" />
+          <Stack.Screen name="history/index" />
+          <Stack.Screen name="history/[id]" />
+          <Stack.Screen name="notifications" />
+          <Stack.Screen name="scan-shop-qr" />
+          <Stack.Screen name="service-start-qr" />
+          <Stack.Screen name="shop/[id]/index" />
+          <Stack.Screen name="shop/[id]/reviews" />
+        </Stack.Protected>
+
+        <Stack.Protected guard={!!session && isBarber && !isAdmin}>
+          <Stack.Screen name="barber" />
+        </Stack.Protected>
+      </Stack>
+    </>
   );
 }

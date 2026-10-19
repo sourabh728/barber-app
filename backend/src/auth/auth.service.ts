@@ -354,16 +354,21 @@ export class AuthService {
     });
 
     if (!user) {
+      this.logger.warn(`Login failed (unknown email): ${email}`);
       throw new UnauthorizedException('Invalid email or password');
     }
 
     const passwordMatches = await bcrypt.compare(password, user.password);
 
     if (!passwordMatches) {
+      this.logger.warn(
+        `Login failed (bad password): ${email} role=${user.role}`,
+      );
       throw new UnauthorizedException('Invalid email or password');
     }
 
     if (!user.emailVerified) {
+      this.logger.warn(`Login blocked (email not verified): ${email}`);
       throw new ForbiddenException({
         message: 'Please verify your email before signing in.',
         code: 'EMAIL_NOT_VERIFIED',
@@ -371,6 +376,9 @@ export class AuthService {
       });
     }
 
+    this.logger.log(
+      `Login ok: ${email} role=${user.role} id=${user.id}`,
+    );
     return this.issueAuthResponse(user);
   }
 
