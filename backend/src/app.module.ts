@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
+import { AdminModule } from './admin/admin.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -9,11 +10,13 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ShopModule } from './shops/shop.module';
 import { VerificationModule } from './verification/verification.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    AdminModule,
     AuthModule,
     CustomerModule,
     NotificationsModule,

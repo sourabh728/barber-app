@@ -94,6 +94,11 @@ export function useLoginActions(options: UseLoginActionsOptions = {}) {
   ) {
     await signIn(accessToken, sessionUserFromLogin(user));
 
+    if (user.role === "ADMIN") {
+      router.replace("/admin");
+      return;
+    }
+
     if (user.role === "BARBER") {
       try {
         const profile = await fetchCurrentUser();

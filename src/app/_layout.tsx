@@ -9,6 +9,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { MaintenanceGate } from "@/components/maintenance-gate";
 import {
   AppearanceProvider,
   useAppearancePreference,
@@ -35,7 +36,9 @@ function ThemedApp() {
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
       <StatusBar style="light" />
-      <RootNavigator />
+      <MaintenanceGate>
+        <RootNavigator />
+      </MaintenanceGate>
     </ThemeProvider>
   );
 }
@@ -56,12 +59,16 @@ export default function RootLayout() {
 function RootNavigator() {
   const { session, user } = useSession();
   const isBarber = user?.role === "BARBER";
+  const isAdmin = user?.role === "ADMIN";
 
   // Do not gate Protected guards on isLoading. While session init finishes,
   // the splash stays up; an empty/unmounted stack paints black on Android.
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={!!session}>
+      <Stack.Protected guard={!!session && isAdmin}>
+        <Stack.Screen name="admin" />
+      </Stack.Protected>
+      <Stack.Protected guard={!!session && !isAdmin}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="edit-profile" />
         <Stack.Screen name="settings" />

@@ -256,3 +256,28 @@ enum AppointmentStatus {
   CANCELLED
   REJECTED
 }
+
+enum PaymentMode {
+  /// Full amount paid at shop (current default)
+  PAY_AT_SHOP
+  /// Small online booking fee now; remaining balance at shop after service
+  ONLINE_FEE_REST_AT_SHOP
+}
+
+/// Singleton platform settings (id = "default") managed by ADMIN.
+model AppSettings {
+  id                    String      @id @default("default")
+  maintenanceEnabled    Boolean     @default(false)
+  maintenanceMessage    String      @default("Trimshim is under maintenance. We’ll be back shortly.")
+  maintenanceUntil      DateTime?
+  paymentMode           PaymentMode @default(PAY_AT_SHOP)
+  /// Online booking fee in INR when paymentMode is ONLINE_FEE_REST_AT_SHOP
+  bookingFeeInr         Int         @default(11)
+  payoutAccountName     String?
+  payoutUpiId           String?
+  payoutBankName        String?
+  payoutAccountNumber   String?
+  payoutIfsc            String?
+  updatedAt             DateTime    @updatedAt
+  createdAt             DateTime    @default(now())
+}

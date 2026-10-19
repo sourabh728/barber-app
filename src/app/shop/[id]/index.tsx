@@ -38,6 +38,11 @@ import {
   type ShopDetail,
   type ShopServiceOption,
 } from "@/services/shops-api";
+import {
+  fetchPublicSettings,
+  formatPaymentLabel,
+  type PublicAppSettings,
+} from "@/services/public-settings-api";
 import { shopImageSource } from "@/utils/media";
 
 const STEPS = ["Services", "Barber", "Review"] as const;
@@ -199,6 +204,8 @@ export default function ShopBookAppointmentScreen() {
   const [behalfConflict, setBehalfConflict] = useState<CustomerBooking | null>(
     null,
   );
+  const [paymentSettings, setPaymentSettings] =
+    useState<PublicAppSettings | null>(null);
 
   const loadShop = useCallback(async () => {
     if (!shopId) {
@@ -210,8 +217,14 @@ export default function ShopBookAppointmentScreen() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchShopById(shopId);
+      const [data, publicSettings] = await Promise.all([
+        fetchShopById(shopId),
+        fetchPublicSettings().catch(() => null),
+      ]);
       setShop(data);
+      if (publicSettings) {
+        setPaymentSettings(publicSettings);
+      }
     } catch (err) {
       setShop(null);
       setError(getShopsErrorMessage(err));
@@ -926,6 +939,22 @@ export default function ShopBookAppointmentScreen() {
                   ₹{totalAmount.toLocaleString("en-IN")}
                 </Text>
               </View>
+
+              <Text style={[styles.reviewLabel, styles.reviewSpacer]}>
+                Payment
+              </Text>
+              <Text style={styles.reviewValue}>
+                {formatPaymentLabel(paymentSettings, totalAmount)}
+              </Text>
+              {paymentSettings?.paymentMode === "ONLINE_FEE_REST_AT_SHOP" &&
+              paymentSettings.payoutUpiId ? (
+                <Text style={styles.bookedAs}>
+                  Pay booking fee to UPI {paymentSettings.payoutUpiId}
+                  {paymentSettings.payoutAccountName
+                    ? ` (${paymentSettings.payoutAccountName})`
+                    : ""}
+                </Text>
+              ) : null}
 
               {user?.name ? (
                 <Text style={styles.bookedAs}>Booking as {user.name}</Text>

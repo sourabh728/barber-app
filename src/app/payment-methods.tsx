@@ -11,6 +11,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useStorageState } from "@/hooks/use-storage-state";
+import {
+  fetchPublicSettings,
+  formatPaymentLabel,
+  type PublicAppSettings,
+} from "@/services/public-settings-api";
 
 const STORAGE_KEY = "preferredPaymentMethod";
 
@@ -68,12 +73,21 @@ export default function PaymentMethodsScreen() {
   const router = useRouter();
   const [[isLoading, stored], setStored] = useStorageState(STORAGE_KEY);
   const [selected, setSelected] = useState<PaymentMethodId>("cash");
+  const [platformPay, setPlatformPay] = useState<PublicAppSettings | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!isLoading && isPaymentMethodId(stored)) {
       setSelected(stored);
     }
   }, [isLoading, stored]);
+
+  useEffect(() => {
+    void fetchPublicSettings()
+      .then(setPlatformPay)
+      .catch(() => setPlatformPay(null));
+  }, []);
 
   const selectMethod = (id: PaymentMethodId) => {
     setSelected(id);
@@ -104,6 +118,15 @@ export default function PaymentMethodsScreen() {
             Choose how you prefer to pay for appointments. You can change this
             anytime.
           </Text>
+
+          {platformPay ? (
+            <View style={styles.platformBanner}>
+              <Text style={styles.platformTitle}>Current platform policy</Text>
+              <Text style={styles.platformBody}>
+                {formatPaymentLabel(platformPay)}
+              </Text>
+            </View>
+          ) : null}
 
           <Text style={styles.sectionLabel}>Cash</Text>
           {OPTIONS.filter((o) => o.id === "cash").map((option) => (
@@ -229,6 +252,31 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 24,
     paddingHorizontal: 4,
+  },
+
+  platformBanner: {
+    backgroundColor: "#ECFDF5",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+    padding: 14,
+    marginBottom: 20,
+    gap: 4,
+  },
+
+  platformTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#0B5A47",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+
+  platformBody: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: "#134E4A",
+    fontWeight: "600",
   },
 
   sectionLabel: {

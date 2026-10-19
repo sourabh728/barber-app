@@ -15,6 +15,7 @@ import { OAuth2Client } from 'google-auth-library';
 
 import { UserRole } from '../../generated/prisma/enums';
 // import { OtpPurpose, UserRole } from '../../generated/prisma/enums';
+import { PLATFORM_ADMIN_EMAIL } from '../admin/admin.constants';
 import {
   publicUploadPath,
   tryDeleteUpload,
@@ -78,6 +79,12 @@ export class AuthService {
     const { name, email, phone, password, role } = registerDto;
     const normalizedEmail = email.trim().toLowerCase();
 
+    if (normalizedEmail === PLATFORM_ADMIN_EMAIL) {
+      throw new ForbiddenException(
+        'This email is reserved for the platform administrator.',
+      );
+    }
+
     const existingUser = await this.prisma.user.findFirst({
       where: {
         OR: [{ email: normalizedEmail }, ...(phone ? [{ phone }] : [])],
@@ -133,6 +140,12 @@ export class AuthService {
       description,
     } = registerBarberDto;
     const normalizedEmail = email.trim().toLowerCase();
+
+    if (normalizedEmail === PLATFORM_ADMIN_EMAIL) {
+      throw new ForbiddenException(
+        'This email is reserved for the platform administrator.',
+      );
+    }
 
     const existingUser = await this.prisma.user.findFirst({
       where: {
@@ -363,17 +376,28 @@ export class AuthService {
 
   async lookupAccountByGoogle(dto: GoogleIdTokenDto) {
     const { email } = await this.verifyGoogleIdToken(dto.idToken);
+
+    // Forgot-password recovery is limited to the platform admin inbox only.
+    if (email !== PLATFORM_ADMIN_EMAIL) {
+      return {
+        exists: false as const,
+        email,
+        message:
+          'Password reset emails are only sent to the platform admin account. Customers and barbers can sign in with Google.',
+      };
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { email },
       select: { email: true, role: true },
     });
 
-    if (!user) {
+    if (!user || user.role !== UserRole.ADMIN) {
       return {
         exists: false as const,
         email,
         message:
-          'Email not found. Please register as a new customer or barber.',
+          'Password reset emails are only sent to the platform admin account.',
       };
     }
 
@@ -386,14 +410,21 @@ export class AuthService {
 
   async resetPasswordWithGoogle(dto: ResetPasswordWithGoogleDto) {
     const { email } = await this.verifyGoogleIdToken(dto.idToken);
+
+    if (email !== PLATFORM_ADMIN_EMAIL) {
+      throw new ForbiddenException(
+        'Password reset is only available for the platform admin account.',
+      );
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { email },
-      select: { id: true, email: true },
+      select: { id: true, email: true, role: true },
     });
 
-    if (!user) {
+    if (!user || user.role !== UserRole.ADMIN) {
       throw new NotFoundException(
-        'Email not found. Please register as a new customer or barber.',
+        'Password reset is only available for the platform admin account.',
       );
     }
 
@@ -442,6 +473,12 @@ export class AuthService {
       });
 
       return this.issueAuthResponse(updatedUser);
+    }
+
+    if (email === PLATFORM_ADMIN_EMAIL) {
+      throw new ForbiddenException(
+        'This email is reserved for the platform administrator. Sign in with email and password.',
+      );
     }
 
     const hashedPassword = await bcrypt.hash(

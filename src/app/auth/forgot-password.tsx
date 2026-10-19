@@ -84,7 +84,7 @@ export default function ForgotPasswordScreen() {
         setVerifiedEmail(result.email);
         setErrorMessage(
           result.message ||
-            "Email not found. Please register as a new customer or barber.",
+            "Password reset is only available for the platform admin account. Customers and barbers can sign in with Google.",
         );
         return;
       }

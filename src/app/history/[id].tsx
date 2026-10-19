@@ -34,6 +34,11 @@ import {
   type BookingVerification,
   type ServiceStartQrResponse,
 } from "@/services/verification-api";
+import {
+  fetchPublicSettings,
+  formatPaymentLabel,
+  type PublicAppSettings,
+} from "@/services/public-settings-api";
 import { showAppAlert } from "@/utils/app-alert";
 import QRCode from "react-native-qrcode-svg";
 
@@ -177,6 +182,8 @@ export default function BookingRequestDetailScreen() {
   const [verification, setVerification] = useState<BookingVerification | null>(
     null,
   );
+  const [paymentSettings, setPaymentSettings] =
+    useState<PublicAppSettings | null>(null);
   const [serviceQr, setServiceQr] = useState<ServiceStartQrResponse | null>(
     null,
   );
@@ -196,10 +203,19 @@ export default function BookingRequestDetailScreen() {
       const data = await fetchMyBooking(bookingId);
       setBooking(data);
       try {
-        const v = await fetchBookingVerification(bookingId);
+        const [v, pay] = await Promise.all([
+          fetchBookingVerification(bookingId),
+          fetchPublicSettings(),
+        ]);
         setVerification(v);
+        setPaymentSettings(pay);
       } catch {
         setVerification(null);
+        try {
+          setPaymentSettings(await fetchPublicSettings());
+        } catch {
+          setPaymentSettings(null);
+        }
       }
     } catch (error) {
       setBooking(null);
@@ -345,7 +361,7 @@ export default function BookingRequestDetailScreen() {
               <DetailRow
                 icon="cash-outline"
                 label="Payment"
-                value={`${formatInr(booking.priceInr)} · Pay at shop`}
+                value={formatPaymentLabel(paymentSettings, booking.priceInr)}
                 styles={styles}
                 accentColor={colors.accent}
               />
