@@ -1,5 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import {
+  Redirect,
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -14,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BookForSomeoneDialog } from "@/components/book-for-someone-dialog";
 import { BookingSuccessDialog } from "@/components/booking-success-dialog";
+import { isPlatformAdminUser } from "@/constants/platform-admin";
 import { useSession } from "@/context/session-provider";
 import {
   createCustomerBooking,
@@ -523,6 +529,10 @@ export default function ShopBookAppointmentScreen() {
     }
     router.replace("/history");
   };
+
+  if (isPlatformAdminUser(user)) {
+    return <Redirect href="/admin" />;
+  }
 
   if (loading) {
     return (

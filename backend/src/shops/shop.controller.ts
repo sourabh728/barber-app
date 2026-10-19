@@ -295,7 +295,7 @@ export class ShopController {
   /** Customer books an appointment — always created as PENDING (awaiting approval). */
   @Post(':id/appointments')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.CUSTOMER, UserRole.BARBER, UserRole.ADMIN)
+  @Roles(UserRole.CUSTOMER)
   createCustomerAppointment(
     @Param('id') shopId: string,
     @Body() dto: CreateCustomerAppointmentDto,

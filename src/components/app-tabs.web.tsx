@@ -12,13 +12,14 @@ import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { isPlatformAdminUser } from '@/constants/platform-admin';
 import { useSession } from '@/context/session-provider';
 import { useTheme } from '@/hooks/use-theme';
 
 export default function AppTabs() {
   const { user } = useSession();
   const isBarber = user?.role === 'BARBER';
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = isPlatformAdminUser(user);
 
   if (isAdmin) {
     return null;

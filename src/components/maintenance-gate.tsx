@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { isPlatformAdminUser } from "@/constants/platform-admin";
 import { useSession } from "@/context/session-provider";
 import {
   fetchPublicSettings,
@@ -56,12 +57,12 @@ export function MaintenanceGate({ children }: PropsWithChildren) {
   }, []);
 
   useEffect(() => {
-    if (user && user.role !== "ADMIN") {
+    if (user && !isPlatformAdminUser(user)) {
       setAdminSignIn(false);
     }
   }, [user]);
 
-  const isAdmin = user?.role === "ADMIN";
+  const isAdmin = isPlatformAdminUser(user);
   const untilMs = settings?.maintenanceUntil
     ? new Date(settings.maintenanceUntil).getTime()
     : null;

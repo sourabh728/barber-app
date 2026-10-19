@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import * as Google from "expo-auth-session/providers/google";
 import * as WebBrowser from "expo-web-browser";
 
+import { isPlatformAdminUser } from "@/constants/platform-admin";
 import { useSession } from "@/context/session-provider";
 import {
   fetchCurrentUser,
@@ -94,7 +95,7 @@ export function useLoginActions(options: UseLoginActionsOptions = {}) {
   ) {
     await signIn(accessToken, sessionUserFromLogin(user));
 
-    if (user.role === "ADMIN") {
+    if (isPlatformAdminUser(user)) {
       router.replace("/admin");
       return;
     }

@@ -1,5 +1,6 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 
+import { isPlatformAdminUser } from '@/constants/platform-admin';
 import { useSession } from '@/context/session-provider';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -7,7 +8,7 @@ export default function AppTabs() {
   const colors = useTheme();
   const { user } = useSession();
   const isBarber = user?.role === 'BARBER';
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = isPlatformAdminUser(user);
 
   return (
     <NativeTabs

@@ -1572,7 +1572,7 @@ export class ShopService {
       }),
       this.prisma.user.findUnique({
         where: { id: customerUserId },
-        select: { id: true, name: true, phone: true },
+        select: { id: true, name: true, phone: true, role: true },
       }),
     ]);
 
@@ -1582,6 +1582,12 @@ export class ShopService {
 
     if (!customer) {
       throw new NotFoundException('User not found');
+    }
+
+    if (customer.role === UserRole.ADMIN) {
+      throw new ForbiddenException(
+        'Platform admins cannot create booking requests.',
+      );
     }
 
     await this.assertCustomerCanCreateBooking(customer.id);
