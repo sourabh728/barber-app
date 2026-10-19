@@ -36,27 +36,35 @@ export class AdminService implements OnModuleInit {
     const hashedPassword = await bcrypt.hash(PLATFORM_ADMIN_PASSWORD, 10);
     const existing = await this.prisma.user.findUnique({ where: { email } });
 
-    if (!existing) {
-      await this.prisma.user.create({
+    // Wipe any prior customer/barber identity for this email so login
+    // always returns a clean ADMIN (no leftover bookings/shops).
+    if (existing && existing.role !== UserRole.ADMIN) {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.notification.deleteMany({ where: { userId: existing.id } });
+        await tx.appointment.deleteMany({ where: { customerId: existing.id } });
+        await tx.shop.deleteMany({ where: { ownerId: existing.id } });
+        await tx.user.delete({ where: { id: existing.id } });
+      });
+    } else if (existing) {
+      await this.prisma.user.update({
+        where: { email },
         data: {
-          name: PLATFORM_ADMIN_NAME,
-          email,
-          password: hashedPassword,
           role: UserRole.ADMIN,
           emailVerified: true,
+          name: PLATFORM_ADMIN_NAME,
+          password: hashedPassword,
         },
       });
       return;
     }
 
-    await this.prisma.user.update({
-      where: { email },
+    await this.prisma.user.create({
       data: {
+        name: PLATFORM_ADMIN_NAME,
+        email,
+        password: hashedPassword,
         role: UserRole.ADMIN,
         emailVerified: true,
-        name: existing.name || PLATFORM_ADMIN_NAME,
-        // Keep password in sync with the designated admin credential.
-        password: hashedPassword,
       },
     });
   }

@@ -2,8 +2,10 @@ import { useEffect } from "react";
 import {
   DarkTheme,
   DefaultTheme,
+  Redirect,
   Stack,
   ThemeProvider,
+  usePathname,
 } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -56,6 +58,17 @@ export default function RootLayout() {
   );
 }
 
+function AdminRouteGuard() {
+  const { user } = useSession();
+  const pathname = usePathname();
+
+  if (user?.role === "ADMIN" && !pathname.startsWith("/admin")) {
+    return <Redirect href="/admin" />;
+  }
+
+  return null;
+}
+
 function RootNavigator() {
   const { session, user } = useSession();
   const isBarber = user?.role === "BARBER";
@@ -64,30 +77,33 @@ function RootNavigator() {
   // Do not gate Protected guards on isLoading. While session init finishes,
   // the splash stays up; an empty/unmounted stack paints black on Android.
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={!!session && isAdmin}>
-        <Stack.Screen name="admin" />
-      </Stack.Protected>
-      <Stack.Protected guard={!!session && !isAdmin}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="edit-profile" />
-        <Stack.Screen name="settings" />
-        <Stack.Screen name="help-support" />
-        <Stack.Screen name="payment-methods" />
-        <Stack.Screen name="history/index" />
-        <Stack.Screen name="history/[id]" />
-        <Stack.Screen name="notifications" />
-        <Stack.Screen name="scan-shop-qr" />
-        <Stack.Screen name="service-start-qr" />
-        <Stack.Screen name="shop/[id]/index" />
-        <Stack.Screen name="shop/[id]/reviews" />
-      </Stack.Protected>
-      <Stack.Protected guard={!!session && isBarber}>
-        <Stack.Screen name="barber" />
-      </Stack.Protected>
-      <Stack.Protected guard={!session}>
-        <Stack.Screen name="auth" />
-      </Stack.Protected>
-    </Stack>
+    <>
+      <AdminRouteGuard />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Protected guard={!!session && isAdmin}>
+          <Stack.Screen name="admin" />
+        </Stack.Protected>
+        <Stack.Protected guard={!!session && !isAdmin}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="edit-profile" />
+          <Stack.Screen name="settings" />
+          <Stack.Screen name="help-support" />
+          <Stack.Screen name="payment-methods" />
+          <Stack.Screen name="history/index" />
+          <Stack.Screen name="history/[id]" />
+          <Stack.Screen name="notifications" />
+          <Stack.Screen name="scan-shop-qr" />
+          <Stack.Screen name="service-start-qr" />
+          <Stack.Screen name="shop/[id]/index" />
+          <Stack.Screen name="shop/[id]/reviews" />
+        </Stack.Protected>
+        <Stack.Protected guard={!!session && isBarber}>
+          <Stack.Screen name="barber" />
+        </Stack.Protected>
+        <Stack.Protected guard={!session}>
+          <Stack.Screen name="auth" />
+        </Stack.Protected>
+      </Stack>
+    </>
   );
 }

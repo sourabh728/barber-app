@@ -7,13 +7,14 @@ export default function AppTabs() {
   const colors = useTheme();
   const { user } = useSession();
   const isBarber = user?.role === 'BARBER';
+  const isAdmin = user?.role === 'ADMIN';
 
   return (
     <NativeTabs
       backgroundColor={colors.background}
       indicatorColor={colors.backgroundElement}
       labelStyle={{ selected: { color: colors.text } }}>
-      <NativeTabs.Trigger name="index">
+      <NativeTabs.Trigger name="index" hidden={isAdmin}>
         <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           src={require('@/assets/images/tabIcons/home.png')}
@@ -21,7 +22,7 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="explore" hidden={isBarber}>
+      <NativeTabs.Trigger name="explore" hidden={isBarber || isAdmin}>
         <NativeTabs.Trigger.Label>Explore</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           src={require('@/assets/images/tabIcons/explore.png')}
@@ -30,7 +31,7 @@ export default function AppTabs() {
       </NativeTabs.Trigger>
 
       {/* Report tab is barber/shop-owner only; customers never see Bookings or Report. */}
-      <NativeTabs.Trigger name="report" hidden={!isBarber}>
+      <NativeTabs.Trigger name="report" hidden={!isBarber || isAdmin}>
         <NativeTabs.Trigger.Label>Report</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           src={require('@/assets/images/tabIcons/booking.png')}
@@ -38,7 +39,7 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="profile">
+      <NativeTabs.Trigger name="profile" hidden={isAdmin}>
         <NativeTabs.Trigger.Label>Profile</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           src={require('@/assets/images/tabIcons/profile.png')}

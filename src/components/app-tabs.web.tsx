@@ -18,6 +18,11 @@ import { useTheme } from '@/hooks/use-theme';
 export default function AppTabs() {
   const { user } = useSession();
   const isBarber = user?.role === 'BARBER';
+  const isAdmin = user?.role === 'ADMIN';
+
+  if (isAdmin) {
+    return null;
+  }
 
   return (
     <Tabs>
