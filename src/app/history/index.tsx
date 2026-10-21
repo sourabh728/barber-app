@@ -59,7 +59,7 @@ function formatTime12h(time24: string) {
   return `${hour}:${minute} ${suffix}`;
 }
 
-function statusMeta(status: AppointmentStatus) {
+function statusMeta(status: AppointmentStatus, mutedColor: string) {
   switch (status) {
     case "PENDING":
       return { label: "Waiting for approval", color: "#FBBF24" };
@@ -68,13 +68,13 @@ function statusMeta(status: AppointmentStatus) {
     case "IN_PROGRESS":
       return { label: "In Progress", color: "#4ADE80" };
     case "COMPLETED":
-      return { label: "Completed", color: colors.textSecondary };
+      return { label: "Completed", color: mutedColor };
     case "CANCELLED":
       return { label: "Cancelled", color: "#F87171" };
     case "REJECTED":
       return { label: "Rejected", color: "#F87171" };
     default:
-      return { label: status, color: colors.textSecondary };
+      return { label: status, color: mutedColor };
   }
 }
 
@@ -166,7 +166,10 @@ export default function CustomerHistoryScreen() {
               </Text>
 
               {bookings.map((booking) => {
-                const meta = statusMeta(booking.status);
+                const meta = statusMeta(
+                  booking.status,
+                  colors.textSecondary,
+                );
                 return (
                   <TouchableOpacity
                     key={booking.id}
