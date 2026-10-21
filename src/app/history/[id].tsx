@@ -19,6 +19,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { AppColors } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 
+import { BookingConfirmedCard } from "@/components/booking-confirmed-card";
+import { BookingRejectedCard } from "@/components/booking-rejected-card";
 import { CancelBookingDialog } from "@/components/cancel-booking-dialog";
 import {
   cancelMyBooking,
@@ -277,7 +279,13 @@ export default function BookingRequestDetailScreen() {
             >
               <Ionicons name="arrow-back" size={20} color="#fff" />
             </TouchableOpacity>
-            <Text style={styles.heading}>Request details</Text>
+            <Text style={styles.heading}>
+              {booking?.status === "CONFIRMED"
+                ? "Booking Confirmation"
+                : booking?.status === "REJECTED"
+                  ? "Advance Payment"
+                  : "Request details"}
+            </Text>
             <View style={styles.headerSpacer} />
           </View>
 
@@ -299,27 +307,58 @@ export default function BookingRequestDetailScreen() {
             </View>
           ) : (
             <>
-              <View
-                style={[
-                  styles.statusBanner,
-                  booking.status === "PENDING"
-                    ? styles.statusBannerPending
-                    : null,
-                ]}
-              >
-                <View style={styles.statusBannerTop}>
-                  <View
-                    style={[styles.statusDot, { backgroundColor: meta.color }]}
-                  />
-                  <Text style={[styles.statusLabel, { color: meta.color }]}>
-                    {meta.label}
-                  </Text>
+              {booking.status === "CONFIRMED" ? (
+                <BookingConfirmedCard
+                  booking={booking}
+                  paymentSettings={paymentSettings}
+                  onViewHistory={() => router.replace("/history")}
+                  onPrimaryAction={() => {
+                    if (verification?.arrivedAt) {
+                      router.push(`/service-start-qr?id=${booking.id}`);
+                      return;
+                    }
+                    router.push("/scan-shop-qr");
+                  }}
+                  primaryLabel={
+                    verification?.arrivedAt
+                      ? "Show service QR"
+                      : "Scan shop QR"
+                  }
+                />
+              ) : booking.status === "REJECTED" ? (
+                <BookingRejectedCard
+                  booking={booking}
+                  paymentSettings={paymentSettings}
+                  onViewOtherBarbers={() =>
+                    router.push(`/shop/${booking.shopId}`)
+                  }
+                  onViewOtherSlots={() =>
+                    router.push(`/shop/${booking.shopId}`)
+                  }
+                />
+              ) : (
+                <View
+                  style={[
+                    styles.statusBanner,
+                    booking.status === "PENDING"
+                      ? styles.statusBannerPending
+                      : null,
+                  ]}
+                >
+                  <View style={styles.statusBannerTop}>
+                    <View
+                      style={[styles.statusDot, { backgroundColor: meta.color }]}
+                    />
+                    <Text style={[styles.statusLabel, { color: meta.color }]}>
+                      {meta.label}
+                    </Text>
+                  </View>
+                  <Text style={styles.bannerTitle}>{meta.bannerTitle}</Text>
+                  {meta.bannerBody ? (
+                    <Text style={styles.bannerBody}>{meta.bannerBody}</Text>
+                  ) : null}
                 </View>
-                <Text style={styles.bannerTitle}>{meta.bannerTitle}</Text>
-                {meta.bannerBody ? (
-                  <Text style={styles.bannerBody}>{meta.bannerBody}</Text>
-                ) : null}
-              </View>
+              )}
 
               <Text style={styles.sectionTitle}>Booking summary</Text>
 

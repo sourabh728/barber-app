@@ -136,14 +136,25 @@ export class CustomerService {
   async getMyStats(userId: string) {
     const owned = await this.buildOwnedAppointmentsFilter(userId);
 
-    const [completedBookings, totalBookings] = await Promise.all([
+    const [completedBookings, totalBookings, pointsAgg] = await Promise.all([
       this.prisma.appointment.count({
         where: { ...owned, status: AppointmentStatus.COMPLETED },
       }),
       this.prisma.appointment.count({ where: owned }),
+      this.prisma.appointment.aggregate({
+        where: { ...owned, bookingScore: { not: null } },
+        _sum: { bookingScore: true },
+        _count: { _all: true },
+      }),
     ]);
 
-    return { completedBookings, totalBookings };
+    return {
+      completedBookings,
+      totalBookings,
+      /** Sum of booking scores (base + punctuality) from completed/scored visits. */
+      totalPoints: pointsAgg._sum.bookingScore ?? 0,
+      scoredBookings: pointsAgg._count._all,
+    };
   }
 
   /** Single booking detail for the signed-in customer. */

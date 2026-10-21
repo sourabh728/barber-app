@@ -1311,12 +1311,22 @@ export class ShopService {
   async getMyStats(ownerId: string) {
     const shop = await this.findOwnerShop(ownerId);
 
-    const completedBookings = await this.prisma.appointment.count({
-      where: {
-        shopId: shop.id,
-        status: AppointmentStatus.COMPLETED,
-      },
-    });
+    const [completedBookings, pointsAgg] = await Promise.all([
+      this.prisma.appointment.count({
+        where: {
+          shopId: shop.id,
+          status: AppointmentStatus.COMPLETED,
+        },
+      }),
+      this.prisma.appointment.aggregate({
+        where: {
+          shopId: shop.id,
+          bookingScore: { not: null },
+        },
+        _sum: { bookingScore: true },
+        _count: { _all: true },
+      }),
+    ]);
 
     // Customer ratings/reviews are not modeled yet — keep placeholders at 0.
     return {
@@ -1324,6 +1334,9 @@ export class ShopService {
       completedBookings,
       ratingAverage: 0,
       reviewCount: 0,
+      /** Sum of booking scores (base + punctuality) for this shop. */
+      totalPoints: pointsAgg._sum.bookingScore ?? 0,
+      scoredBookings: pointsAgg._count._all,
     };
   }
 

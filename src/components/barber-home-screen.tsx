@@ -17,6 +17,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useSession } from "@/context/session-provider";
+import { NewBookingRequestCard } from "@/components/new-booking-request-card";
 import { WalkInBookingDialog } from "@/components/walk-in-booking-dialog";
 import {
   fetchMyShopSchedule,
@@ -650,62 +651,24 @@ export function BarberHomeScreen() {
           </View>
         ) : null}
 
-        <View style={styles.incomingCard}>
-          <View style={styles.incomingHeader}>
-            <Text style={styles.incomingHeaderText}>Incoming Requests</Text>
-          </View>
+        <View style={styles.incomingSection}>
+          <Text style={styles.incomingSectionTitle}>Incoming Requests</Text>
 
           {pendingRequests.length === 0 ? (
-            <Text style={styles.incomingEmpty}>No pending requests today.</Text>
+            <View style={styles.incomingEmptyCard}>
+              <Text style={styles.incomingEmpty}>No pending requests today.</Text>
+            </View>
           ) : (
-            pendingRequests.map((appointment) => {
-              const busy = actionId === appointment.id;
-              return (
-                <View key={appointment.id} style={styles.requestRow}>
-                  <View style={styles.requestIdentity}>
-                    <View style={styles.avatar}>
-                      <Ionicons name="person" size={22} color="#64748B" />
-                    </View>
-                    <View style={styles.requestCopy}>
-                      <Text style={styles.requestName}>
-                        {customerShortName(appointment.customerName)}
-                      </Text>
-                      <Text style={styles.requestTime}>
-                        {formatTime12h(appointment.startTime)}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.requestActions}>
-                    <TouchableOpacity
-                      style={[styles.acceptButton, busy && styles.buttonDisabled]}
-                      disabled={busy}
-                      onPress={() => void openAccept(appointment)}
-                    >
-                      {busy ? (
-                        <ActivityIndicator color="#FFFFFF" size="small" />
-                      ) : (
-                        <Text style={styles.acceptText}>Accept</Text>
-                      )}
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.declineButton, busy && styles.buttonDisabled]}
-                      disabled={busy}
-                      onPress={() => confirmDecline(appointment)}
-                    >
-                      <Text style={styles.declineText}>Decline</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.suggestButton, busy && styles.buttonDisabled]}
-                      disabled={busy}
-                      onPress={() => openSuggestModal(appointment)}
-                    >
-                      <Text style={styles.suggestText}>Suggest Next Slot</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              );
-            })
+            pendingRequests.map((appointment) => (
+              <NewBookingRequestCard
+                key={appointment.id}
+                appointment={appointment}
+                busy={actionId === appointment.id}
+                onAccept={() => void openAccept(appointment)}
+                onReject={() => confirmDecline(appointment)}
+                onSuggestSlot={() => openSuggestModal(appointment)}
+              />
+            ))
           )}
         </View>
 
@@ -1068,120 +1031,28 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  incomingCard: {
+  incomingSection: {
+    marginBottom: 22,
+    gap: 10,
+  },
+
+  incomingSectionTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  incomingEmptyCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    overflow: "hidden",
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    marginBottom: 22,
-  },
-
-  incomingHeader: {
-    backgroundColor: "#0B5A47",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-
-  incomingHeaderText: {
-    color: "#FFFFFF",
-    fontWeight: "800",
-    fontSize: 16,
   },
 
   incomingEmpty: {
     padding: 16,
     color: "#64748B",
     fontSize: 14,
-  },
-
-  requestRow: {
-    padding: 14,
-    borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
-    gap: 12,
-  },
-
-  requestIdentity: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#F1F5F9",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  requestCopy: {
-    flex: 1,
-  },
-
-  requestName: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#0F172A",
-  },
-
-  requestTime: {
-    marginTop: 2,
-    color: "#64748B",
-    fontWeight: "600",
-  },
-
-  requestActions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-
-  acceptButton: {
-    backgroundColor: "#16A34A",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    minWidth: 88,
-    alignItems: "center",
-  },
-
-  acceptText: {
-    color: "#FFFFFF",
-    fontWeight: "800",
-    fontSize: 13,
-  },
-
-  declineButton: {
-    backgroundColor: "#DC2626",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    minWidth: 88,
-    alignItems: "center",
-  },
-
-  declineText: {
-    color: "#FFFFFF",
-    fontWeight: "800",
-    fontSize: 13,
-  },
-
-  suggestButton: {
-    backgroundColor: "#0891B2",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    flexGrow: 1,
-    alignItems: "center",
-  },
-
-  suggestText: {
-    color: "#FFFFFF",
-    fontWeight: "800",
-    fontSize: 13,
   },
 
   buttonDisabled: {

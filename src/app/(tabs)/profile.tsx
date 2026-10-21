@@ -46,6 +46,7 @@ export default function Profile() {
 
   const [completedBookings, setCompletedBookings] = useState(0);
   const [ratingAverage, setRatingAverage] = useState(0);
+  const [totalPoints, setTotalPoints] = useState(0);
   const [statsLoading, setStatsLoading] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
 
@@ -62,10 +63,12 @@ export default function Profile() {
             if (cancelled) return;
             setCompletedBookings(stats.completedBookings);
             setRatingAverage(stats.ratingAverage);
+            setTotalPoints(stats.totalPoints ?? 0);
           } else {
             const stats = await fetchMyBookingStats();
             if (cancelled) return;
             setCompletedBookings(stats.completedBookings);
+            setTotalPoints(stats.totalPoints ?? 0);
           }
         } catch (error) {
           if (cancelled) return;
@@ -201,10 +204,37 @@ export default function Profile() {
 
         <View style={styles.divider} />
 
-        <View style={styles.stat}>
-          <Text style={[styles.statNumber, { color: "#D4AF37" }]}>150</Text>
-          <Text style={styles.statLabel}>Points</Text>
-        </View>
+        {isBarber ? (
+          <TouchableOpacity
+            style={styles.stat}
+            onPress={() => router.push("/barber/leaderboard")}
+            accessibilityRole="button"
+            accessibilityLabel="View points leaderboard"
+          >
+            {statsLoading ? (
+              <ActivityIndicator color="#D4AF37" />
+            ) : (
+              <Text style={[styles.statNumber, { color: "#D4AF37" }]}>
+                {totalPoints}
+              </Text>
+            )}
+            <Text style={styles.statLabel}>Points</Text>
+          </TouchableOpacity>
+        ) : (
+          <View
+            style={styles.stat}
+            accessibilityLabel={`Total booking points ${totalPoints}`}
+          >
+            {statsLoading ? (
+              <ActivityIndicator color="#D4AF37" />
+            ) : (
+              <Text style={[styles.statNumber, { color: "#D4AF37" }]}>
+                {totalPoints}
+              </Text>
+            )}
+            <Text style={styles.statLabel}>Points</Text>
+          </View>
+        )}
       </View>
 
       {/* Menu */}

@@ -29,6 +29,9 @@ export type CustomerBooking = {
 export type CustomerBookingStats = {
   completedBookings: number;
   totalBookings: number;
+  /** Sum of booking scores earned on timed/completed visits. */
+  totalPoints: number;
+  scoredBookings: number;
 };
 
 export async function fetchMyBookings(params?: { status?: AppointmentStatus }) {

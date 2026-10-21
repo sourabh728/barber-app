@@ -6,6 +6,9 @@ export type ShopStats = {
   completedBookings: number;
   ratingAverage: number;
   reviewCount: number;
+  /** Sum of booking scores (base + punctuality) for the shop. */
+  totalPoints: number;
+  scoredBookings: number;
 };
 
 export async function fetchMyShopStats() {
