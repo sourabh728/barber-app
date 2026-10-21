@@ -51,6 +51,15 @@
       "expo-image",
       "expo-secure-store",
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-monochrome.png",
+          "color": "#0B5A47",
+          "defaultChannel": "booking-requests",
+          "sounds": ["./assets/sounds/incoming-booking.wav"]
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "Allow Trimshim to use the camera to scan shop and service QR codes.",

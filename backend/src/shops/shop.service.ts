@@ -1299,6 +1299,24 @@ export class ShopService {
     return appointments.map(serializeAppointment);
   }
 
+  /** All PENDING booking requests for the owner's shop (any date). */
+  async listMyPendingAppointments(ownerId: string) {
+    const shop = await this.findOwnerShop(ownerId);
+    const appointments = await this.prisma.appointment.findMany({
+      where: {
+        shopId: shop.id,
+        status: AppointmentStatus.PENDING,
+        isWalkIn: false,
+      },
+      include: {
+        staff: { select: { id: true, name: true } },
+      },
+      orderBy: [{ date: 'asc' }, { startTime: 'asc' }, { createdAt: 'asc' }],
+    });
+
+    return appointments.map(serializeAppointment);
+  }
+
   /**
    * Aggregates appointment metrics for one calendar day.
    *
@@ -1716,8 +1734,15 @@ export class ShopService {
       userId: shop.ownerId,
       title: 'New booking request',
       body: `${customerName} booked ${appointment.serviceName} at ${appointment.shop.name} on ${formatDateOnly(appointment.date)} (${appointment.startTime}).`,
-      href: '/barber/appointments',
+      href: '/',
       appointmentId: appointment.id,
+      push: true,
+      channelId: 'booking-requests',
+      data: {
+        type: 'NEW_BOOKING_REQUEST',
+        appointmentId: appointment.id,
+        href: '/',
+      },
     });
 
     return {

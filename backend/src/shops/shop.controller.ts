@@ -216,6 +216,14 @@ export class ShopController {
     );
   }
 
+  /** All open PENDING requests (any date) — used for call-style alerts. */
+  @Get('me/appointments/pending')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BARBER)
+  listMyPendingAppointments(@Req() req: AuthenticatedRequest) {
+    return this.shopService.listMyPendingAppointments(req.user.userId);
+  }
+
   @Post('me/appointments')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.BARBER)

@@ -25,6 +25,7 @@ import {
   type ShopSchedule,
 } from "@/services/shop-schedule-api";
 import {
+  fetchMyPendingShopAppointments,
   fetchMyShopAppointments,
   getAppointmentErrorMessage,
   updateMyShopAppointment,
@@ -314,6 +315,7 @@ export function BarberHomeScreen() {
 
   const [schedule, setSchedule] = useState<ShopSchedule | null>(null);
   const [appointments, setAppointments] = useState<ShopAppointment[]>([]);
+  const [pendingAll, setPendingAll] = useState<ShopAppointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -345,13 +347,15 @@ export function BarberHomeScreen() {
     setError(null);
 
     try {
-      const [scheduleData, upcoming, setup] = await Promise.all([
+      const [scheduleData, upcoming, pending, setup] = await Promise.all([
         fetchMyShopSchedule(),
         fetchMyShopAppointments({ date: todayKey, tab: "upcoming" }),
+        fetchMyPendingShopAppointments(),
         fetchMyShopSetupProgress().catch(() => null),
       ]);
       setSchedule(scheduleData);
       setAppointments(upcoming);
+      setPendingAll(pending);
       setSetupProgress(setup);
     } catch (err) {
       setError(
@@ -363,18 +367,33 @@ export function BarberHomeScreen() {
     }
   }, [todayKey]);
 
+  const pollPending = useCallback(async () => {
+    try {
+      const pending = await fetchMyPendingShopAppointments();
+      setPendingAll(pending);
+    } catch {
+      // Keep last known list; next poll retries.
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       void loadDashboard();
-    }, [loadDashboard]),
+      const interval = setInterval(() => {
+        void pollPending();
+      }, 5000);
+      return () => clearInterval(interval);
+    }, [loadDashboard, pollPending]),
   );
 
   const pendingRequests = useMemo(
     () =>
-      appointments
-        .filter((item) => item.status === "PENDING")
-        .sort((a, b) => a.startTime.localeCompare(b.startTime)),
-    [appointments],
+      [...pendingAll].sort((a, b) => {
+        const byDate = a.date.localeCompare(b.date);
+        if (byDate !== 0) return byDate;
+        return a.startTime.localeCompare(b.startTime);
+      }),
+    [pendingAll],
   );
 
   const slotBlocks = useMemo(() => {
@@ -656,7 +675,7 @@ export function BarberHomeScreen() {
 
           {pendingRequests.length === 0 ? (
             <View style={styles.incomingEmptyCard}>
-              <Text style={styles.incomingEmpty}>No pending requests today.</Text>
+              <Text style={styles.incomingEmpty}>No pending requests.</Text>
             </View>
           ) : (
             pendingRequests.map((appointment) => (

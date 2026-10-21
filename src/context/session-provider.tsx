@@ -18,6 +18,7 @@ import {
   sessionUserFromMe,
   type SessionUser,
 } from "@/services/auth-api";
+import { unregisterBarberPushNotifications } from "@/services/push-notifications";
 import { useStorageState } from "@/hooks/use-storage-state";
 
 const SESSION_STORAGE_KEY = "accessToken";
@@ -174,6 +175,11 @@ export function SessionProvider({ children }: PropsWithChildren) {
   );
 
   const signOut = useCallback(async () => {
+    try {
+      await unregisterBarberPushNotifications();
+    } catch {
+      // Best-effort; still sign out locally.
+    }
     clearApiAccessToken();
     setUser(null);
     setSession(null);

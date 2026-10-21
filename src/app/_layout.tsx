@@ -12,6 +12,8 @@ import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { BarberIncomingCallHost } from "@/components/barber-incoming-call-host";
+import { BarberPushRegistration } from "@/components/barber-push-registration";
 import { MaintenanceGate } from "@/components/maintenance-gate";
 import { isPlatformAdminUser } from "@/constants/platform-admin";
 import {
@@ -111,6 +113,8 @@ function RootNavigator() {
   return (
     <>
       <SessionRedirects />
+      <BarberPushRegistration />
+      <BarberIncomingCallHost />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Protected guard={!session}>
           <Stack.Screen name="auth" />

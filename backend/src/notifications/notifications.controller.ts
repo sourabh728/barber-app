@@ -1,8 +1,11 @@
 import {
+  Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -11,6 +14,7 @@ import { Request } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { RegisterPushTokenDto } from './dto/register-push-token.dto';
 import { NotificationsService } from './notifications.service';
 
 type AuthenticatedRequest = Request & {
@@ -37,6 +41,28 @@ export class NotificationsController {
   @Get('unread-count')
   unreadCount(@Req() req: AuthenticatedRequest) {
     return this.notificationsService.unreadCount(req.user.userId);
+  }
+
+  @Put('push-token')
+  registerPushToken(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: RegisterPushTokenDto,
+  ) {
+    return this.notificationsService.registerPushToken(
+      req.user.userId,
+      dto.token,
+    );
+  }
+
+  @Delete('push-token')
+  clearPushToken(
+    @Req() req: AuthenticatedRequest,
+    @Body() body?: { token?: string },
+  ) {
+    return this.notificationsService.clearPushToken(
+      req.user.userId,
+      body?.token,
+    );
   }
 
   @Patch('read-all')

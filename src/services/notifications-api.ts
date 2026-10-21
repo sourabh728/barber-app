@@ -32,3 +32,17 @@ export async function markAllNotificationsRead() {
   const response = await api.patch("/notifications/read-all");
   return response.data;
 }
+
+export async function registerPushToken(token: string) {
+  const response = await api.put<{ ok: boolean }>("/notifications/push-token", {
+    token,
+  });
+  return response.data;
+}
+
+export async function clearPushToken(token?: string) {
+  const response = await api.delete<{ ok: boolean }>("/notifications/push-token", {
+    data: token ? { token } : undefined,
+  });
+  return response.data;
+}

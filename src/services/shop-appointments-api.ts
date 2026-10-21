@@ -52,6 +52,14 @@ export async function fetchMyShopAppointments(params: {
   return response.data;
 }
 
+/** All PENDING customer requests for the shop (any date). */
+export async function fetchMyPendingShopAppointments() {
+  const response = await api.get<ShopAppointment[]>(
+    "/shops/me/appointments/pending",
+  );
+  return response.data;
+}
+
 export async function createMyShopAppointment(
   payload: UpsertAppointmentPayload,
 ) {
