@@ -56,7 +56,7 @@
           "icon": "./assets/images/android-icon-monochrome.png",
           "color": "#0B5A47",
           "defaultChannel": "booking-requests",
-          "sounds": ["./assets/sounds/incoming-booking.wav"]
+          "sounds": ["./assets/sounds/incoming_booking.wav"]
         }
       ],
       [

@@ -85,7 +85,7 @@ export function IncomingBookingCallModal({
           shouldDuckAndroid: false,
         });
         const { sound } = await Audio.Sound.createAsync(
-          require("../../assets/sounds/incoming-booking.wav"),
+          require("../../assets/sounds/incoming_booking.wav"),
           { isLooping: true, volume: 1 },
         );
         if (cancelled) {
