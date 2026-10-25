@@ -31,6 +31,7 @@ import { CreateShopServiceDto } from './dto/create-shop-service.dto';
 import { DailyReportQueryDto } from './dto/daily-report.query.dto';
 import { ListAppointmentsQueryDto } from './dto/list-appointments.query.dto';
 import { ListShopsQueryDto } from './dto/list-shops.query.dto';
+import { RespondSlotSuggestionDto } from './dto/respond-slot-suggestion.dto';
 import { ShopAvailabilityQueryDto } from './dto/shop-availability.query.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { UpdateShopDto } from './dto/update-shop.dto';
@@ -313,6 +314,22 @@ export class ShopController {
       shopId,
       req.user.userId,
       dto,
+    );
+  }
+
+  /** Customer accepts or declines a slot suggested by the barber. */
+  @Patch('customer-appointments/:id/slot-response')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER)
+  respondToSlotSuggestion(
+    @Param('id') appointmentId: string,
+    @Body() dto: RespondSlotSuggestionDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.shopService.respondToSlotSuggestion(
+      req.user.userId,
+      appointmentId,
+      dto.accept,
     );
   }
 

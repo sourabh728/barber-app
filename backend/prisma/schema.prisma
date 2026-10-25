@@ -171,6 +171,11 @@ model Appointment {
   endTime       String
   isWalkIn      Boolean           @default(false)
 
+  /// Slot suggested by the barber, awaiting customer accept/decline.
+  proposedDate       DateTime? @db.Date
+  proposedStartTime  String?
+  proposedEndTime    String?
+
   /// Server time when customer arrival was verified at the shop.
   arrivedAt                 DateTime?
   /// Server time when barber verified service start via customer QR.

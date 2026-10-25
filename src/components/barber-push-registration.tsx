@@ -11,11 +11,12 @@ import {
 } from "@/services/push-notifications";
 
 /**
- * Registers Expo push for barber sessions and routes notification taps to Home.
+ * Registers Expo push for signed-in barbers and customers and routes
+ * notification taps to the screen named in the notification.
  */
 export function BarberPushRegistration() {
   const { session, user } = useSession();
-  const isBarber = user?.role === "BARBER";
+  const canReceivePush = user?.role === "BARBER" || user?.role === "CUSTOMER";
 
   useEffect(() => {
     configureNotificationHandler();
@@ -23,7 +24,7 @@ export function BarberPushRegistration() {
 
   useEffect(() => {
     // expo-notifications response APIs are not available on web.
-    if (Platform.OS === "web" || !session || !isBarber) return;
+    if (Platform.OS === "web" || !session || !canReceivePush) return;
 
     void registerBarberPushNotifications();
 
@@ -43,7 +44,7 @@ export function BarberPushRegistration() {
     return () => {
       sub.remove();
     };
-  }, [session, isBarber]);
+  }, [session, canReceivePush]);
 
   return null;
 }

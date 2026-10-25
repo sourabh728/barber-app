@@ -25,6 +25,9 @@ export type ShopAppointment = {
   startTime: string;
   endTime: string;
   isWalkIn: boolean;
+  proposedDate?: string | null;
+  proposedStartTime?: string | null;
+  proposedEndTime?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -40,6 +43,8 @@ export type UpsertAppointmentPayload = {
   endTime: string;
   isWalkIn?: boolean;
   status?: AppointmentStatus;
+  /** Offer the date/time to the customer instead of changing the booking. */
+  proposeSlot?: boolean;
 };
 
 export async function fetchMyShopAppointments(params: {

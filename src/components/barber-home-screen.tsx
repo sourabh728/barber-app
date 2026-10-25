@@ -515,12 +515,13 @@ export function BarberHomeScreen() {
       await updateMyShopAppointment(suggestTarget.id, {
         startTime,
         endTime,
+        proposeSlot: true,
       });
       setSuggestTarget(null);
       setSuggestSlots([]);
       showAppAlert(
         "Time suggested",
-        `The customer was notified about ${formatTime12h(startTime)}–${formatTime12h(endTime)}.`,
+        `The customer was notified about ${formatTime12h(startTime)}–${formatTime12h(endTime)} and can accept or decline.`,
       );
       await loadDashboard(true);
     } catch (err) {

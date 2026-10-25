@@ -9,6 +9,7 @@ import {
 } from "@/services/notifications-api";
 
 export const BOOKING_REQUEST_CHANNEL_ID = "booking-requests";
+export const BOOKING_UPDATES_CHANNEL_ID = "booking-updates";
 
 let handlerConfigured = false;
 let cachedToken: string | null = null;
@@ -37,6 +38,13 @@ async function ensureAndroidChannel() {
     sound: "default",
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
     bypassDnd: true,
+  });
+
+  await Notifications.setNotificationChannelAsync(BOOKING_UPDATES_CHANNEL_ID, {
+    name: "Booking updates",
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: "default",
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
   });
 }
 

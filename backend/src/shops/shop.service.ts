@@ -15,6 +15,10 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { VerificationService } from '../verification/verification.service';
 import {
+  uniqueLocationNames,
+  withNormalizedLocation,
+} from '../common/location';
+import {
   publicUploadPath,
   tryDeleteUpload,
 } from '../common/upload';
@@ -269,6 +273,9 @@ type AppointmentRecord = {
   startTime: string;
   endTime: string;
   isWalkIn: boolean;
+  proposedDate?: Date | null;
+  proposedStartTime?: string | null;
+  proposedEndTime?: string | null;
   createdAt: Date;
   updatedAt: Date;
   staff: { id: string; name: string } | null;
@@ -289,6 +296,11 @@ function serializeAppointment(appointment: AppointmentRecord) {
     startTime: appointment.startTime,
     endTime: appointment.endTime,
     isWalkIn: appointment.isWalkIn,
+    proposedDate: appointment.proposedDate
+      ? formatDateOnly(appointment.proposedDate)
+      : null,
+    proposedStartTime: appointment.proposedStartTime ?? null,
+    proposedEndTime: appointment.proposedEndTime ?? null,
     createdAt: appointment.createdAt,
     updatedAt: appointment.updatedAt,
   };
@@ -384,7 +396,7 @@ export class ShopService {
   createShop(createShopDto: CreateShopDto, ownerId: string) {
     return this.prisma.shop.create({
       data: {
-        ...createShopDto,
+        ...withNormalizedLocation(createShopDto),
         ownerId,
       },
     });
@@ -487,8 +499,8 @@ export class ShopService {
       limit,
       total,
       totalPages,
-      cities: cityRows.map((row) => row.city).filter(Boolean),
-      states: stateRows.map((row) => row.state).filter(Boolean),
+      cities: uniqueLocationNames(cityRows.map((row) => row.city)),
+      states: uniqueLocationNames(stateRows.map((row) => row.state)),
     };
   }
 
@@ -987,7 +999,7 @@ export class ShopService {
 
     return this.prisma.shop.update({
       where: { id: shop.id },
-      data: updateShopDto,
+      data: withNormalizedLocation(updateShopDto),
     });
   }
 
@@ -1026,7 +1038,7 @@ export class ShopService {
       where: {
         id: shopId,
       },
-      data: updateShopDto,
+      data: withNormalizedLocation(updateShopDto),
     });
   }
 
@@ -1770,6 +1782,75 @@ export class ShopService {
       throw new NotFoundException('Appointment not found');
     }
 
+    if (dto.proposeSlot && existing.customerId) {
+      if (
+        existing.status !== AppointmentStatus.PENDING &&
+        existing.status !== AppointmentStatus.CONFIRMED
+      ) {
+        throw new BadRequestException(
+          'A new time can only be suggested for pending or confirmed bookings',
+        );
+      }
+      if (!dto.startTime || !dto.endTime) {
+        throw new BadRequestException('startTime and endTime are required');
+      }
+      assertTimeOrder(dto.startTime, dto.endTime);
+      const proposedDate =
+        dto.date !== undefined ? toDateOnlyUtc(dto.date) : existing.date;
+
+      if (existing.staffId) {
+        await this.assertStaffBookableAtSlot({
+          shopId: shop.id,
+          staffId: existing.staffId,
+          date: proposedDate,
+          startTime: dto.startTime,
+        });
+      }
+      await this.assertNoStaffSlotClash({
+        shopId: shop.id,
+        staffId: existing.staffId,
+        date: proposedDate,
+        startTime: dto.startTime,
+        endTime: dto.endTime,
+        status: existing.status,
+        excludeAppointmentId: existing.id,
+      });
+
+      const proposed = await this.prisma.appointment.update({
+        where: { id: existing.id },
+        data: {
+          proposedDate,
+          proposedStartTime: dto.startTime,
+          proposedEndTime: dto.endTime,
+        },
+        include: { staff: { select: { id: true, name: true } } },
+      });
+
+      await this.notificationsService.create({
+        userId: existing.customerId,
+        title: 'New time suggested',
+        body: `${existing.shop.name} suggested ${dto.startTime}–${dto.endTime} on ${formatDateOnly(proposedDate)} for ${proposed.serviceName}. Tap to accept or decline.`,
+        href: `/history/${proposed.id}`,
+        appointmentId: proposed.id,
+        push: true,
+        channelId: 'booking-updates',
+        data: {
+          type: 'SLOT_SUGGESTED',
+          appointmentId: proposed.id,
+          href: `/history/${proposed.id}`,
+        },
+      });
+
+      return serializeAppointment(proposed);
+    }
+
+    // A direct edit supersedes any pending suggestion.
+    const clearProposal =
+      existing.proposedStartTime !== null &&
+      (dto.status !== undefined ||
+        dto.startTime !== undefined ||
+        dto.date !== undefined);
+
     const nextStart = dto.startTime ?? existing.startTime;
     const nextEnd = dto.endTime ?? existing.endTime;
     assertTimeOrder(nextStart, nextEnd);
@@ -1836,29 +1917,66 @@ export class ShopService {
         ...(dto.startTime !== undefined ? { startTime: dto.startTime } : {}),
         ...(dto.endTime !== undefined ? { endTime: dto.endTime } : {}),
         ...(dto.isWalkIn !== undefined ? { isWalkIn: dto.isWalkIn } : {}),
+        ...(clearProposal
+          ? {
+              proposedDate: null,
+              proposedStartTime: null,
+              proposedEndTime: null,
+            }
+          : {}),
       },
       include: {
         staff: { select: { id: true, name: true } },
       },
     });
 
-    if (statusChanged && existing.customerId) {
-      const label = appointmentStatusLabel(appointment.status);
-      await this.notificationsService.create({
-        userId: existing.customerId,
-        title: `Booking ${label}`,
-        body: `Your booking at ${existing.shop.name} for ${appointment.serviceName} is now ${label}.`,
-        href: '/history',
-        appointmentId: appointment.id,
-      });
-    } else if (scheduleChanged && existing.customerId) {
-      await this.notificationsService.create({
-        userId: existing.customerId,
-        title: 'New time suggested',
-        body: `${existing.shop.name} suggested ${appointment.startTime}–${appointment.endTime} on ${formatDateOnly(appointment.date)} for ${appointment.serviceName}. Open History to review.`,
-        href: '/history',
-        appointmentId: appointment.id,
-      });
+    if (existing.customerId) {
+      const changes: string[] = [];
+      if (statusChanged) {
+        changes.push(
+          `is now ${appointmentStatusLabel(appointment.status)}`,
+        );
+      }
+      if (scheduleChanged) {
+        changes.push(
+          `has a new time: ${appointment.startTime}–${appointment.endTime} on ${formatDateOnly(appointment.date)}`,
+        );
+      }
+      if (staffIdProvided && existing.staffId !== appointment.staffId) {
+        changes.push(
+          `is now assigned to ${appointment.staff?.name ?? 'any available barber'}`,
+        );
+      }
+      if (dto.priceInr !== undefined && dto.priceInr !== existing.priceInr) {
+        changes.push(`price is now ₹${appointment.priceInr}`);
+      }
+
+      if (changes.length > 0) {
+        const suggestedNewTime = scheduleChanged && !statusChanged;
+        const title = suggestedNewTime
+          ? 'New time suggested'
+          : statusChanged
+            ? `Booking ${appointmentStatusLabel(appointment.status)}`
+            : 'Booking updated';
+        const body = `Your booking at ${existing.shop.name} for ${appointment.serviceName} ${changes.join(' and ')}.${
+          suggestedNewTime ? ' Open History to review.' : ''
+        }`;
+
+        await this.notificationsService.create({
+          userId: existing.customerId,
+          title,
+          body,
+          href: '/history',
+          appointmentId: appointment.id,
+          push: true,
+          channelId: 'booking-updates',
+          data: {
+            type: 'BOOKING_UPDATE',
+            appointmentId: appointment.id,
+            href: '/history',
+          },
+        });
+      }
     }
 
     if (
@@ -1869,5 +1987,96 @@ export class ShopService {
     }
 
     return serializeAppointment(appointment);
+  }
+
+  /** Customer accepts or declines a slot suggested by the barber. */
+  async respondToSlotSuggestion(
+    customerUserId: string,
+    appointmentId: string,
+    accept: boolean,
+  ) {
+    const existing = await this.prisma.appointment.findFirst({
+      where: { id: appointmentId, customerId: customerUserId },
+      include: {
+        staff: { select: { id: true, name: true } },
+        shop: { select: { id: true, name: true, ownerId: true } },
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Appointment not found');
+    }
+
+    if (
+      !existing.proposedStartTime ||
+      !existing.proposedEndTime ||
+      !existing.proposedDate
+    ) {
+      throw new BadRequestException('There is no suggested time to respond to');
+    }
+
+    let data: {
+      date?: Date;
+      startTime?: string;
+      endTime?: string;
+      status?: AppointmentStatus;
+    };
+    if (accept) {
+      await this.assertNoStaffSlotClash({
+        shopId: existing.shopId,
+        staffId: existing.staffId,
+        date: existing.proposedDate,
+        startTime: existing.proposedStartTime,
+        endTime: existing.proposedEndTime,
+        status: AppointmentStatus.CONFIRMED,
+        excludeAppointmentId: existing.id,
+      });
+      data = {
+        date: existing.proposedDate,
+        startTime: existing.proposedStartTime,
+        endTime: existing.proposedEndTime,
+        status: AppointmentStatus.CONFIRMED,
+      };
+    } else {
+      data =
+        existing.status === AppointmentStatus.PENDING
+          ? { status: AppointmentStatus.CANCELLED }
+          : {};
+    }
+
+    const appointment = await this.prisma.appointment.update({
+      where: { id: existing.id },
+      data: {
+        ...data,
+        proposedDate: null,
+        proposedStartTime: null,
+        proposedEndTime: null,
+      },
+      include: { staff: { select: { id: true, name: true } } },
+    });
+
+    const when = `${existing.proposedStartTime}–${existing.proposedEndTime} on ${formatDateOnly(existing.proposedDate)}`;
+    await this.notificationsService.create({
+      userId: existing.shop.ownerId,
+      title: accept ? 'Suggested time accepted' : 'Suggested time declined',
+      body: accept
+        ? `${appointment.customerName} accepted ${when} for ${appointment.serviceName}. The booking is confirmed.`
+        : `${appointment.customerName} declined ${when} for ${appointment.serviceName}.${
+            appointment.status === AppointmentStatus.CANCELLED
+              ? ' The booking was cancelled.'
+              : ''
+          }`,
+      href: '/barber/appointments',
+      appointmentId: appointment.id,
+      push: true,
+      channelId: 'booking-requests',
+      data: {
+        type: accept ? 'SLOT_ACCEPTED' : 'SLOT_DECLINED',
+        appointmentId: appointment.id,
+        href: '/barber/appointments',
+      },
+    });
+
+    return { ...serializeAppointment(appointment), shopName: existing.shop.name };
   }
 }

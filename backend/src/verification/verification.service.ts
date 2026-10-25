@@ -9,6 +9,7 @@ import { AppointmentStatus, UserRole } from '../../generated/prisma/enums';
 
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { uniqueLocationNames } from '../common/location';
 import {
   buildShopQrValue,
   issueServiceStartQr,
@@ -453,20 +454,14 @@ export class VerificationService {
       }),
     ]);
 
-    const states = [
-      ...new Set(locations.map((l) => l.state.trim()).filter(Boolean)),
-    ].sort((a, b) => a.localeCompare(b));
-    const cities = [
-      ...new Set(
-        locations
-          .filter(
-            (l) =>
-              !state || l.state.trim().toLowerCase() === state.toLowerCase(),
-          )
-          .map((l) => l.city.trim())
-          .filter(Boolean),
-      ),
-    ].sort((a, b) => a.localeCompare(b));
+    const states = uniqueLocationNames(locations.map((l) => l.state));
+    const cities = uniqueLocationNames(
+      locations
+        .filter(
+          (l) => !state || l.state.trim().toLowerCase() === state.toLowerCase(),
+        )
+        .map((l) => l.city),
+    );
 
     const points = await this.prisma.appointment.groupBy({
       by: ['shopId'],

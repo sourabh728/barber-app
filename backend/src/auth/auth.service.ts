@@ -16,6 +16,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { UserRole } from '../../generated/prisma/enums';
 // import { OtpPurpose, UserRole } from '../../generated/prisma/enums';
 import { PLATFORM_ADMIN_EMAIL } from '../admin/admin.constants';
+import { normalizeLocationName } from '../common/location';
 import {
   publicUploadPath,
   tryDeleteUpload,
@@ -179,8 +180,8 @@ export class AuthService {
             phone,
             email: normalizedEmail,
             address,
-            city,
-            state,
+            city: normalizeLocationName(city),
+            state: normalizeLocationName(state),
             pincode,
           },
         },

@@ -18,6 +18,10 @@ export type CustomerBooking = {
   startTime: string;
   endTime: string;
   isWalkIn: boolean;
+  /** Slot suggested by the barber, waiting for the customer's answer. */
+  proposedDate?: string | null;
+  proposedStartTime?: string | null;
+  proposedEndTime?: string | null;
   /** ISO timestamp when customer checked in via shop QR */
   arrivedAt?: string | null;
   /** ISO timestamp when barber started service via customer QR */
@@ -109,6 +113,17 @@ export async function createCustomerBooking(
 export async function cancelMyBooking(appointmentId: string) {
   const response = await api.patch<CustomerBooking>(
     `/customers/me/appointments/${appointmentId}/cancel`,
+  );
+  return response.data;
+}
+
+export async function respondToSlotSuggestion(
+  appointmentId: string,
+  accept: boolean,
+) {
+  const response = await api.patch<CustomerBooking>(
+    `/shops/customer-appointments/${appointmentId}/slot-response`,
+    { accept },
   );
   return response.data;
 }

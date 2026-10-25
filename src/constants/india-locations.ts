@@ -48,3 +48,21 @@ export function citiesForState(state: string): string[] {
   );
   return match ? [...INDIA_STATES_CITIES[match]].sort((a, b) => a.localeCompare(b)) : [];
 }
+
+const LOWERCASE_WORDS = new Set(["and", "da", "de", "of"]);
+
+/** "pune" / "PUNE " -> "Pune"; uses the listed spelling when one matches. */
+export function normalizeLocationName(value: string, known: string[] = []) {
+  const cleaned = value.trim().replace(/\s+/g, " ");
+  const listed = known.find((k) => k.toLowerCase() === cleaned.toLowerCase());
+  if (listed) return listed;
+  return cleaned
+    .toLowerCase()
+    .split(" ")
+    .map((word, index) =>
+      index > 0 && LOWERCASE_WORDS.has(word)
+        ? word
+        : word.charAt(0).toUpperCase() + word.slice(1),
+    )
+    .join(" ");
+}

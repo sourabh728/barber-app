@@ -26,6 +26,7 @@ import {
   cancelMyBooking,
   fetchMyBooking,
   getCustomerBookingErrorMessage,
+  respondToSlotSuggestion,
   type CustomerBooking,
 } from "@/services/customer-bookings-api";
 import type { AppointmentStatus } from "@/services/shop-appointments-api";
@@ -180,6 +181,7 @@ export default function BookingRequestDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [cancelling, setCancelling] = useState(false);
+  const [responding, setResponding] = useState(false);
   const [cancelDialogVisible, setCancelDialogVisible] = useState(false);
   const [verification, setVerification] = useState<BookingVerification | null>(
     null,
@@ -250,6 +252,31 @@ export default function BookingRequestDetailScreen() {
   const openCancelDialog = () => {
     if (!booking || cancelling) return;
     setCancelDialogVisible(true);
+  };
+
+  const hasSuggestion =
+    (booking?.status === "PENDING" || booking?.status === "CONFIRMED") &&
+    Boolean(booking?.proposedStartTime && booking?.proposedEndTime);
+
+  const answerSuggestion = async (accept: boolean) => {
+    if (!booking || responding) return;
+    setResponding(true);
+    try {
+      const updated = await respondToSlotSuggestion(booking.id, accept);
+      setBooking(updated);
+      showAppAlert(
+        accept ? "Time accepted" : "Time declined",
+        accept
+          ? "Your booking is confirmed for the new time."
+          : updated.status === "CANCELLED"
+            ? "The booking was cancelled."
+            : "Your original booking time is unchanged.",
+      );
+    } catch (error) {
+      showAppAlert("Could not respond", getCustomerBookingErrorMessage(error));
+    } finally {
+      setResponding(false);
+    }
   };
 
   const meta = booking
@@ -359,6 +386,48 @@ export default function BookingRequestDetailScreen() {
                   ) : null}
                 </View>
               )}
+
+              {hasSuggestion && booking ? (
+                <View style={styles.suggestBox}>
+                  <Text style={styles.suggestTitle}>New time suggested</Text>
+                  <Text style={styles.suggestBody}>
+                    {booking.shopName} suggested{" "}
+                    {formatBookingDate(booking.proposedDate ?? booking.date)},{" "}
+                    {formatTime12h(booking.proposedStartTime ?? "")} –{" "}
+                    {formatTime12h(booking.proposedEndTime ?? "")}.
+                  </Text>
+                  <View style={styles.suggestActions}>
+                    <TouchableOpacity
+                      style={[
+                        styles.suggestDecline,
+                        responding ? styles.buttonDisabled : null,
+                      ]}
+                      disabled={responding}
+                      onPress={() => void answerSuggestion(false)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Decline suggested time"
+                    >
+                      <Text style={styles.cancelButtonText}>Decline</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.suggestAccept,
+                        responding ? styles.buttonDisabled : null,
+                      ]}
+                      disabled={responding}
+                      onPress={() => void answerSuggestion(true)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Accept suggested time"
+                    >
+                      {responding ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <Text style={styles.verifyButtonText}>Accept</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : null}
 
               <Text style={styles.sectionTitle}>Booking summary</Text>
 
@@ -538,6 +607,46 @@ export default function BookingRequestDetailScreen() {
 
 function createStyles(colors: AppColors) {
   return StyleSheet.create({
+  suggestBox: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#F97316",
+    padding: 16,
+    marginBottom: 16,
+    gap: 8,
+  },
+  suggestTitle: {
+    color: "#F97316",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  suggestBody: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  suggestActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 4,
+  },
+  suggestDecline: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#F87171",
+    paddingVertical: 12,
+  },
+  suggestAccept: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: "#F97316",
+    paddingVertical: 12,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.background,

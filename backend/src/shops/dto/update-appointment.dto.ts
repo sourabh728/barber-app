@@ -1,5 +1,5 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { IsIn, IsOptional } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional } from 'class-validator';
 
 import {
   APPOINTMENT_STATUSES,
@@ -11,4 +11,9 @@ export class UpdateAppointmentDto extends PartialType(CreateAppointmentDto) {
   @IsOptional()
   @IsIn(APPOINTMENT_STATUSES)
   status?: AppointmentStatusValue;
+
+  /** Offer date/startTime/endTime to the customer instead of changing the booking. */
+  @IsOptional()
+  @IsBoolean()
+  proposeSlot?: boolean;
 }

@@ -26,6 +26,9 @@ type CustomerAppointmentRecord = {
   startTime: string;
   endTime: string;
   isWalkIn: boolean;
+  proposedDate: Date | null;
+  proposedStartTime: string | null;
+  proposedEndTime: string | null;
   arrivedAt: Date | null;
   actualStartAt: Date | null;
   createdAt: Date;
@@ -50,7 +53,11 @@ function serializeCustomerAppointment(appointment: CustomerAppointmentRecord) {
     startTime: appointment.startTime,
     endTime: appointment.endTime,
     isWalkIn: appointment.isWalkIn,
-    arrivedAt: appointment.arrivedAt?.toISOString() ?? null,
+    proposedDate: appointment.proposedDate
+      ? formatDateOnly(appointment.proposedDate)
+      : null,
+    proposedStartTime: appointment.proposedStartTime,
+    proposedEndTime: appointment.proposedEndTime,
     actualStartAt: appointment.actualStartAt?.toISOString() ?? null,
     createdAt: appointment.createdAt,
     updatedAt: appointment.updatedAt,

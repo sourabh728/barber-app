@@ -15,9 +15,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import {
   citiesForState,
   INDIA_STATES,
+  normalizeLocationName,
 } from "@/constants/india-locations";
 
 const OTHER_CITY = "Other (type manually)";
+const OTHER_STATE = "Other (type manually)";
 
 function Dropdown({
   value,
@@ -139,11 +141,18 @@ export function StateCityPicker({
   inputStyle?: object;
 }) {
   const cities = useMemo(() => citiesForState(state), [state]);
+  const stateIsListed = INDIA_STATES.some(
+    (s) => s.toLowerCase() === state.trim().toLowerCase(),
+  );
   const cityIsListed = cities.some(
     (c) => c.toLowerCase() === city.trim().toLowerCase(),
   );
+  const [manualState, setManualState] = useState(false);
   const [manualCity, setManualCity] = useState(false);
-  const showManual = manualCity || (Boolean(city) && !cityIsListed);
+  const showManualState = manualState || (Boolean(state) && !stateIsListed);
+  // An unlisted state has no city list, so the city must be typed too.
+  const showManualCity =
+    showManualState || manualCity || (Boolean(city) && !cityIsListed);
 
   return (
     <>
@@ -152,40 +161,69 @@ export function StateCityPicker({
         title="Select state"
         placeholder="Select state"
         accessibilityLabel="State"
-        value={state}
-        options={INDIA_STATES}
+        value={showManualState ? OTHER_STATE : state}
+        options={[...INDIA_STATES, OTHER_STATE]}
         disabled={disabled}
         onSelect={(next) => {
           setManualCity(false);
-          onChange({ state: next, city: next === state ? city : "" });
-        }}
-      />
-
-      <Text style={labelStyle}>City</Text>
-      <Dropdown
-        title="Select city"
-        placeholder={state ? "Select city" : "Select state first"}
-        accessibilityLabel="City"
-        value={showManual ? OTHER_CITY : city}
-        options={[...cities, OTHER_CITY]}
-        disabled={disabled || !state}
-        onSelect={(next) => {
-          if (next === OTHER_CITY) {
-            setManualCity(true);
-            onChange({ state, city: "" });
+          if (next === OTHER_STATE) {
+            setManualState(true);
+            onChange({ state: "", city: "" });
           } else {
-            setManualCity(false);
-            onChange({ state, city: next });
+            setManualState(false);
+            onChange({ state: next, city: next === state ? city : "" });
           }
         }}
       />
-      {showManual ? (
+      {showManualState ? (
+        <TextInput
+          style={[inputStyle, { marginTop: 8 }]}
+          placeholder="Enter state name"
+          placeholderTextColor="#777"
+          value={state}
+          onChangeText={(value) => onChange({ state: value, city })}
+          onBlur={() =>
+            onChange({
+              state: normalizeLocationName(state, INDIA_STATES),
+              city,
+            })
+          }
+          autoCapitalize="words"
+          editable={!disabled}
+          accessibilityLabel="State name"
+        />
+      ) : null}
+
+      <Text style={labelStyle}>City</Text>
+      {showManualState ? null : (
+        <Dropdown
+          title="Select city"
+          placeholder={state ? "Select city" : "Select state first"}
+          accessibilityLabel="City"
+          value={showManualCity ? OTHER_CITY : city}
+          options={[...cities, OTHER_CITY]}
+          disabled={disabled || !state}
+          onSelect={(next) => {
+            if (next === OTHER_CITY) {
+              setManualCity(true);
+              onChange({ state, city: "" });
+            } else {
+              setManualCity(false);
+              onChange({ state, city: next });
+            }
+          }}
+        />
+      )}
+      {showManualCity ? (
         <TextInput
           style={[inputStyle, { marginTop: 8 }]}
           placeholder="Enter city name"
           placeholderTextColor="#777"
           value={city}
           onChangeText={(value) => onChange({ state, city: value })}
+          onBlur={() =>
+            onChange({ state, city: normalizeLocationName(city, cities) })
+          }
           autoCapitalize="words"
           editable={!disabled}
           accessibilityLabel="City name"
