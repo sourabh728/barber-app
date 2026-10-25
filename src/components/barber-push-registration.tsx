@@ -1,6 +1,7 @@
 import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
 import { useEffect } from "react";
+import { Platform } from "react-native";
 
 import { useSession } from "@/context/session-provider";
 import {
@@ -21,7 +22,8 @@ export function BarberPushRegistration() {
   }, []);
 
   useEffect(() => {
-    if (!session || !isBarber) return;
+    // expo-notifications response APIs are not available on web.
+    if (Platform.OS === "web" || !session || !isBarber) return;
 
     void registerBarberPushNotifications();
 

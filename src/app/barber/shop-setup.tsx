@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useSession } from "@/context/session-provider";
+import { StateCityPicker } from "@/components/state-city-picker";
 import { createMyShop, getShopsErrorMessage } from "@/services/shops-api";
 import {
   phoneValidationError,
@@ -183,26 +184,16 @@ export default function BarberShopSetupScreen() {
               editable={!isLoading}
             />
 
-            <Text style={styles.label}>City</Text>
-            <TextInput
-              placeholder="City"
-              placeholderTextColor="#777"
-              style={styles.input}
-              value={city}
-              onChangeText={setCity}
-              autoCapitalize="words"
-              editable={!isLoading}
-            />
-
-            <Text style={styles.label}>State</Text>
-            <TextInput
-              placeholder="State"
-              placeholderTextColor="#777"
-              style={styles.input}
-              value={state}
-              onChangeText={setState}
-              autoCapitalize="words"
-              editable={!isLoading}
+            <StateCityPicker
+              state={state}
+              city={city}
+              disabled={isLoading}
+              labelStyle={styles.label}
+              inputStyle={styles.input}
+              onChange={(next) => {
+                setState(next.state);
+                setCity(next.city);
+              }}
             />
 
             <Text style={styles.label}>Pincode</Text>

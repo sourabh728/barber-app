@@ -19,6 +19,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useSession } from "@/context/session-provider";
+import { StateCityPicker } from "@/components/state-city-picker";
 import type { AppColors } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import {
@@ -541,24 +542,19 @@ export default function EditProfileScreen() {
                       editable={!busy}
                     />
 
-                    <Text style={styles.label}>City</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={form.shopCity}
-                      onChangeText={(value) => setField("shopCity", value)}
-                      placeholder="City"
-                      placeholderTextColor="#777"
-                      editable={!busy}
-                    />
-
-                    <Text style={styles.label}>State</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={form.shopState}
-                      onChangeText={(value) => setField("shopState", value)}
-                      placeholder="State"
-                      placeholderTextColor="#777"
-                      editable={!busy}
+                    <StateCityPicker
+                      state={form.shopState}
+                      city={form.shopCity}
+                      disabled={busy}
+                      labelStyle={styles.label}
+                      inputStyle={styles.input}
+                      onChange={(next) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          shopState: next.state,
+                          shopCity: next.city,
+                        }))
+                      }
                     />
 
                     <Text style={styles.label}>Pincode</Text>

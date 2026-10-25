@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { LegalAgreementText } from "@/components/legal-agreement-text";
+import { StateCityPicker } from "@/components/state-city-picker";
 import { useGoogleIdentity } from "@/hooks/use-google-identity";
 import { registerBarber } from "@/services/auth-api";
 import { getRegisterErrorMessage } from "@/services/auth-errors";
@@ -267,32 +268,16 @@ export default function BarberRegisterScreen() {
                   accessibilityLabel="Shop address"
                 />
 
-                <Text style={styles.label}>City</Text>
-                <TextInput
-                  placeholder="City"
-                  placeholderTextColor="#777"
-                  style={styles.input}
-                  value={city}
-                  onChangeText={setCity}
-                  textContentType="addressCity"
-                  autoCapitalize="words"
-                  editable={!isBusy}
-                  returnKeyType="next"
-                  accessibilityLabel="City"
-                />
-
-                <Text style={styles.label}>State</Text>
-                <TextInput
-                  placeholder="State"
-                  placeholderTextColor="#777"
-                  style={styles.input}
-                  value={state}
-                  onChangeText={setState}
-                  textContentType="addressState"
-                  autoCapitalize="words"
-                  editable={!isBusy}
-                  returnKeyType="next"
-                  accessibilityLabel="State"
+                <StateCityPicker
+                  state={state}
+                  city={city}
+                  disabled={isBusy}
+                  labelStyle={styles.label}
+                  inputStyle={styles.input}
+                  onChange={(next) => {
+                    setState(next.state);
+                    setCity(next.city);
+                  }}
                 />
 
                 <Text style={styles.label}>Pincode</Text>
