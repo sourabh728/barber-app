@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AppointmentStatus } from '../../generated/prisma/enums';
+import { AppointmentStatus, UserRole } from '../../generated/prisma/enums';
 
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -411,6 +411,111 @@ export class VerificationService {
       scoredAt: appointment.scoredAt?.toISOString() ?? null,
       date: formatDateOnly(appointment.date),
       startTime: appointment.startTime,
+    };
+  }
+
+  /**
+   * Shop points leaderboard across all shops, filterable by state/city.
+   * Barbers default to their own city/state; admins default to everywhere.
+   */
+  async getShopLeaderboard(
+    userId: string,
+    role: UserRole,
+    query: { state?: string; city?: string; all?: string },
+  ) {
+    const myShop =
+      role === UserRole.BARBER
+        ? await this.prisma.shop.findFirst({
+            where: { ownerId: userId },
+            select: { id: true, city: true, state: true },
+          })
+        : null;
+
+    let state = query.state?.trim() || null;
+    let city = query.city?.trim() || null;
+    if (!state && !city && query.all !== 'true' && myShop) {
+      state = myShop.state.trim() || null;
+      city = myShop.city.trim() || null;
+    }
+
+    const [locations, shops] = await Promise.all([
+      this.prisma.shop.findMany({ select: { city: true, state: true } }),
+      this.prisma.shop.findMany({
+        where: {
+          ...(state
+            ? { state: { equals: state, mode: 'insensitive' as const } }
+            : {}),
+          ...(city
+            ? { city: { equals: city, mode: 'insensitive' as const } }
+            : {}),
+        },
+        select: { id: true, name: true, city: true, state: true },
+      }),
+    ]);
+
+    const states = [
+      ...new Set(locations.map((l) => l.state.trim()).filter(Boolean)),
+    ].sort((a, b) => a.localeCompare(b));
+    const cities = [
+      ...new Set(
+        locations
+          .filter(
+            (l) =>
+              !state || l.state.trim().toLowerCase() === state.toLowerCase(),
+          )
+          .map((l) => l.city.trim())
+          .filter(Boolean),
+      ),
+    ].sort((a, b) => a.localeCompare(b));
+
+    const points = await this.prisma.appointment.groupBy({
+      by: ['shopId'],
+      where: {
+        shopId: { in: shops.map((s) => s.id) },
+        bookingScore: { not: null },
+      },
+      _sum: { bookingScore: true },
+      _count: { _all: true },
+    });
+    const pointsByShop = new Map(
+      points.map((row) => [
+        row.shopId,
+        { totalPoints: row._sum.bookingScore ?? 0, scored: row._count._all },
+      ]),
+    );
+
+    const sorted = shops
+      .map((s) => ({
+        shopId: s.id,
+        shopName: s.name,
+        city: s.city,
+        state: s.state,
+        totalPoints: pointsByShop.get(s.id)?.totalPoints ?? 0,
+        scoredBookings: pointsByShop.get(s.id)?.scored ?? 0,
+        isMine: s.id === myShop?.id,
+      }))
+      .sort(
+        (a, b) =>
+          b.totalPoints - a.totalPoints || a.shopName.localeCompare(b.shopName),
+      );
+
+    let lastScore: number | null = null;
+    let lastRank = 0;
+    const entries = sorted.map((row, index) => {
+      if (lastScore === null || row.totalPoints !== lastScore) {
+        lastRank = index + 1;
+        lastScore = row.totalPoints;
+      }
+      return { rank: lastRank, ...row };
+    });
+
+    return {
+      appliedFilter: { state, city },
+      myShopId: myShop?.id ?? null,
+      myRank: entries.find((e) => e.isMine)?.rank ?? null,
+      states,
+      cities,
+      entries,
     };
   }
 

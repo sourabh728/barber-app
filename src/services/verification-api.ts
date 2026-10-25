@@ -67,6 +67,43 @@ export type WeeklyLeaderboard = {
   entries: LeaderboardEntry[];
 };
 
+export type ShopLeaderboardEntry = {
+  rank: number;
+  shopId: string;
+  shopName: string;
+  city: string;
+  state: string;
+  totalPoints: number;
+  scoredBookings: number;
+  isMine: boolean;
+};
+
+export type ShopLeaderboard = {
+  appliedFilter: { state: string | null; city: string | null };
+  myShopId: string | null;
+  myRank: number | null;
+  states: string[];
+  cities: string[];
+  entries: ShopLeaderboardEntry[];
+};
+
+export type ShopLeaderboardParams = {
+  state?: string;
+  city?: string;
+  all?: boolean;
+};
+
+export async function fetchShopLeaderboard(params: ShopLeaderboardParams = {}) {
+  const response = await api.get<ShopLeaderboard>("/leaderboard/shops", {
+    params: {
+      state: params.state || undefined,
+      city: params.city || undefined,
+      all: params.all ? "true" : undefined,
+    },
+  });
+  return response.data;
+}
+
 export function getVerificationErrorMessage(error: unknown): string {
   if (isAxiosError(error)) {
     const data = error.response?.data as { message?: string | string[] } | undefined;

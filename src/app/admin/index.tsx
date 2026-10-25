@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useSession } from "@/context/session-provider";
+import { ShopLeaderboardView } from "@/components/shop-leaderboard";
 import {
   fetchAdminBookingsReport,
   fetchAdminOverview,
@@ -555,25 +556,7 @@ export default function AdminDashboardScreen() {
             </View>
 
             <Text style={styles.sectionTitle}>Shop points leaderboard</Text>
-            {overview.shopPointsLeaderboard.length === 0 ? (
-              <Text style={styles.muted}>No scored bookings yet.</Text>
-            ) : (
-              overview.shopPointsLeaderboard.map((row) => (
-                <View key={row.id} style={styles.shopRow}>
-                  <View style={styles.rankBadge}>
-                    <Text style={styles.rankText}>#{row.rank}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.shopName}>{row.name}</Text>
-                    <Text style={styles.shopMeta}>
-                      {row.city || "—"} · {row.scoredBookings} scored ·{" "}
-                      {row.bookings} total bookings
-                    </Text>
-                  </View>
-                  <Text style={styles.pointsBig}>{row.totalPoints}</Text>
-                </View>
-              ))
-            )}
+            <ShopLeaderboardView />
           </>
         ) : null}
 

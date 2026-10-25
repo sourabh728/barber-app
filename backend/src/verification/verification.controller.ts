@@ -18,6 +18,7 @@ import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { LeaderboardQueryDto } from './dto/leaderboard.query.dto';
 import { ScanServiceStartDto } from './dto/scan-service-start.dto';
 import { ScanShopQrDto } from './dto/scan-shop-qr.dto';
+import { ShopLeaderboardQueryDto } from './dto/shop-leaderboard.query.dto';
 import { VerificationService } from './verification.service';
 
 type AuthenticatedRequest = Request & {
@@ -86,6 +87,21 @@ export class VerificationController {
     return this.verificationService.scanServiceStart(
       req.user.userId,
       dto.qrPayload,
+    );
+  }
+
+  /** Barber/Admin: shop points leaderboard with state/city filters. */
+  @Get('leaderboard/shops')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BARBER, UserRole.ADMIN)
+  shopLeaderboard(
+    @Query() query: ShopLeaderboardQueryDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.verificationService.getShopLeaderboard(
+      req.user.userId,
+      req.user.role,
+      query,
     );
   }
 
