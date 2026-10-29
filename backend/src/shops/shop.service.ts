@@ -14,6 +14,7 @@ import {
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { VerificationService } from '../verification/verification.service';
+import { parseShopQrValue } from '../verification/qr-tokens';
 import {
   uniqueLocationNames,
   withNormalizedLocation,
@@ -393,12 +394,44 @@ export class ShopService {
     private readonly verificationService: VerificationService,
   ) {}
 
-  createShop(createShopDto: CreateShopDto, ownerId: string) {
-    return this.prisma.shop.create({
-      data: {
-        ...withNormalizedLocation(createShopDto),
-        ownerId,
-      },
+  async createShop(createShopDto: CreateShopDto, ownerId: string) {
+    const { qrPayload, ...shopData } = createShopDto;
+    const data = { ...withNormalizedLocation(shopData), ownerId };
+
+    if (!qrPayload) {
+      return this.prisma.shop.create({ data });
+    }
+
+    const parsed = parseShopQrValue(qrPayload);
+    if (!parsed) {
+      throw new BadRequestException('Invalid registration QR code.');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const code = await tx.shopQrCode.findUnique({
+        where: { token: parsed.token },
+      });
+      if (!code) {
+        throw new BadRequestException('Invalid registration QR code.');
+      }
+      if (code.shopId) {
+        throw new ConflictException(
+          'This QR code is already linked to another shop.',
+        );
+      }
+      const shop = await tx.shop.create({
+        data: { ...data, qrToken: code.token },
+      });
+      const claimed = await tx.shopQrCode.updateMany({
+        where: { id: code.id, shopId: null },
+        data: { shopId: shop.id, claimedAt: new Date() },
+      });
+      if (claimed.count !== 1) {
+        throw new ConflictException(
+          'This QR code is already linked to another shop.',
+        );
+      }
+      return shop;
     });
   }
 

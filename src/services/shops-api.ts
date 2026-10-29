@@ -58,6 +58,7 @@ export type CreateShopPayload = {
   phone?: string;
   email?: string;
   description?: string;
+  qrPayload?: string;
 };
 
 export async function createMyShop(payload: CreateShopPayload) {

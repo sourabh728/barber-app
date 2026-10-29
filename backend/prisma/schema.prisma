@@ -86,6 +86,8 @@ model Shop {
   owner       User     @relation(fields: [ownerId], references: [id])
   /// Opaque token embedded in the shop's static arrival QR (not the shop UUID).
   qrToken     String   @unique @default(uuid())
+  /// Admin-generated onboarding QR linked to this shop (its token becomes qrToken).
+  qrCode      ShopQrCode?
   holidays     ShopHoliday[]
   staff        ShopStaff[]
   services     ShopService[]
@@ -93,6 +95,20 @@ model Shop {
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+/// Pre-generated, named QR codes handed to barbers at onboarding.
+model ShopQrCode {
+  id        String    @id @default(uuid())
+  /// Label chosen by admin so a printed QR can be traced to a person/shop.
+  name      String
+  token     String    @unique @default(uuid())
+  shopId    String?   @unique
+  shop      Shop?     @relation(fields: [shopId], references: [id], onDelete: SetNull)
+  claimedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([createdAt])
 }
 
 model ShopHoliday {

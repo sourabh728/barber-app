@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import {
   AppointmentStatus,
@@ -7,6 +12,7 @@ import {
 } from '../../generated/prisma/enums';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { buildShopQrValue } from '../verification/qr-tokens';
 import {
   PLATFORM_ADMIN_EMAIL,
   PLATFORM_ADMIN_NAME,
@@ -31,6 +37,49 @@ export class AdminService implements OnModuleInit {
   async onModuleInit() {
     await this.ensurePlatformAdmin();
     await this.ensureSettings();
+  }
+
+  async listShopQrCodes() {
+    const codes = await this.prisma.shopQrCode.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: { shop: { select: { id: true, name: true } } },
+    });
+    return codes.map((c) => ({
+      id: c.id,
+      name: c.name,
+      qrPayload: buildShopQrValue(c.token),
+      claimed: Boolean(c.shopId),
+      shopName: c.shop?.name ?? null,
+      claimedAt: c.claimedAt,
+      createdAt: c.createdAt,
+    }));
+  }
+
+  async createShopQrCode(name: string) {
+    const code = await this.prisma.shopQrCode.create({ data: { name } });
+    return {
+      id: code.id,
+      name: code.name,
+      qrPayload: buildShopQrValue(code.token),
+      claimed: false,
+      shopName: null,
+      claimedAt: null,
+      createdAt: code.createdAt,
+    };
+  }
+
+  async deleteShopQrCode(id: string) {
+    const code = await this.prisma.shopQrCode.findUnique({ where: { id } });
+    if (!code) {
+      throw new NotFoundException('QR code not found.');
+    }
+    if (code.shopId) {
+      throw new BadRequestException(
+        'This QR is already linked to a shop and cannot be deleted.',
+      );
+    }
+    await this.prisma.shopQrCode.delete({ where: { id } });
+    return { ok: true };
   }
 
   private async ensureSettings() {

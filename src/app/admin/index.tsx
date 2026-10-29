@@ -287,6 +287,13 @@ export default function AdminDashboardScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.iconBtn}
+          onPress={() => router.push("/admin/qr-codes")}
+          accessibilityLabel="Shop QR codes"
+        >
+          <Ionicons name="qr-code-outline" size={20} color="#0B5A47" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.iconBtn}
           onPress={() => {
             void (async () => {
               await signOut();

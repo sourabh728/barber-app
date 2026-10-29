@@ -39,4 +39,9 @@ export class CreateShopDto {
   @IsString()
   @IsNotEmpty()
   pincode!: string;
+
+  /** Scanned onboarding QR payload issued by an admin. */
+  @IsOptional()
+  @IsString()
+  qrPayload?: string;
 }

@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import { useRef, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -17,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useSession } from "@/context/session-provider";
 import { StateCityPicker } from "@/components/state-city-picker";
 import { createMyShop, getShopsErrorMessage } from "@/services/shops-api";
+import { takePendingRegistrationQr } from "@/utils/registration-qr";
 import {
   phoneValidationError,
   sanitizePhoneInput,
@@ -36,6 +37,16 @@ export default function BarberShopSetupScreen() {
   const [pincode, setPincode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [qrPayload, setQrPayload] = useState<string | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      const scanned = takePendingRegistrationQr();
+      if (scanned) {
+        setQrPayload(scanned);
+      }
+    }, []),
+  );
 
   async function handleCreateShop() {
     if (isSubmitting.current) {
@@ -102,6 +113,7 @@ export default function BarberShopSetupScreen() {
         ...(normalizedDescription
           ? { description: normalizedDescription }
           : {}),
+        ...(qrPayload ? { qrPayload } : {}),
       });
       router.replace("/profile");
     } catch (error: unknown) {
@@ -211,6 +223,17 @@ export default function BarberShopSetupScreen() {
               <Text style={styles.errorText}>{errorMessage}</Text>
             ) : null}
 
+            <Text style={styles.label}>Registration QR (optional)</Text>
+            <TouchableOpacity
+              style={styles.qrButton}
+              onPress={() => router.push("/barber/scan-registration-qr")}
+              disabled={isLoading}
+            >
+              <Text style={styles.qrButtonText}>
+                {qrPayload ? "✓ QR linked — tap to rescan" : "Scan QR from Trimshim"}
+              </Text>
+            </TouchableOpacity>
+
             <TouchableOpacity
               style={[styles.button, isLoading && styles.buttonDisabled]}
               onPress={handleCreateShop}
@@ -299,4 +322,14 @@ const styles = StyleSheet.create({
   },
   buttonText: { color: "#fff", fontSize: 17, fontWeight: "800" },
   buttonDisabled: { opacity: 0.7 },
+  qrButton: {
+    height: 54,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#F6A623",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 18,
+  },
+  qrButtonText: { color: "#F6A623", fontWeight: "700", fontSize: 15 },
 });

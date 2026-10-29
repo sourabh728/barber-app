@@ -140,6 +140,30 @@ export async function updateAdminSettings(input: UpdateAdminSettingsInput) {
   return response.data;
 }
 
+export type AdminQrCode = {
+  id: string;
+  name: string;
+  qrPayload: string;
+  claimed: boolean;
+  shopName: string | null;
+  claimedAt: string | null;
+  createdAt: string;
+};
+
+export async function fetchAdminQrCodes() {
+  const response = await api.get<AdminQrCode[]>("/admin/qr-codes");
+  return response.data;
+}
+
+export async function createAdminQrCode(name: string) {
+  const response = await api.post<AdminQrCode>("/admin/qr-codes", { name });
+  return response.data;
+}
+
+export async function deleteAdminQrCode(id: string) {
+  await api.delete(`/admin/qr-codes/${id}`);
+}
+
 export function getAdminErrorMessage(
   error: unknown,
   fallback = "Something went wrong.",
