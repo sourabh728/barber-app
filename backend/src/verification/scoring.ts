@@ -5,17 +5,49 @@ export const BASE_ORDER_POINTS = 5;
 export const MAX_PUNCTUALITY_POINTS = 5;
 export const MAX_BOOKING_SCORE = BASE_ORDER_POINTS + MAX_PUNCTUALITY_POINTS;
 
+/** Grace window (seconds) before punctuality drops to 0. */
+export const PUNCTUALITY_GRACE_SECONDS = 10 * 60;
+const PUNCTUALITY_STEP_SECONDS = 2 * 60;
+const PUNCTUALITY_STEPS = 5;
+
+/** Barber tier: 1 = solo, 2 = medium, 3 = large (3+). */
+export type BarberTier = 1 | 2 | 3;
+
+/** Max booking points and max punctuality points per tier, in tenths. */
+const TIER_POINTS_TENTHS: Record<
+  BarberTier,
+  { base: number; punctuality: number }
+> = {
+  1: { base: 50, punctuality: 50 },
+  2: { base: 40, punctuality: 40 },
+  3: { base: 30, punctuality: 30 },
+};
+
+export function normalizeBarberTier(barberCount: number | null | undefined): BarberTier {
+  if (!barberCount || barberCount <= 1) return 1;
+  return barberCount === 2 ? 2 : 3;
+}
+
 /**
- * Punctuality points from delay minutes (Actual_Start − Slot_Time).
- * Early starts are treated as 0 delay → full punctuality points.
+ * Punctuality points from the delay in seconds (Actual_Start − Slot_Time).
+ * Five equal 2-minute steps up to the 10-minute grace, then 0.
+ * Early starts count as 0 delay → full punctuality points.
  */
-export function punctualityPointsForDelayMinutes(delayMinutes: number): number {
-  const delay = Math.max(0, delayMinutes);
-  if (delay <= 2) return 5;
-  if (delay <= 4) return 4;
-  if (delay <= 6) return 3;
-  if (delay <= 10) return 1;
-  return 0;
+export function punctualityPointsForDelaySeconds(
+  delaySeconds: number,
+  barberCount: number = 1,
+): number {
+  const { punctuality } = TIER_POINTS_TENTHS[normalizeBarberTier(barberCount)];
+  const delay = Math.max(0, delaySeconds);
+  if (delay > PUNCTUALITY_GRACE_SECONDS) return 0;
+  const stepIndex = Math.max(0, Math.ceil(delay / PUNCTUALITY_STEP_SECONDS) - 1);
+  const tenths = (punctuality * (PUNCTUALITY_STEPS - stepIndex)) / PUNCTUALITY_STEPS;
+  return tenths / 10;
+}
+
+export function maxBookingScore(barberCount?: number | null): number {
+  const { base, punctuality } = TIER_POINTS_TENTHS[normalizeBarberTier(barberCount)];
+  return (base + punctuality) / 10;
 }
 
 export type BookingScoreBreakdown = {
@@ -23,6 +55,7 @@ export type BookingScoreBreakdown = {
   punctualityPoints: number;
   bookingScore: number;
   delayMinutes: number;
+  barberTier: BarberTier;
 };
 
 /**
@@ -120,16 +153,33 @@ export function calculateBookingScore(params: {
   slotDate: Date | string;
   slotStartTime: string;
   actualStartAt: Date;
+  barberCount?: number | null;
 }): BookingScoreBreakdown {
+  const barberTier = normalizeBarberTier(params.barberCount);
   const slotAt = slotInstantInBusinessTz(params.slotDate, params.slotStartTime);
   const delayMs = params.actualStartAt.getTime() - slotAt.getTime();
-  const delayMinutes = Math.floor(delayMs / 60_000);
-  const punctualityPoints = punctualityPointsForDelayMinutes(delayMinutes);
-  const basePoints = BASE_ORDER_POINTS;
+  const punctualityPoints = punctualityPointsForDelaySeconds(
+    delayMs / 1000,
+    barberTier,
+  );
+  const basePoints = TIER_POINTS_TENTHS[barberTier].base / 10;
   return {
     basePoints,
     punctualityPoints,
-    bookingScore: basePoints + punctualityPoints,
-    delayMinutes: Math.max(0, delayMinutes),
+    bookingScore: Math.round((basePoints + punctualityPoints) * 10) / 10,
+    delayMinutes: Math.max(0, Math.floor(delayMs / 60_000)),
+    barberTier,
   };
+}
+
+/** Prisma Decimal (or number) → number; null stays null. */
+export function pointsToNumber(
+  value: { toNumber(): number } | number | null | undefined,
+): number | null {
+  if (value == null) return null;
+  return typeof value === 'number' ? value : value.toNumber();
+}
+
+export function roundPoints(value: number): number {
+  return Math.round(value * 10) / 10;
 }

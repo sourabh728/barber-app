@@ -138,6 +138,7 @@ export class AuthService {
       city,
       state,
       pincode,
+      barberCount,
       description,
     } = registerBarberDto;
     const normalizedEmail = email.trim().toLowerCase();
@@ -183,6 +184,7 @@ export class AuthService {
             city: normalizeLocationName(city),
             state: normalizeLocationName(state),
             pincode,
+            ...(barberCount ? { barberCount } : {}),
           },
         },
       },
@@ -199,6 +201,7 @@ export class AuthService {
             city: true,
             state: true,
             pincode: true,
+            barberCount: true,
             ownerId: true,
             createdAt: true,
             updatedAt: true,
@@ -589,6 +592,7 @@ export class AuthService {
             city: true,
             state: true,
             pincode: true,
+            barberCount: true,
             photoUrl: true,
             ownerId: true,
             createdAt: true,

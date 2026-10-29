@@ -16,6 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useSession } from "@/context/session-provider";
 import { StateCityPicker } from "@/components/state-city-picker";
+import { BarberCountPicker } from "@/components/barber-count-picker";
 import { createMyShop, getShopsErrorMessage } from "@/services/shops-api";
 import { takePendingRegistrationQr } from "@/utils/registration-qr";
 import {
@@ -35,6 +36,7 @@ export default function BarberShopSetupScreen() {
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [pincode, setPincode] = useState("");
+  const [barberCount, setBarberCount] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [qrPayload, setQrPayload] = useState<string | null>(null);
@@ -109,6 +111,7 @@ export default function BarberShopSetupScreen() {
         city: normalizedCity,
         state: normalizedState,
         pincode: normalizedPincode,
+        barberCount,
         ...(user?.email ? { email: user.email } : {}),
         ...(normalizedDescription
           ? { description: normalizedDescription }
@@ -217,6 +220,13 @@ export default function BarberShopSetupScreen() {
               onChangeText={setPincode}
               keyboardType="number-pad"
               editable={!isLoading}
+            />
+
+            <BarberCountPicker
+              value={barberCount}
+              onChange={setBarberCount}
+              disabled={isLoading}
+              labelStyle={styles.label}
             />
 
             {errorMessage ? (

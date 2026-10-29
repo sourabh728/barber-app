@@ -20,6 +20,9 @@ import {
   BUSINESS_TIMEZONE,
   calculateBookingScore,
   formatDateKeyInTimeZone,
+  maxBookingScore,
+  pointsToNumber,
+  roundPoints,
   slotInstantInBusinessTz,
   weekBoundsContaining,
 } from './scoring';
@@ -340,9 +343,9 @@ export class VerificationService {
       if (appointment.scoredAt != null) {
         return {
           alreadyScored: true,
-          bookingScore: appointment.bookingScore,
-          basePoints: appointment.basePoints,
-          punctualityPoints: appointment.punctualityPoints,
+          bookingScore: pointsToNumber(appointment.bookingScore),
+          basePoints: pointsToNumber(appointment.basePoints),
+          punctualityPoints: pointsToNumber(appointment.punctualityPoints),
         };
       }
       if (appointment.status !== AppointmentStatus.COMPLETED) {
@@ -356,10 +359,16 @@ export class VerificationService {
         return null;
       }
 
+      const shop = await tx.shop.findUnique({
+        where: { id: appointment.shopId },
+        select: { barberCount: true },
+      });
+
       const breakdown = calculateBookingScore({
         slotDate: appointment.date,
         slotStartTime: appointment.startTime,
         actualStartAt: appointment.actualStartAt,
+        barberCount: shop?.barberCount,
       });
 
       const updated = await tx.appointment.update({
@@ -368,15 +377,16 @@ export class VerificationService {
           basePoints: breakdown.basePoints,
           punctualityPoints: breakdown.punctualityPoints,
           bookingScore: breakdown.bookingScore,
+          scoredBarberCount: breakdown.barberTier,
           scoredAt: new Date(),
         },
       });
 
       return {
         alreadyScored: false,
-        bookingScore: updated.bookingScore,
-        basePoints: updated.basePoints,
-        punctualityPoints: updated.punctualityPoints,
+        bookingScore: pointsToNumber(updated.bookingScore),
+        basePoints: pointsToNumber(updated.basePoints),
+        punctualityPoints: pointsToNumber(updated.punctualityPoints),
         delayMinutes: breakdown.delayMinutes,
       };
     });
@@ -393,6 +403,7 @@ export class VerificationService {
         basePoints: true,
         punctualityPoints: true,
         bookingScore: true,
+        scoredBarberCount: true,
         scoredAt: true,
         startTime: true,
         date: true,
@@ -406,9 +417,10 @@ export class VerificationService {
       status: appointment.status,
       arrivedAt: appointment.arrivedAt?.toISOString() ?? null,
       actualStartAt: appointment.actualStartAt?.toISOString() ?? null,
-      basePoints: appointment.basePoints,
-      punctualityPoints: appointment.punctualityPoints,
-      bookingScore: appointment.bookingScore,
+      basePoints: pointsToNumber(appointment.basePoints),
+      punctualityPoints: pointsToNumber(appointment.punctualityPoints),
+      bookingScore: pointsToNumber(appointment.bookingScore),
+      maxBookingScore: maxBookingScore(appointment.scoredBarberCount),
       scoredAt: appointment.scoredAt?.toISOString() ?? null,
       date: formatDateOnly(appointment.date),
       startTime: appointment.startTime,
@@ -475,7 +487,10 @@ export class VerificationService {
     const pointsByShop = new Map(
       points.map((row) => [
         row.shopId,
-        { totalPoints: row._sum.bookingScore ?? 0, scored: row._count._all },
+        {
+          totalPoints: roundPoints(pointsToNumber(row._sum.bookingScore) ?? 0),
+          scored: row._count._all,
+        },
       ]),
     );
 
@@ -584,10 +599,14 @@ export class VerificationService {
         eligibleBookings: 0,
         punctualitySum: 0,
       };
-      existing.totalPoints += row.bookingScore ?? 0;
+      existing.totalPoints += pointsToNumber(row.bookingScore) ?? 0;
       existing.eligibleBookings += 1;
-      existing.punctualitySum += row.punctualityPoints ?? 0;
+      existing.punctualitySum += pointsToNumber(row.punctualityPoints) ?? 0;
       byStaff.set(row.staffId, existing);
+    }
+
+    for (const acc of byStaff.values()) {
+      acc.totalPoints = roundPoints(acc.totalPoints);
     }
 
     const sorted = [...byStaff.values()].sort((a, b) => {

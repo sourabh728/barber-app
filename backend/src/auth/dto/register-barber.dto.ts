@@ -1,9 +1,12 @@
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsEmail,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
+  Max,
+  Min,
   MinLength,
 } from 'class-validator';
 
@@ -49,6 +52,14 @@ export class RegisterBarberDto {
   @IsString()
   @IsNotEmpty()
   pincode!: string;
+
+  /** Number of barbers: 1, 2 or 3 (3 means 3+). */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(3)
+  barberCount?: number;
 
   @IsString()
   @IsNotEmpty()

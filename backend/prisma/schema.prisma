@@ -83,6 +83,8 @@ model Shop {
   lunchEnd    String   @default("14:00")
 
   ownerId     String
+  /// Number of barbers: 1, 2 or 3 (3 means 3+). Drives points per booking.
+  barberCount Int      @default(1)
   owner       User     @relation(fields: [ownerId], references: [id])
   /// Opaque token embedded in the shop's static arrival QR (not the shop UUID).
   qrToken     String   @unique @default(uuid())
@@ -186,6 +188,8 @@ model Appointment {
   /// 24h "HH:mm" end
   endTime       String
   isWalkIn      Boolean           @default(false)
+  /// Why the booking was cancelled by the system (e.g. slot time passed).
+  cancelReason  String?
 
   /// Slot suggested by the barber, awaiting customer accept/decline.
   proposedDate       DateTime? @db.Date
@@ -202,9 +206,11 @@ model Appointment {
   serviceStartQrConsumedAt  DateTime?
 
   /// Idempotent scoring fields (set once when COMPLETED + actualStartAt).
-  basePoints         Int?
-  punctualityPoints  Int?
-  bookingScore       Int?
+  basePoints         Decimal? @db.Decimal(3, 1)
+  punctualityPoints  Decimal? @db.Decimal(3, 1)
+  bookingScore       Decimal? @db.Decimal(3, 1)
+  /// Shop barber tier (1, 2, 3+) used when this booking was scored.
+  scoredBarberCount  Int?
   scoredAt           DateTime?
 
   arrival            AppointmentArrival?

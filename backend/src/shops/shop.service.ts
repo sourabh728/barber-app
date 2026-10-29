@@ -15,6 +15,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { VerificationService } from '../verification/verification.service';
 import { parseShopQrValue } from '../verification/qr-tokens';
+import { pointsToNumber, roundPoints } from '../verification/scoring';
 import {
   uniqueLocationNames,
   withNormalizedLocation,
@@ -277,6 +278,7 @@ type AppointmentRecord = {
   proposedDate?: Date | null;
   proposedStartTime?: string | null;
   proposedEndTime?: string | null;
+  cancelReason?: string | null;
   createdAt: Date;
   updatedAt: Date;
   staff: { id: string; name: string } | null;
@@ -302,6 +304,7 @@ function serializeAppointment(appointment: AppointmentRecord) {
       : null,
     proposedStartTime: appointment.proposedStartTime ?? null,
     proposedEndTime: appointment.proposedEndTime ?? null,
+    cancelReason: appointment.cancelReason ?? null,
     createdAt: appointment.createdAt,
     updatedAt: appointment.updatedAt,
   };
@@ -1398,7 +1401,7 @@ export class ShopService {
       ratingAverage: 0,
       reviewCount: 0,
       /** Sum of booking scores (base + punctuality) for this shop. */
-      totalPoints: pointsAgg._sum.bookingScore ?? 0,
+      totalPoints: roundPoints(pointsToNumber(pointsAgg._sum.bookingScore) ?? 0),
       scoredBookings: pointsAgg._count._all,
     };
   }

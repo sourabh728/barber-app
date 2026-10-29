@@ -24,6 +24,7 @@ export type ProfileShop = {
   city: string;
   state: string;
   pincode: string;
+  barberCount?: number;
   photoUrl: string | null;
   ownerId: string;
   createdAt: string;
@@ -63,6 +64,7 @@ export type RegisterBarberPayload = {
   city: string;
   state: string;
   pincode: string;
+  barberCount?: number;
   description?: string;
 };
 
@@ -199,6 +201,7 @@ export type UpdateShopPayload = {
   city?: string;
   state?: string;
   pincode?: string;
+  barberCount?: number;
 };
 
 export async function updateCurrentUser(payload: UpdateProfilePayload) {

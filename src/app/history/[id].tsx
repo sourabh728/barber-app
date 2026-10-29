@@ -384,6 +384,11 @@ export default function BookingRequestDetailScreen() {
                   {meta.bannerBody ? (
                     <Text style={styles.bannerBody}>{meta.bannerBody}</Text>
                   ) : null}
+                  {booking.status === "CANCELLED" && booking.cancelReason ? (
+                    <Text style={styles.bannerBody}>
+                      Reason: {booking.cancelReason}
+                    </Text>
+                  ) : null}
                 </View>
               )}
 
@@ -550,7 +555,8 @@ export default function BookingRequestDetailScreen() {
                   ) : null}
                   {verification?.bookingScore != null ? (
                     <Text style={styles.scoreText}>
-                      Score: {verification.bookingScore}/10 (
+                      Score: {verification.bookingScore}/
+                      {verification.maxBookingScore ?? 10} (
                       {verification.basePoints} base +{" "}
                       {verification.punctualityPoints} punctuality)
                     </Text>

@@ -13,12 +13,17 @@ import {
 
 import { PrismaService } from '../prisma/prisma.service';
 import { buildShopQrValue } from '../verification/qr-tokens';
+import { pointsToNumber, roundPoints } from '../verification/scoring';
 import {
   PLATFORM_ADMIN_EMAIL,
   PLATFORM_ADMIN_NAME,
   PLATFORM_ADMIN_PASSWORD,
 } from './admin.constants';
 import { UpdateAdminSettingsDto } from './dto/update-admin-settings.dto';
+
+function pts(value: { toNumber(): number } | number | null | undefined): number {
+  return roundPoints(pointsToNumber(value) ?? 0);
+}
 
 function toDateOnlyUtc(dateKey: string): Date {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey.slice(0, 10));
@@ -264,9 +269,9 @@ export class AdminService implements OnModuleInit {
       shopPoints.map((row) => [
         row.shopId,
         {
-          totalPoints: row._sum.bookingScore ?? 0,
-          basePoints: row._sum.basePoints ?? 0,
-          punctualityPoints: row._sum.punctualityPoints ?? 0,
+          totalPoints: pts(row._sum.bookingScore),
+          basePoints: pts(row._sum.basePoints),
+          punctualityPoints: pts(row._sum.punctualityPoints),
           scoredBookings: row._count._all,
         },
       ]),
@@ -321,15 +326,11 @@ export class AdminService implements OnModuleInit {
       },
       points: {
         scoredBookings: scoredAgg._count._all,
-        totalPoints: scoredAgg._sum.bookingScore ?? 0,
-        totalBasePoints: scoredAgg._sum.basePoints ?? 0,
-        totalPunctualityPoints: scoredAgg._sum.punctualityPoints ?? 0,
-        averageBookingScore: scoredAgg._avg.bookingScore
-          ? Math.round(scoredAgg._avg.bookingScore * 10) / 10
-          : 0,
-        averagePunctuality: scoredAgg._avg.punctualityPoints
-          ? Math.round(scoredAgg._avg.punctualityPoints * 10) / 10
-          : 0,
+        totalPoints: pts(scoredAgg._sum.bookingScore),
+        totalBasePoints: pts(scoredAgg._sum.basePoints),
+        totalPunctualityPoints: pts(scoredAgg._sum.punctualityPoints),
+        averageBookingScore: pts(scoredAgg._avg.bookingScore),
+        averagePunctuality: pts(scoredAgg._avg.punctualityPoints),
       },
       shopList,
       shopPointsLeaderboard: [...shopList]
@@ -352,7 +353,7 @@ export class AdminService implements OnModuleInit {
         shopId: b.shop.id,
         date: b.date.toISOString().slice(0, 10),
         startTime: b.startTime,
-        bookingScore: b.bookingScore,
+        bookingScore: pointsToNumber(b.bookingScore),
         arrivedAt: b.arrivedAt?.toISOString() ?? null,
         actualStartAt: b.actualStartAt?.toISOString() ?? null,
         createdAt: b.createdAt.toISOString(),
@@ -417,7 +418,7 @@ export class AdminService implements OnModuleInit {
       paymentTotalInr += appt.priceInr;
       totalsByStatus[appt.status] = (totalsByStatus[appt.status] ?? 0) + 1;
       if (appt.bookingScore != null) {
-        totalPoints += appt.bookingScore;
+        totalPoints += pointsToNumber(appt.bookingScore) ?? 0;
       }
 
       let row = byShop.get(appt.shopId);
@@ -439,7 +440,7 @@ export class AdminService implements OnModuleInit {
       row.byStatus[appt.status] = (row.byStatus[appt.status] ?? 0) + 1;
       row.paymentTotalInr += appt.priceInr;
       if (appt.bookingScore != null) {
-        row.points += appt.bookingScore;
+        row.points += pointsToNumber(appt.bookingScore) ?? 0;
         row.scoredBookings += 1;
       }
     }
@@ -468,10 +469,10 @@ export class AdminService implements OnModuleInit {
         byStatus: totalsByStatus,
         paymentTotalInr,
         estimatedOnlineFeesInr,
-        points: totalPoints,
+        points: roundPoints(totalPoints),
         shopsWithBookings: shops.length,
       },
-      shops,
+      shops: shops.map((s) => ({ ...s, points: roundPoints(s.points) })),
     };
   }
 

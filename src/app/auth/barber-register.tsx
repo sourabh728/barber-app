@@ -17,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { LegalAgreementText } from "@/components/legal-agreement-text";
 import { StateCityPicker } from "@/components/state-city-picker";
+import { BarberCountPicker } from "@/components/barber-count-picker";
 import { useGoogleIdentity } from "@/hooks/use-google-identity";
 import { registerBarber } from "@/services/auth-api";
 import { getRegisterErrorMessage } from "@/services/auth-errors";
@@ -42,6 +43,7 @@ export default function BarberRegisterScreen() {
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [pincode, setPincode] = useState("");
+  const [barberCount, setBarberCount] = useState(1);
   const [password, setPassword] = useState("");
   const [hidePassword, setHidePassword] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -128,6 +130,7 @@ export default function BarberRegisterScreen() {
         city: normalizedCity,
         state: normalizedState,
         pincode: normalizedPincode,
+        barberCount,
         ...(normalizedDescription
           ? { description: normalizedDescription }
           : {}),
@@ -292,6 +295,13 @@ export default function BarberRegisterScreen() {
                   editable={!isBusy}
                   returnKeyType="next"
                   accessibilityLabel="Pincode"
+                />
+
+                <BarberCountPicker
+                  value={barberCount}
+                  onChange={setBarberCount}
+                  disabled={isBusy}
+                  labelStyle={styles.label}
                 />
 
                 <Text style={styles.label}>Password</Text>

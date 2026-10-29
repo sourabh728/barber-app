@@ -42,6 +42,7 @@ export type BookingVerification = {
   basePoints: number | null;
   punctualityPoints: number | null;
   bookingScore: number | null;
+  maxBookingScore?: number;
   scoredAt: string | null;
   date: string;
   startTime: string;

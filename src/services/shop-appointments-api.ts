@@ -27,6 +27,7 @@ export type ShopAppointment = {
   isWalkIn: boolean;
   proposedDate?: string | null;
   proposedStartTime?: string | null;
+  cancelReason?: string | null;
   proposedEndTime?: string | null;
   createdAt: string;
   updatedAt: string;

@@ -7,6 +7,7 @@ import { AppointmentStatus } from '../../generated/prisma/enums';
 
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { pointsToNumber, roundPoints } from '../verification/scoring';
 
 function formatDateOnly(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -29,6 +30,7 @@ type CustomerAppointmentRecord = {
   proposedDate: Date | null;
   proposedStartTime: string | null;
   proposedEndTime: string | null;
+  cancelReason?: string | null;
   arrivedAt: Date | null;
   actualStartAt: Date | null;
   createdAt: Date;
@@ -58,6 +60,7 @@ function serializeCustomerAppointment(appointment: CustomerAppointmentRecord) {
       : null,
     proposedStartTime: appointment.proposedStartTime,
     proposedEndTime: appointment.proposedEndTime,
+    cancelReason: appointment.cancelReason ?? null,
     actualStartAt: appointment.actualStartAt?.toISOString() ?? null,
     createdAt: appointment.createdAt,
     updatedAt: appointment.updatedAt,
@@ -159,7 +162,7 @@ export class CustomerService {
       completedBookings,
       totalBookings,
       /** Sum of booking scores (base + punctuality) from completed/scored visits. */
-      totalPoints: pointsAgg._sum.bookingScore ?? 0,
+      totalPoints: roundPoints(pointsToNumber(pointsAgg._sum.bookingScore) ?? 0),
       scoredBookings: pointsAgg._count._all,
     };
   }

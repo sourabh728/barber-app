@@ -1,39 +1,37 @@
 import {
-  BASE_ORDER_POINTS,
   calculateBookingScore,
-  punctualityPointsForDelayMinutes,
+  maxBookingScore,
+  punctualityPointsForDelaySeconds,
   slotInstantInBusinessTz,
   weekBoundsContaining,
 } from './scoring';
 
-describe('punctualityPointsForDelayMinutes', () => {
-  it('awards 5 for 0–2 minutes', () => {
-    expect(punctualityPointsForDelayMinutes(0)).toBe(5);
-    expect(punctualityPointsForDelayMinutes(2)).toBe(5);
+describe('punctualityPointsForDelaySeconds', () => {
+  // Delay (seconds) → expected points per tier [solo, medium, large]
+  const cases: [number, [number, number, number]][] = [
+    [0, [5, 4, 3]],
+    [120, [5, 4, 3]],
+    [121, [4, 3.2, 2.4]],
+    [240, [4, 3.2, 2.4]],
+    [241, [3, 2.4, 1.8]],
+    [360, [3, 2.4, 1.8]],
+    [361, [2, 1.6, 1.2]],
+    [480, [2, 1.6, 1.2]],
+    [481, [1, 0.8, 0.6]],
+    [600, [1, 0.8, 0.6]],
+    [601, [0, 0, 0]],
+    [3600, [0, 0, 0]],
+    [-300, [5, 4, 3]],
+  ];
+
+  it.each(cases)('delay %ss follows the chart', (seconds, expected) => {
+    expect(punctualityPointsForDelaySeconds(seconds, 1)).toBe(expected[0]);
+    expect(punctualityPointsForDelaySeconds(seconds, 2)).toBe(expected[1]);
+    expect(punctualityPointsForDelaySeconds(seconds, 3)).toBe(expected[2]);
   });
 
-  it('awards 4 for >2 up to 4', () => {
-    expect(punctualityPointsForDelayMinutes(3)).toBe(4);
-    expect(punctualityPointsForDelayMinutes(4)).toBe(4);
-  });
-
-  it('awards 3 for >4 up to 6', () => {
-    expect(punctualityPointsForDelayMinutes(5)).toBe(3);
-    expect(punctualityPointsForDelayMinutes(6)).toBe(3);
-  });
-
-  it('awards 1 for >6 up to 10', () => {
-    expect(punctualityPointsForDelayMinutes(7)).toBe(1);
-    expect(punctualityPointsForDelayMinutes(10)).toBe(1);
-  });
-
-  it('awards 0 for >10', () => {
-    expect(punctualityPointsForDelayMinutes(11)).toBe(0);
-    expect(punctualityPointsForDelayMinutes(60)).toBe(0);
-  });
-
-  it('treats negative delay as 0', () => {
-    expect(punctualityPointsForDelayMinutes(-5)).toBe(5);
+  it('treats 4+ barbers as the large tier', () => {
+    expect(punctualityPointsForDelaySeconds(0, 7)).toBe(3);
   });
 });
 
@@ -41,69 +39,60 @@ describe('calculateBookingScore', () => {
   const slotDate = '2026-10-20';
   const slotStart = '10:00';
   const slotAt = slotInstantInBusinessTz(slotDate, slotStart);
+  const at = (offsetSeconds: number) =>
+    new Date(slotAt.getTime() + offsetSeconds * 1000);
 
-  it('scores 10 for on-time start', () => {
-    const result = calculateBookingScore({
-      slotDate,
-      slotStartTime: slotStart,
-      actualStartAt: slotAt,
-    });
-    expect(result.basePoints).toBe(BASE_ORDER_POINTS);
-    expect(result.punctualityPoints).toBe(5);
-    expect(result.bookingScore).toBe(10);
+  it('max booking score is 10 / 8 / 6 per tier', () => {
+    expect(maxBookingScore(1)).toBe(10);
+    expect(maxBookingScore(2)).toBe(8);
+    expect(maxBookingScore(3)).toBe(6);
   });
 
-  it('scores 10 at exactly 2 minutes late', () => {
-    const result = calculateBookingScore({
-      slotDate,
-      slotStartTime: slotStart,
-      actualStartAt: new Date(slotAt.getTime() + 2 * 60_000),
-    });
-    expect(result.bookingScore).toBe(10);
+  it('scores the maximum for an on-time start', () => {
+    for (const [count, max] of [
+      [1, 10],
+      [2, 8],
+      [3, 6],
+    ] as const) {
+      const result = calculateBookingScore({
+        slotDate,
+        slotStartTime: slotStart,
+        actualStartAt: slotAt,
+        barberCount: count,
+      });
+      expect(result.bookingScore).toBe(max);
+      expect(result.basePoints).toBe(max / 2);
+    }
   });
 
-  it('scores 9 at 3 minutes late', () => {
+  it('scores a medium shop 3 minutes late as 4 + 3.2', () => {
     const result = calculateBookingScore({
       slotDate,
       slotStartTime: slotStart,
-      actualStartAt: new Date(slotAt.getTime() + 3 * 60_000),
+      actualStartAt: at(180),
+      barberCount: 2,
     });
-    expect(result.bookingScore).toBe(9);
+    expect(result.punctualityPoints).toBe(3.2);
+    expect(result.bookingScore).toBe(7.2);
+    expect(result.delayMinutes).toBe(3);
   });
 
-  it('scores 8 at 5 minutes late', () => {
+  it('keeps only the base points after the 10 minute grace', () => {
     const result = calculateBookingScore({
       slotDate,
       slotStartTime: slotStart,
-      actualStartAt: new Date(slotAt.getTime() + 5 * 60_000),
+      actualStartAt: at(601),
+      barberCount: 3,
     });
-    expect(result.bookingScore).toBe(8);
-  });
-
-  it('scores 6 at 8 minutes late', () => {
-    const result = calculateBookingScore({
-      slotDate,
-      slotStartTime: slotStart,
-      actualStartAt: new Date(slotAt.getTime() + 8 * 60_000),
-    });
-    expect(result.bookingScore).toBe(6);
-  });
-
-  it('scores 5 at 12 minutes late', () => {
-    const result = calculateBookingScore({
-      slotDate,
-      slotStartTime: slotStart,
-      actualStartAt: new Date(slotAt.getTime() + 12 * 60_000),
-    });
-    expect(result.bookingScore).toBe(5);
     expect(result.punctualityPoints).toBe(0);
+    expect(result.bookingScore).toBe(3);
   });
 
-  it('scores 10 for early start', () => {
+  it('defaults to the solo tier and gives early starts full points', () => {
     const result = calculateBookingScore({
       slotDate,
       slotStartTime: slotStart,
-      actualStartAt: new Date(slotAt.getTime() - 5 * 60_000),
+      actualStartAt: at(-300),
     });
     expect(result.bookingScore).toBe(10);
     expect(result.delayMinutes).toBe(0);

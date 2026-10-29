@@ -1,5 +1,13 @@
-import { Transform } from 'class-transformer';
-import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import {
+  IsEmail,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 
 import {
   MatchesPhone10Digits,
@@ -39,6 +47,14 @@ export class CreateShopDto {
   @IsString()
   @IsNotEmpty()
   pincode!: string;
+
+  /** Number of barbers: 1, 2 or 3 (3 means 3+). */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(3)
+  barberCount?: number;
 
   /** Scanned onboarding QR payload issued by an admin. */
   @IsOptional()

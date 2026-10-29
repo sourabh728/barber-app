@@ -21,6 +21,7 @@ export type CustomerBooking = {
   /** Slot suggested by the barber, waiting for the customer's answer. */
   proposedDate?: string | null;
   proposedStartTime?: string | null;
+  cancelReason?: string | null;
   proposedEndTime?: string | null;
   /** ISO timestamp when customer checked in via shop QR */
   arrivedAt?: string | null;

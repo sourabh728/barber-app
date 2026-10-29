@@ -55,6 +55,7 @@ export type CreateShopPayload = {
   city: string;
   state: string;
   pincode: string;
+  barberCount?: number;
   phone?: string;
   email?: string;
   description?: string;

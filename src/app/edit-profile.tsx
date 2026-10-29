@@ -20,6 +20,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useSession } from "@/context/session-provider";
 import { StateCityPicker } from "@/components/state-city-picker";
+import { BarberCountPicker } from "@/components/barber-count-picker";
 import type { AppColors } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import {
@@ -52,6 +53,7 @@ type FormState = {
   shopCity: string;
   shopState: string;
   shopPincode: string;
+  shopBarberCount: number;
   shopPhotoUrl: string | null;
 };
 
@@ -69,6 +71,7 @@ const emptyForm: FormState = {
   shopCity: "",
   shopState: "",
   shopPincode: "",
+  shopBarberCount: 1,
   shopPhotoUrl: null,
 };
 
@@ -88,6 +91,7 @@ function formFromProfile(profile: CurrentUserResponse): FormState {
     shopCity: shop?.city ?? "",
     shopState: shop?.state ?? "",
     shopPincode: shop?.pincode ?? "",
+    shopBarberCount: shop?.barberCount ?? 1,
     shopPhotoUrl: shop?.photoUrl ?? null,
   };
 }
@@ -289,6 +293,7 @@ export default function EditProfileScreen() {
           city: form.shopCity.trim(),
           state: form.shopState.trim(),
           pincode: form.shopPincode.trim(),
+          barberCount: form.shopBarberCount,
         });
       }
 
@@ -566,6 +571,13 @@ export default function EditProfileScreen() {
                       placeholderTextColor="#777"
                       editable={!busy}
                       keyboardType="number-pad"
+                    />
+
+                    <BarberCountPicker
+                      value={form.shopBarberCount}
+                      onChange={(value) => setField("shopBarberCount", value)}
+                      disabled={busy}
+                      labelStyle={styles.label}
                     />
                   </>
                 ) : null}
