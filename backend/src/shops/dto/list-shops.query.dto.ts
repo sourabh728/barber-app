@@ -1,5 +1,12 @@
-import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class ListShopsQueryDto {
   @IsOptional()
@@ -29,4 +36,10 @@ export class ListShopsQueryDto {
   @IsOptional()
   @IsString()
   state?: string;
+
+  /** Only shops the signed-in customer has marked as favourite. */
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  favoritesOnly?: boolean;
 }

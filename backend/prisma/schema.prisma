@@ -27,6 +27,20 @@ model User {
   shops         Shop[]
   appointments  Appointment[]
   notifications Notification[]
+  favoriteShops FavoriteShop[]
+}
+
+/// A customer's saved ("favourite") shop.
+model FavoriteShop {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, shopId])
+  @@index([shopId])
 }
 
 model Notification {
@@ -94,6 +108,7 @@ model Shop {
   staff        ShopStaff[]
   services     ShopService[]
   appointments Appointment[]
+  favoritedBy  FavoriteShop[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

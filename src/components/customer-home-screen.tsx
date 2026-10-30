@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -16,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ShopCard } from "@/components/shop-card";
 import { isPlatformAdminUser } from "@/constants/platform-admin";
 import { useSession } from "@/context/session-provider";
 import type { AppColors } from "@/constants/theme";
@@ -26,10 +26,13 @@ import {
 } from "@/services/customer-bookings-api";
 import {
   fetchShops,
+  fetchSuggestedShops,
   getShopsErrorMessage,
+  setShopFavorite,
   type PublicShop,
+  type SuggestedShop,
 } from "@/services/shops-api";
-import { shopImageSource } from "@/utils/media";
+import { showAppAlert } from "@/utils/app-alert";
 
 const PAGE_SIZE = 20;
 
@@ -37,13 +40,6 @@ function customerFirstName(name: string | undefined | null) {
   const trimmed = name?.trim();
   if (!trimmed) return "there";
   return trimmed.split(/\s+/)[0] ?? trimmed;
-}
-
-function formatShopLine(shop: PublicShop) {
-  return [shop.address, shop.city, shop.state, shop.pincode]
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join(", ");
 }
 
 function toDateKey(date: Date) {
@@ -115,11 +111,6 @@ function pickNextAcceptedReminder(bookings: CustomerBooking[]) {
   return upcoming[0] ?? null;
 }
 
-const SHOP_ICONS: (keyof typeof Ionicons.glyphMap)[] = [
-  "cut-outline",
-  "storefront-outline",
-];
-
 export function CustomerHomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -142,6 +133,8 @@ export function CustomerHomeScreen() {
   const [draftCity, setDraftCity] = useState<string | null>(null);
   const [draftState, setDraftState] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [suggested, setSuggested] = useState<SuggestedShop[]>([]);
   const [acceptedReminder, setAcceptedReminder] =
     useState<CustomerBooking | null>(null);
 
@@ -163,6 +156,7 @@ export function CustomerHomeScreen() {
         search: debouncedQuery || undefined,
         city: selectedCity || undefined,
         state: selectedState || undefined,
+        favoritesOnly,
       });
       setShops(data.items);
       setTotalPages(data.totalPages);
@@ -174,7 +168,16 @@ export function CustomerHomeScreen() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedQuery, page, selectedCity, selectedState]);
+  }, [debouncedQuery, favoritesOnly, page, selectedCity, selectedState]);
+
+  const loadSuggestions = useCallback(async () => {
+    try {
+      setSuggested(await fetchSuggestedShops());
+    } catch {
+      // Suggestions are optional; the main shop list still works.
+      setSuggested([]);
+    }
+  }, []);
 
   const loadAcceptedReminder = useCallback(async () => {
     try {
@@ -194,12 +197,54 @@ export function CustomerHomeScreen() {
   useFocusEffect(
     useCallback(() => {
       void loadShops();
+      void loadSuggestions();
       void loadAcceptedReminder();
-    }, [loadAcceptedReminder, loadShops]),
+    }, [loadAcceptedReminder, loadShops, loadSuggestions]),
   );
 
   const firstName = customerFirstName(user?.name);
   const hasActiveFilter = Boolean(selectedCity || selectedState);
+  const showSuggestions =
+    !favoritesOnly &&
+    !hasActiveFilter &&
+    !debouncedQuery &&
+    page === 1 &&
+    suggested.length > 0;
+
+  const toggleFavorite = useCallback(
+    async (shop: PublicShop) => {
+      const next = !shop.isFavorite;
+      const apply = (value: boolean) => {
+        const patch = <T extends PublicShop>(items: T[]) =>
+          items.map((item) =>
+            item.id === shop.id ? { ...item, isFavorite: value } : item,
+          );
+        setShops((current) =>
+          favoritesOnly && !value
+            ? current.filter((item) => item.id !== shop.id)
+            : patch(current),
+        );
+        setSuggested((current) => patch(current));
+      };
+
+      apply(next);
+      try {
+        await setShopFavorite(shop.id, next);
+      } catch (err) {
+        apply(!next);
+        showAppAlert(
+          "Favourite shops",
+          getShopsErrorMessage(err, "Could not update favourite shops."),
+        );
+      }
+    },
+    [favoritesOnly],
+  );
+
+  const toggleFavoritesOnly = () => {
+    setFavoritesOnly((current) => !current);
+    setPage(1);
+  };
 
   const openFilter = () => {
     setDraftCity(selectedCity);
@@ -229,60 +274,13 @@ export function CustomerHomeScreen() {
   }: {
     item: PublicShop;
     index: number;
-  }) => {
-    const address = formatShopLine(item);
-    const servicesServed = Math.max(0, item.servicesServed ?? 0);
-    const iconName = SHOP_ICONS[index % SHOP_ICONS.length];
-
-    return (
-      <View style={styles.shopCard}>
-        <View style={styles.shopRow}>
-          <View style={styles.shopIconWrap}>
-            {item.photoUrl ? (
-              <Image
-                source={shopImageSource(item.photoUrl)}
-                style={styles.shopThumb}
-              />
-            ) : (
-              <Ionicons name={iconName} size={22} color="#475569" />
-            )}
-          </View>
-
-          <View style={styles.shopMain}>
-            <View style={styles.shopTopRow}>
-              <View style={styles.shopCopy}>
-                <Text style={styles.shopName} numberOfLines={1}>
-                  {item.name}
-                </Text>
-                <Text style={styles.shopAddress} numberOfLines={2}>
-                  {address}
-                </Text>
-              </View>
-              <View style={styles.servicesWrap}>
-                <Text style={styles.servicesLabel}>Services served</Text>
-                <Text style={styles.servicesValue}>{servicesServed}</Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.bookButton}
-              activeOpacity={0.85}
-              onPress={() =>
-                router.push({
-                  pathname: "/shop/[id]",
-                  params: { id: item.id },
-                })
-              }
-              accessibilityRole="button"
-              accessibilityLabel={`Book appointment at ${item.name}`}
-            >
-              <Text style={styles.bookButtonText}>Book Appointment</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    );
-  };
+  }) => (
+    <ShopCard
+      shop={item}
+      index={index}
+      onToggleFavorite={toggleFavorite}
+    />
+  );
 
   if (isPlatformAdminUser(user)) {
     return <Redirect href="/admin" />;
@@ -395,31 +393,77 @@ export function CustomerHomeScreen() {
               />
             </View>
 
-            <View style={styles.sectionRow}>
-              <Text style={styles.sectionTitle}>All Barbers</Text>
-              <TouchableOpacity
-                style={[
-                  styles.filterButton,
-                  hasActiveFilter ? styles.filterButtonActive : null,
-                ]}
-                onPress={openFilter}
-                accessibilityRole="button"
-                accessibilityLabel="Filter shops"
-              >
-                <Ionicons
-                  name="options-outline"
-                  size={14}
-                  color={hasActiveFilter ? "#FFFFFF" : "#0F172A"}
-                />
-                <Text
-                  style={[
-                    styles.filterButtonText,
-                    hasActiveFilter ? styles.filterButtonTextActive : null,
-                  ]}
-                >
-                  Filter
+            {showSuggestions ? (
+              <View style={styles.suggestionBlock}>
+                <Text style={styles.sectionTitle}>Book again</Text>
+                <Text style={styles.suggestionHint}>
+                  Shops you visit often
                 </Text>
-              </TouchableOpacity>
+                {suggested.map((shop, index) => (
+                  <ShopCard
+                    key={shop.id}
+                    shop={shop}
+                    index={index}
+                    caption={`Booked ${shop.bookingCount} times`}
+                    onToggleFavorite={toggleFavorite}
+                  />
+                ))}
+              </View>
+            ) : null}
+
+            <View style={styles.sectionRow}>
+              <Text style={styles.sectionTitle}>
+                {favoritesOnly ? "Favourite Barbers" : "All Barbers"}
+              </Text>
+              <View style={styles.sectionActions}>
+                <TouchableOpacity
+                  style={[
+                    styles.filterButton,
+                    favoritesOnly ? styles.favoriteButtonActive : null,
+                  ]}
+                  onPress={toggleFavoritesOnly}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: favoritesOnly }}
+                  accessibilityLabel="Show favourite shops only"
+                >
+                  <Ionicons
+                    name={favoritesOnly ? "heart" : "heart-outline"}
+                    size={14}
+                    color={favoritesOnly ? "#FFFFFF" : "#E11D48"}
+                  />
+                  <Text
+                    style={[
+                      styles.filterButtonText,
+                      favoritesOnly ? styles.filterButtonTextActive : null,
+                    ]}
+                  >
+                    Favourite
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.filterButton,
+                    hasActiveFilter ? styles.filterButtonActive : null,
+                  ]}
+                  onPress={openFilter}
+                  accessibilityRole="button"
+                  accessibilityLabel="Filter shops"
+                >
+                  <Ionicons
+                    name="options-outline"
+                    size={14}
+                    color={hasActiveFilter ? "#FFFFFF" : "#0F172A"}
+                  />
+                  <Text
+                    style={[
+                      styles.filterButtonText,
+                      hasActiveFilter ? styles.filterButtonTextActive : null,
+                    ]}
+                  >
+                    Filter
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {hasActiveFilter ? (
@@ -449,9 +493,11 @@ export function CustomerHomeScreen() {
           ) : (
             <View style={styles.stateBlock}>
               <Text style={styles.stateText}>
-                {debouncedQuery || hasActiveFilter
-                  ? "No shops match your search or filters."
-                  : "No shops available yet."}
+                {favoritesOnly && !debouncedQuery && !hasActiveFilter
+                  ? "You have no favourite shops yet. Tap the heart on a shop to save it."
+                  : debouncedQuery || hasActiveFilter
+                    ? "No shops match your search or filters."
+                    : "No shops available yet."}
               </Text>
             </View>
           )
@@ -497,6 +543,7 @@ export function CustomerHomeScreen() {
         refreshing={loading && shops.length > 0}
         onRefresh={() => {
           void loadShops();
+          void loadSuggestions();
           void loadAcceptedReminder();
         }}
       />
@@ -801,96 +848,26 @@ function createStyles(colors: AppColors) {
     fontSize: 12,
   },
 
-  shopCard: {
-    backgroundColor: colors.backgroundCard,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 8,
-    padding: 10,
-  },
-
-  shopRow: {
+  sectionActions: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-  },
-
-  shopIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    backgroundColor: colors.backgroundMuted,
     alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-
-  shopThumb: {
-    width: 44,
-    height: 44,
-  },
-
-  shopMain: {
-    flex: 1,
     gap: 8,
   },
 
-  shopTopRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
+  favoriteButtonActive: {
+    backgroundColor: "#E11D48",
+    borderColor: "#E11D48",
   },
 
-  shopCopy: {
-    flex: 1,
-    minWidth: 0,
+  suggestionBlock: {
+    marginTop: 14,
   },
 
-  shopName: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: colors.text,
-  },
-
-  shopAddress: {
-    marginTop: 2,
-    fontSize: 11,
-    lineHeight: 15,
-    color: colors.textSecondary,
-  },
-
-  servicesWrap: {
-    alignItems: "flex-end",
-    minWidth: 72,
-  },
-
-  servicesLabel: {
-    fontSize: 10,
-    color: colors.textSecondary,
-    fontWeight: "600",
-    textAlign: "right",
-  },
-
-  servicesValue: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: colors.text,
-    marginTop: 1,
-  },
-
-  bookButton: {
-    alignSelf: "flex-start",
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-
-  bookButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "700",
+  suggestionHint: {
     fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
+    marginBottom: 8,
   },
 
   pagination: {

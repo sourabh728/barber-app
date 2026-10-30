@@ -52,8 +52,46 @@ export class ShopController {
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.CUSTOMER, UserRole.BARBER, UserRole.ADMIN)
-  listShops(@Query() query: ListShopsQueryDto) {
-    return this.shopService.listShops(query);
+  listShops(
+    @Query() query: ListShopsQueryDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.shopService.listShops(query, req.user.userId);
+  }
+
+  /** Shops the customer books repeatedly ("book again"). Before :id routes. */
+  @Get('suggestions')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER)
+  listSuggestedShops(@Req() req: AuthenticatedRequest) {
+    return this.shopService.listSuggestedShops(req.user.userId);
+  }
+
+  @Get('favorites')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER)
+  listFavoriteShops(@Req() req: AuthenticatedRequest) {
+    return this.shopService.listFavoriteShops(req.user.userId);
+  }
+
+  @Put(':id/favorite')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER)
+  addFavoriteShop(
+    @Param('id') shopId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.shopService.addFavoriteShop(req.user.userId, shopId);
+  }
+
+  @Delete(':id/favorite')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER)
+  removeFavoriteShop(
+    @Param('id') shopId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.shopService.removeFavoriteShop(req.user.userId, shopId);
   }
 
   @Post()
@@ -297,8 +335,8 @@ export class ShopController {
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.CUSTOMER, UserRole.BARBER, UserRole.ADMIN)
-  getShop(@Param('id') shopId: string) {
-    return this.shopService.getShopById(shopId);
+  getShop(@Param('id') shopId: string, @Req() req: AuthenticatedRequest) {
+    return this.shopService.getShopById(shopId, req.user.userId);
   }
 
   /** Customer books an appointment — always created as PENDING (awaiting approval). */

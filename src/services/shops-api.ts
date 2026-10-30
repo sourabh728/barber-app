@@ -16,6 +16,15 @@ export type PublicShop = {
   closeTime: string;
   /** Completed appointments / services served so far. */
   servicesServed: number;
+  /** Customer marked this shop as a favourite. */
+  isFavorite?: boolean;
+  /** Today's remaining slots are all full (every barber booked). */
+  allSlotsBooked?: boolean;
+};
+
+export type SuggestedShop = PublicShop & {
+  /** How many times the customer has booked this shop. */
+  bookingCount: number;
 };
 
 export type ShopListParams = {
@@ -24,6 +33,7 @@ export type ShopListParams = {
   search?: string;
   city?: string;
   state?: string;
+  favoritesOnly?: boolean;
 };
 
 export type ShopListResponse = {
@@ -44,9 +54,31 @@ export async function fetchShops(params: ShopListParams = {}) {
       ...(params.search?.trim() ? { search: params.search.trim() } : {}),
       ...(params.city?.trim() ? { city: params.city.trim() } : {}),
       ...(params.state?.trim() ? { state: params.state.trim() } : {}),
+      ...(params.favoritesOnly ? { favoritesOnly: true } : {}),
     },
   });
   return response.data;
+}
+
+export async function fetchSuggestedShops() {
+  const response = await api.get<{ items: SuggestedShop[] }>(
+    "/shops/suggestions",
+  );
+  return response.data.items;
+}
+
+export async function fetchFavoriteShops() {
+  const response = await api.get<{ items: PublicShop[] }>("/shops/favorites");
+  return response.data.items;
+}
+
+export async function setShopFavorite(shopId: string, favorite: boolean) {
+  if (favorite) {
+    await api.put(`/shops/${shopId}/favorite`);
+  } else {
+    await api.delete(`/shops/${shopId}/favorite`);
+  }
+  return favorite;
 }
 
 export type CreateShopPayload = {

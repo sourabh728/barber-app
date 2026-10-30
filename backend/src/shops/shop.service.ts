@@ -15,7 +15,12 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { VerificationService } from '../verification/verification.service';
 import { parseShopQrValue } from '../verification/qr-tokens';
-import { pointsToNumber, roundPoints } from '../verification/scoring';
+import {
+  BUSINESS_TIMEZONE,
+  formatDateKeyInTimeZone,
+  pointsToNumber,
+  roundPoints,
+} from '../verification/scoring';
 import {
   uniqueLocationNames,
   withNormalizedLocation,
@@ -389,6 +394,42 @@ function serializePublicShop(shop: PublicShopRecord) {
   };
 }
 
+/** Home-screen "all slots booked" check uses the shortest bookable slot. */
+const HOME_SLOT_MINUTES = 30;
+/** Matches the booking screen: slots starting within 15 min are not offered. */
+const SLOT_LEAD_MINUTES = 15;
+/** A shop is suggested once the customer has booked it at least this often. */
+const SUGGESTION_MIN_BOOKINGS = 2;
+const SUGGESTION_LIMIT = 3;
+
+type ShopListRecord = PublicShopRecord & {
+  lunchStart: string;
+  lunchEnd: string;
+};
+
+function hhmmToMinutes(time: string): number | null {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time);
+  return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+}
+
+function minutesToHhmm(total: number): string {
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(
+    total % 60,
+  ).padStart(2, '0')}`;
+}
+
+function minutesNowInBusinessTz(now: Date): number {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: BUSINESS_TIMEZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? 0);
+  const minute = Number(parts.find((p) => p.type === 'minute')?.value ?? 0);
+  return hour * 60 + minute;
+}
+
 @Injectable()
 export class ShopService {
   constructor(
@@ -439,7 +480,7 @@ export class ShopService {
   }
 
   /** Public catalog of shops for the customer home screen. */
-  async listShops(query: ListShopsQueryDto = {}) {
+  async listShops(query: ListShopsQueryDto = {}, userId?: string) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const search = query.search?.trim();
@@ -447,6 +488,9 @@ export class ShopService {
     const state = query.state?.trim();
 
     const where = {
+      ...(query.favoritesOnly
+        ? { favoritedBy: { some: { userId: userId ?? '' } } }
+        : {}),
       ...(city
         ? { city: { equals: city, mode: 'insensitive' as const } }
         : {}),
@@ -483,6 +527,8 @@ export class ShopService {
           photoUrl: true,
           openTime: true,
           closeTime: true,
+          lunchStart: true,
+          lunchEnd: true,
         },
       }),
       this.prisma.shop.findMany({
@@ -530,7 +576,7 @@ export class ShopService {
     const pageItems = ranked.slice((page - 1) * limit, page * limit);
 
     return {
-      items: pageItems.map(serializePublicShop),
+      items: await this.decorateShops(pageItems, userId),
       page,
       limit,
       total,
@@ -540,8 +586,278 @@ export class ShopService {
     };
   }
 
+  /**
+   * Adds per-customer `isFavorite` and today's `allSlotsBooked` to shops.
+   */
+  private async decorateShops(shops: ShopListRecord[], userId?: string) {
+    if (shops.length === 0) {
+      return [];
+    }
+
+    const [favoriteIds, fullyBookedIds] = await Promise.all([
+      this.favoriteShopIds(
+        shops.map((shop) => shop.id),
+        userId,
+      ),
+      this.shopIdsFullyBookedToday(shops),
+    ]);
+
+    return shops.map((shop) => ({
+      ...serializePublicShop(shop),
+      isFavorite: favoriteIds.has(shop.id),
+      allSlotsBooked: fullyBookedIds.has(shop.id),
+    }));
+  }
+
+  private async favoriteShopIds(shopIds: string[], userId?: string) {
+    if (!userId || shopIds.length === 0) {
+      return new Set<string>();
+    }
+    const rows = await this.prisma.favoriteShop.findMany({
+      where: { userId, shopId: { in: shopIds } },
+      select: { shopId: true },
+    });
+    return new Set(rows.map((row) => row.shopId));
+  }
+
+  /**
+   * Shops that still have bookable slots left today, all of which are full
+   * (every active barber is booked). Closed / holiday / no-barber shops are
+   * not reported as fully booked.
+   */
+  private async shopIdsFullyBookedToday(
+    shops: ShopListRecord[],
+    now: Date = new Date(),
+  ) {
+    const fullyBooked = new Set<string>();
+    if (shops.length === 0) {
+      return fullyBooked;
+    }
+
+    const shopIds = shops.map((shop) => shop.id);
+    const todayKey = formatDateKeyInTimeZone(now, BUSINESS_TIMEZONE);
+    const today = toDateOnlyUtc(todayKey);
+    const nowMinutes = minutesNowInBusinessTz(now);
+
+    const [staffRows, appointments, holidays] = await Promise.all([
+      this.prisma.shopStaff.findMany({
+        where: {
+          shopId: { in: shopIds },
+          status: { in: [StaffStatus.ACTIVE, StaffStatus.AWAY] },
+        },
+        select: { shopId: true, status: true, awayUntil: true },
+      }),
+      this.prisma.appointment.findMany({
+        where: {
+          shopId: { in: shopIds },
+          date: today,
+          status: {
+            notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.REJECTED],
+          },
+        },
+        select: { shopId: true, startTime: true, endTime: true },
+      }),
+      this.prisma.shopHoliday.findMany({
+        where: { shopId: { in: shopIds }, date: today },
+        select: { shopId: true },
+      }),
+    ]);
+
+    const holidayShopIds = new Set(holidays.map((row) => row.shopId));
+
+    for (const shop of shops) {
+      if (holidayShopIds.has(shop.id)) continue;
+
+      const open = hhmmToMinutes(shop.openTime);
+      const close = hhmmToMinutes(shop.closeTime);
+      if (open === null || close === null) continue;
+      const lunchStart = hhmmToMinutes(shop.lunchStart);
+      const lunchEnd = hhmmToMinutes(shop.lunchEnd);
+
+      const busy: Array<{ startTime: string; endTime: string }> = [];
+      let activeStaffCount = 0;
+      for (const member of staffRows) {
+        if (member.shopId !== shop.id) continue;
+        activeStaffCount += 1;
+        if (
+          member.status === StaffStatus.AWAY &&
+          member.awayUntil &&
+          member.awayUntil.getTime() > now.getTime()
+        ) {
+          const awayBlock = awayOccupiedInterval(
+            member.awayUntil,
+            todayKey,
+            shop.openTime,
+            shop.closeTime,
+          );
+          if (awayBlock) busy.push(awayBlock);
+        }
+      }
+      if (activeStaffCount === 0) continue;
+
+      for (const appointment of appointments) {
+        if (appointment.shopId === shop.id) busy.push(appointment);
+      }
+
+      let remainingSlots = 0;
+      let openSlots = 0;
+      for (
+        let start = open;
+        start + HOME_SLOT_MINUTES <= close;
+        start += HOME_SLOT_MINUTES
+      ) {
+        const end = start + HOME_SLOT_MINUTES;
+        if (
+          lunchStart !== null &&
+          lunchEnd !== null &&
+          start < lunchEnd &&
+          end > lunchStart
+        ) {
+          continue;
+        }
+        if (start < nowMinutes + SLOT_LEAD_MINUTES) continue;
+
+        remainingSlots += 1;
+        const slotStart = minutesToHhmm(start);
+        const slotEnd = minutesToHhmm(end);
+        const overlapping = busy.filter(
+          (other) => slotStart < other.endTime && other.startTime < slotEnd,
+        ).length;
+        if (overlapping < activeStaffCount) {
+          openSlots += 1;
+          break;
+        }
+      }
+
+      if (remainingSlots > 0 && openSlots === 0) {
+        fullyBooked.add(shop.id);
+      }
+    }
+
+    return fullyBooked;
+  }
+
+  /**
+   * Shops the customer books repeatedly ("book again" suggestions),
+   * most frequent first, then most recent.
+   */
+  async listSuggestedShops(userId: string) {
+    const grouped = await this.prisma.appointment.groupBy({
+      by: ['shopId'],
+      where: {
+        customerId: userId,
+        status: {
+          notIn: [AppointmentStatus.CANCELLED, AppointmentStatus.REJECTED],
+        },
+      },
+      having: { shopId: { _count: { gte: SUGGESTION_MIN_BOOKINGS } } },
+      _count: { _all: true },
+      _max: { createdAt: true },
+    });
+
+    if (grouped.length === 0) {
+      return { items: [] };
+    }
+
+    grouped.sort((a, b) => {
+      if (b._count._all !== a._count._all) {
+        return b._count._all - a._count._all;
+      }
+      return (
+        (b._max.createdAt?.getTime() ?? 0) - (a._max.createdAt?.getTime() ?? 0)
+      );
+    });
+    const top = grouped.slice(0, SUGGESTION_LIMIT);
+    const bookingCountByShop = new Map(
+      top.map((row) => [row.shopId, row._count._all]),
+    );
+
+    const shops = await this.prisma.shop.findMany({
+      where: { id: { in: top.map((row) => row.shopId) } },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        phone: true,
+        email: true,
+        address: true,
+        city: true,
+        state: true,
+        pincode: true,
+        photoUrl: true,
+        openTime: true,
+        closeTime: true,
+        lunchStart: true,
+        lunchEnd: true,
+      },
+    });
+
+    const ordered = top
+      .map((row) => shops.find((shop) => shop.id === row.shopId))
+      .filter((shop): shop is NonNullable<typeof shop> => Boolean(shop));
+    const decorated = await this.decorateShops(ordered, userId);
+
+    return {
+      items: decorated.map((shop) => ({
+        ...shop,
+        bookingCount: bookingCountByShop.get(shop.id) ?? 0,
+      })),
+    };
+  }
+
+  async listFavoriteShops(userId: string) {
+    const rows = await this.prisma.favoriteShop.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            phone: true,
+            email: true,
+            address: true,
+            city: true,
+            state: true,
+            pincode: true,
+            photoUrl: true,
+            openTime: true,
+            closeTime: true,
+            lunchStart: true,
+            lunchEnd: true,
+          },
+        },
+      },
+    });
+
+    return { items: await this.decorateShops(rows.map((row) => row.shop), userId) };
+  }
+
+  async addFavoriteShop(userId: string, shopId: string) {
+    const shop = await this.prisma.shop.findUnique({
+      where: { id: shopId },
+      select: { id: true },
+    });
+    if (!shop) {
+      throw new NotFoundException('Shop not found');
+    }
+
+    await this.prisma.favoriteShop.upsert({
+      where: { userId_shopId: { userId, shopId } },
+      create: { userId, shopId },
+      update: {},
+    });
+    return { shopId, isFavorite: true as const };
+  }
+
+  async removeFavoriteShop(userId: string, shopId: string) {
+    await this.prisma.favoriteShop.deleteMany({ where: { userId, shopId } });
+    return { shopId, isFavorite: false as const };
+  }
+
   /** Shop detail for the customer Book Appointment screen. */
-  async getShopById(shopId: string) {
+  async getShopById(shopId: string, userId?: string) {
     const shop = await this.prisma.shop.findUnique({
       where: { id: shopId },
       select: {
@@ -597,9 +913,11 @@ export class ShopService {
       shop;
 
     const bookableStaff = await this.normalizeBookableStaff(staff);
+    const favoriteIds = await this.favoriteShopIds([shopId], userId);
 
     return {
       ...serializePublicShop(shopFields),
+      isFavorite: favoriteIds.has(shopId),
       lunchStart,
       lunchEnd,
       holidays: holidays.map((h) => formatDateOnly(h.date)),

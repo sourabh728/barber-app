@@ -130,6 +130,7 @@ function RootNavigator() {
           <Stack.Screen name="settings" />
           <Stack.Screen name="help-support" />
           <Stack.Screen name="payment-methods" />
+          <Stack.Screen name="favorite-shops" />
           <Stack.Screen name="history/index" />
           <Stack.Screen name="history/[id]" />
           <Stack.Screen name="notifications" />

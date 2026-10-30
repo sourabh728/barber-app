@@ -396,6 +396,16 @@ export default function Profile() {
             <MenuItem
               colors={colors}
               styles={styles}
+              icon={<Ionicons name="heart" size={22} color="#E11D48" />}
+              title="Your favourite shops"
+              onPress={() => {
+                router.push("/favorite-shops");
+              }}
+            />
+
+            <MenuItem
+              colors={colors}
+              styles={styles}
               icon={<Ionicons name="scan-outline" size={22} color="#0EA5E9" />}
               title="Check in (scan shop QR)"
               onPress={() => {

@@ -40,6 +40,7 @@ import {
   formatShopAddress,
   getShopsErrorMessage,
   isShopOpenNow,
+  setShopFavorite,
   staffFirstName,
   type ShopDetail,
   type ShopServiceOption,
@@ -162,19 +163,30 @@ function buildTimeSlots(
   return slots;
 }
 
+/** How many barbers are already busy during this slot. */
+function slotBookedCount(
+  slotStart: string,
+  durationMinutes: number,
+  occupied: OccupiedSlotInterval[],
+) {
+  const start = toMinutes(slotStart);
+  if (start === null) return 0;
+  const slotEnd = fromMinutes(start + durationMinutes);
+  return occupied.filter(
+    (other) => slotStart < other.endTime && other.startTime < slotEnd,
+  ).length;
+}
+
 function slotOverlapsOccupied(
   slotStart: string,
   durationMinutes: number,
   occupied: OccupiedSlotInterval[],
   activeStaffCount = 1,
 ) {
-  const start = toMinutes(slotStart);
-  if (start === null) return false;
-  const slotEnd = fromMinutes(start + durationMinutes);
-  const overlapping = occupied.filter(
-    (other) => slotStart < other.endTime && other.startTime < slotEnd,
-  ).length;
-  return overlapping >= Math.max(1, activeStaffCount);
+  return (
+    slotBookedCount(slotStart, durationMinutes, occupied) >=
+    Math.max(1, activeStaffCount)
+  );
 }
 
 export default function ShopBookAppointmentScreen() {
@@ -248,6 +260,23 @@ export default function ShopBookAppointmentScreen() {
       setBookingLimit(null);
     }
   }, []);
+
+  const toggleFavorite = useCallback(async () => {
+    if (!shop) return;
+    const next = !shop.isFavorite;
+    setShop((current) => (current ? { ...current, isFavorite: next } : current));
+    try {
+      await setShopFavorite(shop.id, next);
+    } catch (err) {
+      setShop((current) =>
+        current ? { ...current, isFavorite: !next } : current,
+      );
+      showAppAlert(
+        "Favourite shops",
+        getShopsErrorMessage(err, "Could not update favourite shops."),
+      );
+    }
+  }, [shop]);
 
   useEffect(() => {
     if (!shopId || !selectedStaffId || !selectedDate) {
@@ -593,6 +622,26 @@ export default function ShopBookAppointmentScreen() {
             <Text style={styles.headerSubtitle}>Book Appointment</Text>
           </View>
 
+          {user?.role === "CUSTOMER" ? (
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => void toggleFavorite()}
+              accessibilityRole="button"
+              accessibilityState={{ selected: Boolean(shop.isFavorite) }}
+              accessibilityLabel={
+                shop.isFavorite
+                  ? "Remove from favourite shops"
+                  : "Add to favourite shops"
+              }
+            >
+              <Ionicons
+                name={shop.isFavorite ? "heart" : "heart-outline"}
+                size={18}
+                color={shop.isFavorite ? "#E11D48" : "#0F172A"}
+              />
+            </TouchableOpacity>
+          ) : null}
+
           <View
             style={[
               styles.statusBadge,
@@ -867,12 +916,13 @@ export default function ShopBookAppointmentScreen() {
               ) : (
                 <View style={styles.slotGrid}>
                   {timeSlots.map((slot) => {
-                    const booked = slotOverlapsOccupied(
-                      slot,
-                      durationMinutes,
-                      occupiedSlots,
-                      activeStaffCount,
+                    const totalBarbers = Math.max(1, activeStaffCount);
+                    const bookedCount = Math.min(
+                      totalBarbers,
+                      slotBookedCount(slot, durationMinutes, occupiedSlots),
                     );
+                    const booked = bookedCount >= totalBarbers;
+                    const fillPercent = (bookedCount / totalBarbers) * 100;
                     const selected = !booked && selectedStartTime === slot;
                     return (
                       <TouchableOpacity
@@ -885,7 +935,22 @@ export default function ShopBookAppointmentScreen() {
                         disabled={booked}
                         onPress={() => setSelectedStartTime(slot)}
                         accessibilityState={{ disabled: booked, selected }}
+                        accessibilityLabel={
+                          bookedCount > 0
+                            ? `${formatTime12h(slot)}, ${bookedCount} of ${totalBarbers} barbers booked`
+                            : formatTime12h(slot)
+                        }
                       >
+                        {bookedCount > 0 && !selected ? (
+                          <View
+                            pointerEvents="none"
+                            style={[
+                              styles.slotFill,
+                              booked ? styles.slotFillFull : null,
+                              { width: `${fillPercent}%` },
+                            ]}
+                          />
+                        ) : null}
                         <Text
                           style={[
                             styles.slotChipText,
@@ -895,6 +960,16 @@ export default function ShopBookAppointmentScreen() {
                         >
                           {formatTime12h(slot)}
                         </Text>
+                        {totalBarbers > 1 && bookedCount > 0 ? (
+                          <Text
+                            style={[
+                              styles.slotCountText,
+                              selected ? styles.chipTextSelected : null,
+                            ]}
+                          >
+                            {bookedCount}/{totalBarbers} booked
+                          </Text>
+                        ) : null}
                       </TouchableOpacity>
                     );
                   })}
@@ -1427,6 +1502,26 @@ const styles = StyleSheet.create({
     borderColor: "#CBD5E1",
     backgroundColor: "#E2E8F0",
     opacity: 0.7,
+  },
+  slotFill: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: "#FDE68A",
+    borderTopLeftRadius: 10,
+    borderBottomLeftRadius: 10,
+  },
+  slotFillFull: {
+    backgroundColor: "#CBD5E1",
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 10,
+  },
+  slotCountText: {
+    marginTop: 2,
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#475569",
   },
   slotChipTextBooked: {
     color: "#94A3B8",
