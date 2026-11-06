@@ -355,6 +355,45 @@ export default function AdminDashboardScreen() {
           />
         }
       >
+        {tab === "report" && overview ? (
+          <>
+            <View style={styles.summaryRow}>
+              {overview.shopList.slice(0, 4).map((shop) => (
+                <View key={shop.id} style={styles.summaryPill}>
+                  <Text style={styles.summaryPillText} numberOfLines={1}>
+                    {shop.name || "Shop"}
+                  </Text>
+                </View>
+              ))}
+              {Array.from({ length: Math.max(0, 4 - overview.shopList.length) }).map(
+                (_, index) => (
+                  <View key={`placeholder-${index}`} style={styles.summaryPillPlaceholder} />
+                ),
+              )}
+            </View>
+
+            <Text style={styles.sectionTitle}>All listed shops</Text>
+            <View style={styles.statGridOverview}>
+              <View style={styles.overviewCard}>
+                <Text style={styles.overviewLabel}>Shops</Text>
+                <Text style={styles.overviewValue}>{overview.shops}</Text>
+              </View>
+              <View style={styles.overviewCard}>
+                <Text style={styles.overviewLabel}>Customers</Text>
+                <Text style={styles.overviewValue}>{overview.customers}</Text>
+              </View>
+              <View style={styles.overviewCard}>
+                <Text style={styles.overviewLabel}>Barbers</Text>
+                <Text style={styles.overviewValue}>{overview.barbers}</Text>
+              </View>
+              <View style={styles.overviewCard}>
+                <Text style={styles.overviewLabel}>Bookings</Text>
+                <Text style={styles.overviewValue}>{overview.bookings.total}</Text>
+              </View>
+            </View>
+          </>
+        ) : null}
+
         {tab === "report" ? (
           <>
             <Text style={styles.sectionTitle}>Date-wise booking report</Text>
@@ -873,6 +912,40 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     gap: 10,
   },
+  summaryRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 4,
+    marginBottom: 10,
+    overflow: "hidden",
+  },
+  summaryPill: {
+    flex: 1,
+    minHeight: 54,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 16,
+    backgroundColor: "#0B5A47",
+    borderWidth: 1,
+    borderColor: "#0B5A47",
+    paddingHorizontal: 10,
+    opacity: 0.9,
+  },
+  summaryPillPlaceholder: {
+    flex: 1,
+    minHeight: 54,
+    borderRadius: 16,
+    backgroundColor: "#D9E8E1",
+    borderWidth: 1,
+    borderColor: "#C7DDD2",
+    opacity: 0.8,
+  },
+  summaryPillText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    textAlign: "center",
+  },
   sectionTitle: {
     marginTop: 10,
     fontSize: 16,
@@ -918,6 +991,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
+  },
+  statGridOverview: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  overviewCard: {
+    width: "48%",
+    minHeight: 120,
+    backgroundColor: "#F3F5F4",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#D5E3DC",
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    justifyContent: "center",
+  },
+  overviewLabel: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#334155",
+    marginBottom: 6,
+  },
+  overviewValue: {
+    fontSize: 32,
+    lineHeight: 36,
+    fontWeight: "800",
+    color: "#0F172A",
   },
   statCard: {
     width: "48%",
