@@ -1031,10 +1031,11 @@ export default function ShopBookAppointmentScreen() {
               <Text style={styles.reviewValue}>
                 {formatPaymentLabel(paymentSettings, totalAmount)}
               </Text>
-              {paymentSettings?.paymentMode === "ONLINE_FEE_REST_AT_SHOP" &&
+              {(paymentSettings?.paymentMode === "ONLINE_FEE_REST_AT_SHOP" ||
+                paymentSettings?.paymentMode === "PERCENTAGE_ONLINE_REST_AT_SHOP") &&
               paymentSettings.payoutUpiId ? (
                 <Text style={styles.bookedAs}>
-                  Pay booking fee to UPI {paymentSettings.payoutUpiId}
+                  Pay the upfront amount to UPI {paymentSettings.payoutUpiId}
                   {paymentSettings.payoutAccountName
                     ? ` (${paymentSettings.payoutAccountName})`
                     : ""}

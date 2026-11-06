@@ -46,7 +46,9 @@ export function BookingRejectedCard({
   const bodyCopy =
     paymentMode === "ONLINE_FEE_REST_AT_SHOP"
       ? `But don't worry, you can still get a great cut. Book another barber for that same slot with a small deposit of ₹${fee}, or find another time.`
-      : "But don't worry, you can still get a great cut. Book another barber for that same slot, or find another time that works for you.";
+      : paymentMode === "PERCENTAGE_ONLINE_REST_AT_SHOP"
+        ? `But don't worry, you can still get a great cut. Book another barber for that same slot and pay ${fee}% upfront, or find another time that works for you.`
+        : "But don't worry, you can still get a great cut. Book another barber for that same slot, or find another time that works for you.";
 
   return (
     <View style={styles.wrap}>

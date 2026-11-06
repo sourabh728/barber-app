@@ -91,9 +91,7 @@ export function BookingConfirmedCard({
     "Booking confirmed",
     `Slot confirmed: ${formatTime12h(booking.startTime)} – ${formatTime12h(booking.endTime)}`,
     `Date: ${formatConfirmDate(booking.date)}`,
-    paymentMode === "ONLINE_FEE_REST_AT_SHOP"
-      ? `Payment: ${paymentLine}`
-      : `Payment: pay at shop · ${paymentLine}`,
+    `Payment: ${paymentLine}`,
     arriveBy
       ? `Please arrive by ${arriveBy} (for ${formatTime12h(booking.startTime)} slot)`
       : `Shop: ${booking.shopName}`,

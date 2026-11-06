@@ -451,11 +451,15 @@ export class AdminService implements OnModuleInit {
       (totalsByStatus.IN_PROGRESS ?? 0) +
       (totalsByStatus.COMPLETED ?? 0);
 
-    const onlineFeePerBooking =
+    const estimatedOnlineFeesInr =
       settings.paymentMode === PaymentMode.ONLINE_FEE_REST_AT_SHOP
-        ? settings.bookingFeeInr
-        : 0;
-    const estimatedOnlineFeesInr = onlineFeePerBooking * billableCount;
+        ? settings.bookingFeeInr * billableCount
+        : settings.paymentMode === PaymentMode.PERCENTAGE_ONLINE_REST_AT_SHOP
+          ? Array.from(byShop.values()).reduce((sum, shopRow) => {
+              if (!shopRow.bookings) return sum;
+              return sum + shopRow.paymentTotalInr * (settings.bookingFeeInr / 100);
+            }, 0)
+          : 0;
 
     const shops = [...byShop.values()].sort((a, b) => b.bookings - a.bookings);
 

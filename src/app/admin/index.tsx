@@ -214,6 +214,10 @@ export default function AdminDashboardScreen() {
 
   async function savePayments() {
     const fee = Number(bookingFeeInr);
+    const mustRequirePayout =
+      paymentMode === "ONLINE_FEE_REST_AT_SHOP" ||
+      paymentMode === "PERCENTAGE_ONLINE_REST_AT_SHOP";
+
     if (
       paymentMode === "ONLINE_FEE_REST_AT_SHOP" &&
       (!Number.isFinite(fee) || fee < 1)
@@ -221,11 +225,19 @@ export default function AdminDashboardScreen() {
       showAppAlert("Invalid fee", "Enter a booking fee of at least ₹1.");
       return;
     }
+
     if (
-      paymentMode === "ONLINE_FEE_REST_AT_SHOP" &&
-      !payoutUpiId.trim() &&
-      !payoutAccountNumber.trim()
+      paymentMode === "PERCENTAGE_ONLINE_REST_AT_SHOP" &&
+      (!Number.isFinite(fee) || fee < 1 || fee > 100)
     ) {
+      showAppAlert(
+        "Invalid percentage",
+        "Choose a percentage from 1 to 100 for the upfront payment.",
+      );
+      return;
+    }
+
+    if (mustRequirePayout && !payoutUpiId.trim() && !payoutAccountNumber.trim()) {
       showAppAlert(
         "Payout account needed",
         "Add a UPI ID or bank account so customers know where to pay.",
@@ -237,7 +249,9 @@ export default function AdminDashboardScreen() {
     try {
       const updated = await updateAdminSettings({
         paymentMode,
-        bookingFeeInr: Number.isFinite(fee) ? Math.round(fee) : 11,
+        bookingFeeInr: Number.isFinite(fee)
+          ? Math.min(Math.max(Math.round(fee), 1), 100)
+          : 10,
         payoutAccountName: payoutAccountName.trim() || null,
         payoutUpiId: payoutUpiId.trim() || null,
         payoutBankName: payoutBankName.trim() || null,
@@ -449,9 +463,11 @@ export default function AdminDashboardScreen() {
                 </View>
                 <Text style={styles.help}>
                   Payment mode:{" "}
-                  {report.paymentMode === "ONLINE_FEE_REST_AT_SHOP"
-                    ? `₹${report.bookingFeeInr} online + rest at shop`
-                    : "Pay at shop"}
+                  {report.paymentMode === "PAY_AT_SHOP"
+                    ? "Pay at shop"
+                    : report.paymentMode === "ONLINE_FEE_REST_AT_SHOP"
+                      ? `₹${report.bookingFeeInr} online + rest at shop`
+                      : `${report.bookingFeeInr}% online + rest at shop`}
                 </Text>
 
                 <Text style={styles.sectionTitle}>By shop</Text>
@@ -580,13 +596,13 @@ export default function AdminDashboardScreen() {
               [
                 [
                   "PAY_AT_SHOP",
-                  "Pay at shop",
+                  "Pay 100% at shop",
                   "Full amount collected at the shop.",
                 ],
                 [
-                  "ONLINE_FEE_REST_AT_SHOP",
-                  "₹11 online + rest at shop",
-                  "Small booking fee online; balance after service.",
+                  "PERCENTAGE_ONLINE_REST_AT_SHOP",
+                  "Choose a percentage online + rest at shop",
+                  "Customers pay a percentage upfront and the remainder after service.",
                 ],
               ] as const
             ).map(([mode, title, desc]) => (
@@ -614,15 +630,20 @@ export default function AdminDashboardScreen() {
               </TouchableOpacity>
             ))}
 
-            {paymentMode === "ONLINE_FEE_REST_AT_SHOP" ? (
+            {paymentMode === "PERCENTAGE_ONLINE_REST_AT_SHOP" ? (
               <>
-                <Text style={styles.label}>Online booking fee (₹)</Text>
+                <Text style={styles.label}>Customer pays upfront (%)</Text>
                 <TextInput
                   style={styles.input}
                   keyboardType="number-pad"
                   value={bookingFeeInr}
                   onChangeText={setBookingFeeInr}
+                  placeholder="20"
+                  placeholderTextColor="#94A3B8"
                 />
+                <Text style={styles.help}>
+                  Example: 20 means customers pay 20% now and 80% at the shop.
+                </Text>
               </>
             ) : null}
 

@@ -306,6 +306,8 @@ enum PaymentMode {
   PAY_AT_SHOP
   /// Small online booking fee now; remaining balance at shop after service
   ONLINE_FEE_REST_AT_SHOP
+  /// Customers pay a percentage upfront and the rest at the shop
+  PERCENTAGE_ONLINE_REST_AT_SHOP
 }
 
 /// Singleton platform settings (id = "default") managed by ADMIN.
@@ -315,7 +317,7 @@ model AppSettings {
   maintenanceMessage    String      @default("Trimshim is under maintenance. We’ll be back shortly.")
   maintenanceUntil      DateTime?
   paymentMode           PaymentMode @default(PAY_AT_SHOP)
-  /// Online booking fee in INR when paymentMode is ONLINE_FEE_REST_AT_SHOP
+  /// Fixed booking fee in INR when paymentMode is ONLINE_FEE_REST_AT_SHOP, or the % value when paymentMode is PERCENTAGE_ONLINE_REST_AT_SHOP.
   bookingFeeInr         Int         @default(11)
   payoutAccountName     String?
   payoutUpiId           String?
