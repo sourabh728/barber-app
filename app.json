@@ -4,7 +4,7 @@
     "slug": "barber-app1",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/logo-glow.png",
     "scheme": [
       "barberapp",
       "com.barberapp1.app"
@@ -24,7 +24,6 @@
     },
     "android": {
       "package": "com.barberapp1.app",
-      "label": "Trimshim",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -56,7 +55,9 @@
           "icon": "./assets/images/android-icon-monochrome.png",
           "color": "#0B5A47",
           "defaultChannel": "booking-requests",
-          "sounds": ["./assets/sounds/incoming_booking.wav"]
+          "sounds": [
+            "./assets/sounds/incoming_booking.wav"
+          ]
         }
       ],
       [
@@ -80,7 +81,8 @@
         {
           "iosUrlScheme": "com.googleusercontent.apps.1027190803077-d4jo52678urbje0api4k2shl8gr797aq"
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
