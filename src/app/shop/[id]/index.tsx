@@ -1,19 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
 import {
-  Redirect,
-  useFocusEffect,
-  useLocalSearchParams,
-  useRouter,
+    Redirect,
+    useFocusEffect,
+    useLocalSearchParams,
+    useRouter,
 } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -22,34 +22,34 @@ import { BookingSuccessDialog } from "@/components/booking-success-dialog";
 import { isPlatformAdminUser } from "@/constants/platform-admin";
 import { useSession } from "@/context/session-provider";
 import {
-  createCustomerBooking,
-  fetchCustomerBookingLimit,
-  fetchMyBookings,
-  findOverlappingApprovedBooking,
-  getCustomerBookingErrorMessage,
-  type CustomerBooking,
-  type CustomerBookingLimit,
+    createCustomerBooking,
+    fetchCustomerBookingLimit,
+    fetchMyBookings,
+    findOverlappingApprovedBooking,
+    getCustomerBookingErrorMessage,
+    type CustomerBooking,
+    type CustomerBookingLimit,
 } from "@/services/customer-bookings-api";
-import { showAppAlert } from "@/utils/app-alert";
 import {
-  DEFAULT_SHOP_SERVICES,
-  fetchShopAvailability,
-  fetchShopById,
-  formatRatingSummary,
-  type OccupiedSlotInterval,
-  formatShopAddress,
-  getShopsErrorMessage,
-  isShopOpenNow,
-  setShopFavorite,
-  staffFirstName,
-  type ShopDetail,
-  type ShopServiceOption,
-} from "@/services/shops-api";
-import {
-  fetchPublicSettings,
-  formatPaymentLabel,
-  type PublicAppSettings,
+    fetchPublicSettings,
+    formatPaymentLabel,
+    type PublicAppSettings,
 } from "@/services/public-settings-api";
+import {
+    DEFAULT_SHOP_SERVICES,
+    fetchShopAvailability,
+    fetchShopById,
+    formatRatingSummary,
+    formatShopAddress,
+    getShopsErrorMessage,
+    isShopOpenNow,
+    setShopFavorite,
+    staffFirstName,
+    type OccupiedSlotInterval,
+    type ShopDetail,
+    type ShopServiceOption,
+} from "@/services/shops-api";
+import { showAppAlert } from "@/utils/app-alert";
 import { shopImageSource } from "@/utils/media";
 
 const STEPS = ["Services", "Barber", "Review"] as const;

@@ -1,32 +1,32 @@
+import { ShopLeaderboardView } from "@/components/shop-leaderboard";
+import { useSession } from "@/context/session-provider";
+import {
+  fetchAdminBookingsReport,
+  fetchAdminOverview,
+  fetchAdminSettings,
+  getAdminErrorMessage,
+  updateAdminSettings,
+  type AdminBookingsReport,
+  type AdminOverview,
+  type AdminSettings,
+} from "@/services/admin-api";
+import type { PaymentMode } from "@/services/public-settings-api";
+import { showAppAlert } from "@/utils/app-alert";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ShopLeaderboardView } from "@/components/shop-leaderboard";
-import { useSession } from "@/context/session-provider";
-import {
-    fetchAdminBookingsReport,
-    fetchAdminOverview,
-    fetchAdminSettings,
-    getAdminErrorMessage,
-    updateAdminSettings,
-    type AdminBookingsReport,
-    type AdminOverview,
-    type AdminSettings,
-} from "@/services/admin-api";
-import type { PaymentMode } from "@/services/public-settings-api";
-import { showAppAlert } from "@/utils/app-alert";
 
 type TabId = "report" | "shops" | "points" | "payments" | "takedown";
 

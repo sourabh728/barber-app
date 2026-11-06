@@ -1,18 +1,17 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import React from "react";
 import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 import { useSession } from "@/context/session-provider";
 import type { CustomerBooking } from "@/services/customer-bookings-api";
 import {
-  formatPaymentLabel,
-  type PublicAppSettings,
+    formatPaymentLabel,
+    type PublicAppSettings,
 } from "@/services/public-settings-api";
 
 type BookingConfirmedCardProps = {

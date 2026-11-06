@@ -1,23 +1,23 @@
 import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-  OnModuleInit,
+    BadRequestException,
+    Injectable,
+    NotFoundException,
+    OnModuleInit,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import {
-  AppointmentStatus,
-  PaymentMode,
-  UserRole,
+    AppointmentStatus,
+    PaymentMode,
+    UserRole,
 } from '../../generated/prisma/enums';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { buildShopQrValue } from '../verification/qr-tokens';
 import { pointsToNumber, roundPoints } from '../verification/scoring';
 import {
-  PLATFORM_ADMIN_EMAIL,
-  PLATFORM_ADMIN_NAME,
-  PLATFORM_ADMIN_PASSWORD,
+    PLATFORM_ADMIN_EMAIL,
+    PLATFORM_ADMIN_NAME,
+    PLATFORM_ADMIN_PASSWORD,
 } from './admin.constants';
 import { UpdateAdminSettingsDto } from './dto/update-admin-settings.dto';
 
