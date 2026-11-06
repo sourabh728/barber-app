@@ -13,7 +13,6 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import { ShopLeaderboardView } from "@/components/shop-leaderboard";
 import { useSession } from "@/context/session-provider";
 import {
