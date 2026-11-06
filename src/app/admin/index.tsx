@@ -2,29 +2,29 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { useSession } from "@/context/session-provider";
 import { ShopLeaderboardView } from "@/components/shop-leaderboard";
+import { useSession } from "@/context/session-provider";
 import {
-  fetchAdminBookingsReport,
-  fetchAdminOverview,
-  fetchAdminSettings,
-  getAdminErrorMessage,
-  updateAdminSettings,
-  type AdminBookingsReport,
-  type AdminOverview,
-  type AdminSettings,
+    fetchAdminBookingsReport,
+    fetchAdminOverview,
+    fetchAdminSettings,
+    getAdminErrorMessage,
+    updateAdminSettings,
+    type AdminBookingsReport,
+    type AdminOverview,
+    type AdminSettings,
 } from "@/services/admin-api";
 import type { PaymentMode } from "@/services/public-settings-api";
 import { showAppAlert } from "@/utils/app-alert";
@@ -814,18 +814,25 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   tab: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: "#D1E7DD",
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#EAF5F1",
+    borderWidth: 1,
+    borderColor: "#C9E2D7",
+    minWidth: 86,
+    alignItems: "center",
+    justifyContent: "center",
   },
   tabActive: {
     backgroundColor: "#0B5A47",
+    borderColor: "#0B5A47",
   },
   tabText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#334155",
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F172A",
+    textAlign: "center",
   },
   tabTextActive: {
     color: "#FFFFFF",
