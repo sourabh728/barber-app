@@ -1,44 +1,46 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Modal,
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  Vibration,
-  View,
+    ActivityIndicator,
+    Modal,
+    Platform,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextStyle,
+    TouchableOpacity,
+    Vibration,
+    View,
+    ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { useSession } from "@/context/session-provider";
 import { NewBookingRequestCard } from "@/components/new-booking-request-card";
 import { WalkInBookingDialog } from "@/components/walk-in-booking-dialog";
+import { useSession } from "@/context/session-provider";
 import {
-  fetchMyShopSchedule,
-  getScheduleErrorMessage,
-  type ShopSchedule,
-} from "@/services/shop-schedule-api";
-import {
-  fetchMyPendingShopAppointments,
-  fetchMyShopAppointments,
-  getAppointmentErrorMessage,
-  updateMyShopAppointment,
-  type AppointmentStatus,
-  type ShopAppointment,
+    fetchMyPendingShopAppointments,
+    fetchMyShopAppointments,
+    getAppointmentErrorMessage,
+    updateMyShopAppointment,
+    type AppointmentStatus,
+    type ShopAppointment,
 } from "@/services/shop-appointments-api";
 import {
-  fetchMyShopSetupProgress,
-  type ShopSetupProgress,
+    fetchMyShopSchedule,
+    getScheduleErrorMessage,
+    type ShopSchedule,
+} from "@/services/shop-schedule-api";
+import {
+    fetchMyShopSetupProgress,
+    type ShopSetupProgress,
 } from "@/services/shop-setup-api";
 import {
-  fetchMyShopStaff,
-  type ShopStaff,
+    fetchMyShopStaff,
+    type ShopStaff,
 } from "@/services/shop-staff-api";
 import { showAppAlert } from "@/utils/app-alert";
 
@@ -545,8 +547,8 @@ export function BarberHomeScreen() {
 
     const labelTime = `${formatTime12h(block.startTime)} – ${formatTime12h(block.endTime)}`;
     let subtitle = "Available";
-    let slotStyle = styles.slotAvailable;
-    let textStyle = styles.slotTextAvailable;
+    let slotStyle: ViewStyle = styles.slotAvailable;
+    let textStyle: TextStyle = styles.slotTextAvailable;
 
     if (block.status === "booked" && block.appointment) {
       subtitle = `Booked – ${customerShortName(block.appointment.customerName)}`;
