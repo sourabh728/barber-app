@@ -1,15 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Audio } from "expo-av";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import {
-  Modal,
-  Platform,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  Vibration,
-  View,
+    Modal,
+    Platform,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    Vibration,
+    View,
 } from "react-native";
 
 import type { ShopAppointment } from "@/services/shop-appointments-api";
@@ -59,63 +58,28 @@ export function IncomingBookingCallModal({
   onReject,
   onSuggestSlot,
 }: IncomingBookingCallModalProps) {
-  const soundRef = useRef<Audio.Sound | null>(null);
   const vibrateTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
+    if (!appointment) return;
 
-    async function startRing() {
-      if (!appointment) return;
-
-      if (Platform.OS !== "web") {
-        if (Platform.OS === "android") {
-          Vibration.vibrate([0, 800, 400, 800, 400], true);
-        } else {
-          vibrateTimer.current = setInterval(() => {
-            Vibration.vibrate(600);
-          }, 1400);
-        }
-      }
-
-      try {
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
-          shouldDuckAndroid: false,
-        });
-        const { sound } = await Audio.Sound.createAsync(
-          require("../../assets/sounds/incoming_booking.wav"),
-          { isLooping: true, volume: 1 },
-        );
-        if (cancelled) {
-          await sound.unloadAsync();
-          return;
-        }
-        soundRef.current = sound;
-        await sound.playAsync();
-      } catch {
-        // Vibration still alerts if audio fails.
+    if (Platform.OS !== "web") {
+      if (Platform.OS === "android") {
+        Vibration.vibrate([0, 800, 400, 800, 400], true);
+      } else {
+        vibrateTimer.current = setInterval(() => {
+          Vibration.vibrate(600);
+        }, 1400);
       }
     }
 
-    void startRing();
-
     return () => {
-      cancelled = true;
       if (Platform.OS === "android") {
         Vibration.cancel();
       }
       if (vibrateTimer.current) {
         clearInterval(vibrateTimer.current);
         vibrateTimer.current = null;
-      }
-      const sound = soundRef.current;
-      soundRef.current = null;
-      if (sound) {
-        void sound.stopAsync().finally(() => {
-          void sound.unloadAsync();
-        });
       }
     };
   }, [appointment?.id]);
