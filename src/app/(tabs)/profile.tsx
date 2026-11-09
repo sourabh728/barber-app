@@ -207,7 +207,7 @@ export default function Profile() {
         {isBarber ? (
           <TouchableOpacity
             style={styles.stat}
-            onPress={() => router.push("/barber/shop-leaderboard")}
+            onPress={() => router.navigate("/leaderboard")}
             accessibilityRole="button"
             accessibilityLabel="View points leaderboard"
           >
@@ -320,10 +320,10 @@ export default function Profile() {
             <MenuItem
               colors={colors}
               styles={styles}
-              icon={<Ionicons name="trophy-outline" size={22} color="#EAB308" />}
-              title="Leaderboard"
+              icon={<Ionicons name="bar-chart-outline" size={22} color="#EAB308" />}
+              title="Report"
               onPress={() => {
-                router.push("/barber/shop-leaderboard");
+                router.push("/barber/report");
               }}
             />
 

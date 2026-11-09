@@ -31,12 +31,11 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      {/* Report tab is barber/shop-owner only; customers never see Bookings or Report. */}
-      <NativeTabs.Trigger name="report" hidden={!isBarber || isAdmin}>
-        <NativeTabs.Trigger.Label>Report</NativeTabs.Trigger.Label>
+      <NativeTabs.Trigger name="leaderboard" hidden={!isBarber || isAdmin}>
+        <NativeTabs.Trigger.Label>Leaderboard</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/booking.png')}
-          renderingMode="template"
+          sf="trophy"
+          md="leaderboard"
         />
       </NativeTabs.Trigger>
 

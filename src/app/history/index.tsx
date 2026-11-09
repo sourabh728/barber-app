@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import type { AppColors } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
+import { useForegroundPolling } from "@/hooks/use-booking-status-polling";
 
 import {
   fetchMyBookings,
@@ -90,6 +91,21 @@ export default function CustomerHistoryScreen() {
   const [bookings, setBookings] = useState<CustomerBooking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [pollError, setPollError] = useState("");
+
+  const refreshBookings = useCallback(
+    (signal: AbortSignal) => fetchMyBookings(undefined, signal),
+    [],
+  );
+  const onBookingsUpdate = useCallback((list: CustomerBooking[]) => {
+    setBookings(list);
+    setPollError("");
+  }, []);
+  const onPollingError = useCallback((error: unknown) => {
+    setPollError(
+      `Could not refresh booking status: ${getCustomerBookingErrorMessage(error)} Retrying automatically.`,
+    );
+  }, []);
 
   const loadBookings = useCallback(async () => {
     setErrorMessage("");
@@ -110,6 +126,13 @@ export default function CustomerHistoryScreen() {
     useCallback(() => {
       void loadBookings();
     }, [loadBookings]),
+  );
+
+  useForegroundPolling(
+    !isLoading && !errorMessage && bookings.length > 0,
+    refreshBookings,
+    onBookingsUpdate,
+    onPollingError,
   );
 
   return (
@@ -157,6 +180,11 @@ export default function CustomerHistoryScreen() {
             <Text style={styles.emptyText}>No bookings yet</Text>
           ) : (
             <>
+              {pollError ? (
+                <Text style={styles.errorText} accessibilityLiveRegion="polite">
+                  {pollError}
+                </Text>
+              ) : null}
               <Text style={styles.subtitle}>
                 {bookings.length}{" "}
                 {bookings.length === 1 ? "booking" : "bookings"} so far
@@ -405,4 +433,3 @@ function createStyles(colors: AppColors) {
   },
 });
 }
-

@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IncomingBookingCallModal } from "@/components/incoming-booking-call-modal";
+import { SuggestBookingSlotModal } from "@/components/suggest-booking-slot-modal";
 import { useSession } from "@/context/session-provider";
 import {
   fetchMyPendingShopAppointments,
@@ -26,6 +27,11 @@ import {
   type ShopStaff,
 } from "@/services/shop-staff-api";
 import { showAppAlert } from "@/utils/app-alert";
+import {
+  reconcileDismissedRequests,
+  selectRingingRequest,
+  type DismissedRequests,
+} from "@/utils/incoming-booking-state";
 
 /**
  * App-wide host: polls PENDING requests for barbers and rings like an
@@ -43,12 +49,15 @@ export function BarberIncomingCallHost() {
   );
   const [assignStaffId, setAssignStaffId] = useState<string | null>(null);
   const [activeStaff, setActiveStaff] = useState<ShopStaff[]>([]);
+  const [suggestTarget, setSuggestTarget] = useState<ShopAppointment | null>(null);
+  const [dismissedRequests, setDismissedRequests] = useState<DismissedRequests>({});
 
   const loadPending = useCallback(async () => {
     if (!session || !isBarber) return;
     try {
       const list = await fetchMyPendingShopAppointments();
       setPending(list);
+      setDismissedRequests((current) => reconcileDismissedRequests(current, list));
     } catch {
       // Keep last list; next poll retries.
     }
@@ -57,6 +66,8 @@ export function BarberIncomingCallHost() {
   useEffect(() => {
     if (!session || !isBarber) {
       setPending([]);
+      setDismissedRequests({});
+      setSuggestTarget(null);
       return;
     }
 
@@ -85,8 +96,11 @@ export function BarberIncomingCallHost() {
     };
   }, [session, isBarber, loadPending]);
 
-  const ringing =
-    !acceptTarget && pending.length > 0 ? pending[0] : null;
+  const ringing = selectRingingRequest(
+    pending,
+    dismissedRequests,
+    Boolean(acceptTarget || suggestTarget),
+  );
 
   const patchStatus = async (
     appointment: ShopAppointment,
@@ -150,10 +164,20 @@ export function BarberIncomingCallHost() {
           if (ringing) void patchStatus(ringing, "REJECTED");
         }}
         onSuggestSlot={() => {
-          showAppAlert(
-            "Suggest a time",
-            "Open Home → Incoming Requests → Suggest slot to offer another time.",
-          );
+          if (!ringing) return;
+          setDismissedRequests((current) => ({ ...current, [ringing.id]: "dismissed" }));
+          setSuggestTarget(ringing);
+        }}
+      />
+
+      <SuggestBookingSlotModal
+        appointment={suggestTarget}
+        onClose={() => setSuggestTarget(null)}
+        onSuggested={(updated) => {
+          setDismissedRequests((current) => ({ ...current, [updated.id]: "suggested" }));
+          setPending((current) => current.map((item) => item.id === updated.id ? updated : item));
+          setSuggestTarget(null);
+          void loadPending();
         }}
       />
 

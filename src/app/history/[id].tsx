@@ -18,6 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import type { AppColors } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
+import { useBookingStatusPolling } from "@/hooks/use-booking-status-polling";
 
 import { BookingConfirmedCard } from "@/components/booking-confirmed-card";
 import { BookingRejectedCard } from "@/components/booking-rejected-card";
@@ -192,6 +193,22 @@ export default function BookingRequestDetailScreen() {
     null,
   );
   const [serviceQrLoading, setServiceQrLoading] = useState(false);
+  const [pollError, setPollError] = useState("");
+
+  const onBookingUpdate = useCallback((data: CustomerBooking) => {
+    setBooking((current) =>
+      current && current.id === data.id && current.updatedAt > data.updatedAt
+        ? current
+        : data,
+    );
+    setPollError("");
+  }, []);
+
+  const onPollingError = useCallback((error: unknown) => {
+    setPollError(
+      `Could not refresh booking status: ${getCustomerBookingErrorMessage(error)} Retrying automatically.`,
+    );
+  }, []);
 
   const loadBooking = useCallback(async () => {
     if (!bookingId) {
@@ -206,6 +223,7 @@ export default function BookingRequestDetailScreen() {
     try {
       const data = await fetchMyBooking(bookingId);
       setBooking(data);
+      setIsLoading(false);
       try {
         const [v, pay] = await Promise.all([
           fetchBookingVerification(bookingId),
@@ -233,6 +251,13 @@ export default function BookingRequestDetailScreen() {
     useCallback(() => {
       void loadBooking();
     }, [loadBooking]),
+  );
+
+  useBookingStatusPolling(
+    bookingId,
+    Boolean(booking && !isLoading && !cancelling && !responding),
+    onBookingUpdate,
+    onPollingError,
   );
 
   const runCancel = async () => {
@@ -334,6 +359,11 @@ export default function BookingRequestDetailScreen() {
             </View>
           ) : (
             <>
+              {pollError ? (
+                <Text style={styles.errorText} accessibilityLiveRegion="polite">
+                  {pollError}
+                </Text>
+              ) : null}
               {booking.status === "CONFIRMED" ? (
                 <BookingConfirmedCard
                   booking={booking}
@@ -896,4 +926,3 @@ function createStyles(colors: AppColors) {
   },
 });
 }
-

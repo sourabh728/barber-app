@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useCallback, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -10,9 +10,13 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useBookingStatusPolling } from "@/hooks/use-booking-status-polling";
+import { getCustomerBookingErrorMessage, type CustomerBooking } from "@/services/customer-bookings-api";
+
 type BookingSuccessDialogProps = {
   visible: boolean;
   shopName?: string;
+  bookingId: string | null;
   /** Opens the request details / waiting status screen. */
   onViewRequest: () => void;
 };
@@ -20,9 +24,23 @@ type BookingSuccessDialogProps = {
 export function BookingSuccessDialog({
   visible,
   shopName,
+  bookingId,
   onViewRequest,
 }: BookingSuccessDialogProps) {
   const insets = useSafeAreaInsets();
+  const [pollError, setPollError] = useState("");
+  const onUpdate = useCallback((booking: CustomerBooking) => {
+    setPollError("");
+    if (booking.status !== "PENDING" || booking.proposedStartTime) {
+      onViewRequest();
+    }
+  }, [onViewRequest]);
+  const onError = useCallback((error: unknown) => {
+    setPollError(
+      `Could not refresh booking status: ${getCustomerBookingErrorMessage(error)} Retrying automatically.`,
+    );
+  }, []);
+  useBookingStatusPolling(bookingId, visible, onUpdate, onError);
 
   return (
     <Modal
@@ -53,6 +71,11 @@ export function BookingSuccessDialog({
             <View style={styles.statusDot} />
             <Text style={styles.statusText}>Pending approval</Text>
           </View>
+          {pollError ? (
+            <Text style={styles.errorText} accessibilityLiveRegion="polite">
+              {pollError}
+            </Text>
+          ) : null}
 
           <TouchableOpacity
             style={styles.primaryButton}
@@ -145,6 +168,11 @@ const styles = StyleSheet.create({
     color: "#92400E",
     fontWeight: "700",
     fontSize: 12,
+  },
+  errorText: {
+    color: "#B91C1C",
+    marginBottom: 12,
+    textAlign: "center",
   },
 
   primaryButton: {

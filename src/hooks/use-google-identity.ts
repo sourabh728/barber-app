@@ -30,10 +30,10 @@ export type GoogleIdentity = {
   name?: string;
 };
 
-export function useGoogleIdentity() {
+export function useGoogleIdentity(initialIdentity: GoogleIdentity | null = null) {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [identity, setIdentity] = useState<GoogleIdentity | null>(null);
+  const [identity, setIdentity] = useState<GoogleIdentity | null>(initialIdentity);
   const isSubmitting = useRef(false);
 
   const googleConfigured = isGoogleAuthConfigured();

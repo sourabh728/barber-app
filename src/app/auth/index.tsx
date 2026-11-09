@@ -33,7 +33,7 @@ export default function LoginScreen() {
     googleRequestReady,
     handleEmailLogin,
     handleGoogleLogin,
-  } = useLoginActions({ role: "CUSTOMER" });
+  } = useLoginActions();
 
   return (
     <SafeAreaView style={styles.container}>

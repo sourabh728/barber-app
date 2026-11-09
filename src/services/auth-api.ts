@@ -180,6 +180,17 @@ export async function loginWithGoogleIdToken(
   return response.data;
 }
 
+export type GoogleSignInResponse =
+  | { found: true; accessToken: string; user: LoginResponse["user"] }
+  | { found: false; email: string; name?: string };
+
+export async function signInWithGoogleIdToken(idToken: string) {
+  const response = await api.post<GoogleSignInResponse>("/auth/google/sign-in", {
+    idToken,
+  });
+  return response.data;
+}
+
 export async function fetchCurrentUser() {
   const response = await api.get<CurrentUserResponse>("/auth/me");
   return response.data;

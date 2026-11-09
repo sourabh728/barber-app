@@ -39,17 +39,21 @@ export type CustomerBookingStats = {
   scoredBookings: number;
 };
 
-export async function fetchMyBookings(params?: { status?: AppointmentStatus }) {
+export async function fetchMyBookings(
+  params?: { status?: AppointmentStatus },
+  signal?: AbortSignal,
+) {
   const response = await api.get<CustomerBooking[]>(
     "/customers/me/appointments",
-    { params },
+    { params, signal },
   );
   return response.data;
 }
 
-export async function fetchMyBooking(appointmentId: string) {
+export async function fetchMyBooking(appointmentId: string, signal?: AbortSignal) {
   const response = await api.get<CustomerBooking>(
     `/customers/me/appointments/${appointmentId}`,
+    { signal },
   );
   return response.data;
 }

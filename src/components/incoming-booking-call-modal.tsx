@@ -1,7 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useAudioPlayer, useAudioPlayerStatus, type AudioPlayer } from "expo-audio";
 import { useEffect, useRef } from "react";
 import {
+    AppState,
     Modal,
     Platform,
     StyleSheet,
@@ -12,6 +14,7 @@ import {
 } from "react-native";
 
 import type { ShopAppointment } from "@/services/shop-appointments-api";
+import { showAppAlert } from "@/utils/app-alert";
 
 type IncomingBookingCallModalProps = {
   appointment: ShopAppointment | null;
@@ -47,6 +50,11 @@ function formatDateLabel(dateKey: string) {
   });
 }
 
+function playRingtone(player: AudioPlayer) {
+  player.loop = true;
+  player.play();
+}
+
 /**
  * Full-screen “incoming call” UI for a PENDING booking request.
  * Rings with vibration + looping ringtone until the barber acts.
@@ -58,22 +66,37 @@ export function IncomingBookingCallModal({
   onReject,
   onSuggestSlot,
 }: IncomingBookingCallModalProps) {
+  if (!appointment) return null;
+
+  return (
+    <RingingBookingCall
+      appointment={appointment}
+      busy={busy}
+      onAccept={onAccept}
+      onReject={onReject}
+      onSuggestSlot={onSuggestSlot}
+    />
+  );
+}
+
+function RingingBookingCall({
+  appointment,
+  busy = false,
+  onAccept,
+  onReject,
+  onSuggestSlot,
+}: IncomingBookingCallModalProps & { appointment: ShopAppointment }) {
+  const player = useAudioPlayer(require("@/assets/sounds/incoming_booking.wav"));
+  const audioStatus = useAudioPlayerStatus(player);
   const vibrateTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (!appointment) return;
-
-    if (Platform.OS !== "web") {
-      if (Platform.OS === "android") {
-        Vibration.vibrate([0, 800, 400, 800, 400], true);
-      } else {
-        vibrateTimer.current = setInterval(() => {
-          Vibration.vibrate(600);
-        }, 1400);
+    const stop = () => {
+      try {
+        player.pause();
+      } catch (error) {
+        console.error("Could not stop the booking ringtone:", error);
       }
-    }
-
-    return () => {
       if (Platform.OS === "android") {
         Vibration.cancel();
       }
@@ -82,9 +105,46 @@ export function IncomingBookingCallModal({
         vibrateTimer.current = null;
       }
     };
-  }, [appointment?.id]);
 
-  if (!appointment) return null;
+    const start = () => {
+      try {
+        playRingtone(player);
+      } catch (error) {
+        console.error("Could not play the booking ringtone:", error);
+        showAppAlert(
+          "Ringtone unavailable",
+          "Could not play the booking ringtone. Check your device sound settings.",
+        );
+      }
+      if (Platform.OS === "android") {
+        Vibration.vibrate([0, 800, 400, 800, 400], true);
+      } else if (Platform.OS === "ios" && !vibrateTimer.current) {
+        Vibration.vibrate();
+        vibrateTimer.current = setInterval(() => {
+          Vibration.vibrate(600);
+        }, 1400);
+      }
+    };
+
+    if (AppState.currentState === "active" || AppState.currentState === null) {
+      start();
+    }
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") start();
+      else stop();
+    });
+
+    return () => {
+      subscription.remove();
+      stop();
+    };
+  }, [appointment.id, player]);
+
+  useEffect(() => {
+    if (audioStatus.error) {
+      console.error("Booking ringtone playback failed:", audioStatus.error);
+    }
+  }, [audioStatus.error]);
 
   return (
     <Modal
@@ -102,6 +162,11 @@ export function IncomingBookingCallModal({
       >
         <Text style={styles.eyebrow}>Incoming booking request</Text>
         <Text style={styles.title}>New booking</Text>
+        {audioStatus.error ? (
+          <Text style={styles.audioError} accessibilityLiveRegion="polite">
+            Ringtone unavailable. Check your device sound settings.
+          </Text>
+        ) : null}
 
         <View style={styles.pulse}>
           <View style={styles.avatar}>
@@ -187,6 +252,11 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "800",
     marginBottom: 28,
+  },
+  audioError: {
+    color: "#FECACA",
+    marginBottom: 12,
+    textAlign: "center",
   },
   pulse: {
     width: 140,

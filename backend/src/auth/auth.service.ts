@@ -456,6 +456,37 @@ export class AuthService {
     };
   }
 
+  async signInWithGoogle(dto: GoogleIdTokenDto) {
+    const { email, name } = await this.verifyGoogleIdToken(dto.idToken);
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: publicUserSelect,
+    });
+
+    if (!user) {
+      if (email === PLATFORM_ADMIN_EMAIL) {
+        throw new ForbiddenException(
+          'This email is reserved for the platform administrator. Sign in with email and password.',
+        );
+      }
+
+      return { found: false as const, email, name };
+    }
+
+    const verifiedUser = user.emailVerified
+      ? user
+      : await this.prisma.user.update({
+          where: { id: user.id },
+          data: { emailVerified: true },
+          select: publicUserSelect,
+        });
+
+    return {
+      found: true as const,
+      ...(await this.issueAuthResponse(verifiedUser)),
+    };
+  }
+
   async loginWithGoogle(googleLoginDto: GoogleLoginDto) {
     const { email, name: googleName } = await this.verifyGoogleIdToken(
       googleLoginDto.idToken,

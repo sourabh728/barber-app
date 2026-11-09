@@ -5,13 +5,13 @@ import * as Google from "expo-auth-session/providers/google";
 import * as WebBrowser from "expo-web-browser";
 
 import { isPlatformAdminUser } from "@/constants/platform-admin";
+import { usePendingGoogleIdentity } from "@/context/pending-google-identity";
 import { useSession } from "@/context/session-provider";
 import {
   fetchCurrentUser,
   loginWithEmail,
-  loginWithGoogleIdToken,
+  signInWithGoogleIdToken,
   sessionUserFromLogin,
-  type GoogleLoginRole,
 } from "@/services/auth-api";
 import {
   getGoogleAuthSessionErrorMessage,
@@ -37,14 +37,10 @@ WebBrowser.maybeCompleteAuthSession();
 const GOOGLE_NOT_CONFIGURED =
   "Google Sign-In is not configured. Add Google client IDs to continue.";
 
-type UseLoginActionsOptions = {
-  role?: GoogleLoginRole;
-};
-
-export function useLoginActions(options: UseLoginActionsOptions = {}) {
+export function useLoginActions() {
   const router = useRouter();
   const { signIn } = useSession();
-  const intendedRole = options.role ?? "CUSTOMER";
+  const { setPendingIdentity } = usePendingGoogleIdentity();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -154,6 +150,7 @@ export function useLoginActions(options: UseLoginActionsOptions = {}) {
     }
 
     setErrorMessage("");
+    setPendingIdentity(null);
 
     if (!googleConfigured) {
       setErrorMessage(GOOGLE_NOT_CONFIGURED);
@@ -211,7 +208,12 @@ export function useLoginActions(options: UseLoginActionsOptions = {}) {
         }
       }
 
-      const data = await loginWithGoogleIdToken(idToken, intendedRole);
+      const data = await signInWithGoogleIdToken(idToken);
+      if (!data.found) {
+        setPendingIdentity({ idToken, email: data.email, name: data.name });
+        router.push("/auth/choose-registration");
+        return;
+      }
       await completeLogin(data.accessToken, data.user);
     } catch (error: unknown) {
       const nativeMessage = getNativeGoogleSignInErrorMessage(error);
