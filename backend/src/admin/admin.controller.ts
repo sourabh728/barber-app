@@ -55,6 +55,11 @@ export class AdminController {
     return this.adminService.createShopQrCode(dto.name);
   }
 
+  @Get('qr-codes/:id/svg')
+  async qrCodeSvg(@Param('id') id: string) {
+    return { svg: await this.adminService.getShopQrCodeSvg(id) };
+  }
+
   @Delete('qr-codes/:id')
   deleteQrCode(@Param('id') id: string) {
     return this.adminService.deleteShopQrCode(id);

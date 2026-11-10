@@ -34,7 +34,9 @@ export class MaintenanceInterceptor implements NestInterceptor {
       path.startsWith('/auth') ||
       path.startsWith('/settings') ||
       path === '/health' ||
-      path === '/';
+      path === '/' ||
+      path === '/admin' ||
+      path === '/admin/';
 
     if (allowlisted) {
       return next.handle();

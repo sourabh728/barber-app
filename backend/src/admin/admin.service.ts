@@ -5,6 +5,7 @@ import {
     OnModuleInit,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import QRCode from 'qrcode';
 import {
     AppointmentStatus,
     PaymentMode,
@@ -58,6 +59,18 @@ export class AdminService implements OnModuleInit {
       claimedAt: c.claimedAt,
       createdAt: c.createdAt,
     }));
+  }
+
+  async getShopQrCodeSvg(id: string) {
+    const code = await this.prisma.shopQrCode.findUnique({ where: { id } });
+    if (!code) {
+      throw new NotFoundException('QR code not found.');
+    }
+    return QRCode.toString(buildShopQrValue(code.token), {
+      type: 'svg',
+      margin: 1,
+      width: 180,
+    });
   }
 
   async createShopQrCode(name: string) {
