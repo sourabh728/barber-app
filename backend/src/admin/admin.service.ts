@@ -229,7 +229,7 @@ export class AdminService implements OnModuleInit {
       shops,
       detailedShops,
       customerRows,
-    ] = await Promise.all([
+    ] = (await Promise.all([
       this.prisma.shop.count(),
       this.prisma.user.count({ where: { role: UserRole.CUSTOMER } }),
       this.prisma.user.count({ where: { role: UserRole.BARBER } }),
@@ -258,6 +258,18 @@ export class AdminService implements OnModuleInit {
           actualStartAt: true,
           createdAt: true,
           shop: { select: { id: true, name: true } },
+        },
+      }),
+      this.prisma.shop.findMany({
+        orderBy: { name: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          city: true,
+          state: true,
+          address: true,
+          owner: { select: { id: true, name: true, email: true, phone: true } },
+          _count: { select: { appointments: true, staff: true } },
         },
       }),
       this.prisma.shop.findMany({
@@ -335,7 +347,101 @@ export class AdminService implements OnModuleInit {
           },
         },
       }),
-    ]);
+    ])) as [
+      number,
+      number,
+      number,
+      Array<{ status: AppointmentStatus; _count: { _all: number } }>,
+      {
+        _sum: {
+          bookingScore: number | null;
+          basePoints: number | null;
+          punctualityPoints: number | null;
+        };
+        _count: { _all: number };
+        _avg: { bookingScore: number | null; punctualityPoints: number | null };
+      },
+      Array<{
+        id: string;
+        status: AppointmentStatus;
+        serviceName: string;
+        customerName: string;
+        date: Date;
+        startTime: string;
+        bookingScore: number | null;
+        arrivedAt: Date | null;
+        actualStartAt: Date | null;
+        createdAt: Date;
+        shop: { id: string; name: string };
+      }>,
+      Array<{
+        id: string;
+        name: string;
+        city: string | null;
+        state: string | null;
+        address: string | null;
+        owner: { id: string; name: string; email: string; phone: string | null };
+        _count: { appointments: number; staff: number };
+      }>,
+      Array<{
+        id: string;
+        name: string;
+        city: string | null;
+        state: string | null;
+        address: string | null;
+        pincode: string | null;
+        phone: string | null;
+        email: string | null;
+        openTime: string;
+        closeTime: string;
+        lunchStart: string;
+        lunchEnd: string;
+        barberCount: number;
+        owner: { id: string; name: string; email: string; phone: string | null };
+        createdAt: Date;
+        updatedAt: Date;
+        holidays: { date: Date }[];
+        staff: Array<{
+          id: string;
+          name: string;
+          title: string | null;
+          phone: string | null;
+          status: string;
+          leaveReturnDate: Date | null;
+          awayUntil: Date | null;
+          createdAt: Date;
+          updatedAt: Date;
+        }>;
+        services: Array<{
+          id: string;
+          name: string;
+          priceInr: number;
+          durationMin: number;
+          active: boolean;
+          sortOrder: number | null;
+        }>;
+        _count: { appointments: number; staff: number };
+      }>,
+      Array<{
+        id: string;
+        name: string;
+        email: string;
+        phone: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        _count: { appointments: number };
+        appointments: Array<{
+          id: string;
+          status: AppointmentStatus;
+          serviceName: string;
+          priceInr: number;
+          date: Date;
+          startTime: string;
+          createdAt: Date;
+          shop: { id: string; name: string };
+        }>;
+      }>,
+    ];
 
     const shopPoints = await this.prisma.appointment.groupBy({
       by: ['shopId'],
@@ -454,7 +560,7 @@ export class AdminService implements OnModuleInit {
       };
     });
 
-    const customerDirectory = customerRows.map((customer) => ({
+    const customerDirectory = (customerRows ?? []).map((customer) => ({
       id: customer.id,
       name: customer.name,
       email: customer.email,
