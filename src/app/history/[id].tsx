@@ -1,18 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import {
-  useFocusEffect,
-  useLocalSearchParams,
-  useRouter,
+    useFocusEffect,
+    useLocalSearchParams,
+    useRouter,
 } from "expo-router";
-import React, { useCallback, useState , useMemo} from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -23,25 +23,25 @@ import { BookingConfirmedCard } from "@/components/booking-confirmed-card";
 import { BookingRejectedCard } from "@/components/booking-rejected-card";
 import { CancelBookingDialog } from "@/components/cancel-booking-dialog";
 import {
-  cancelMyBooking,
-  fetchMyBooking,
-  getCustomerBookingErrorMessage,
-  respondToSlotSuggestion,
-  type CustomerBooking,
+    cancelMyBooking,
+    fetchMyBooking,
+    getCustomerBookingErrorMessage,
+    respondToSlotSuggestion,
+    type CustomerBooking,
 } from "@/services/customer-bookings-api";
+import {
+    fetchPublicSettings,
+    formatPaymentLabel,
+    type PublicAppSettings,
+} from "@/services/public-settings-api";
 import type { AppointmentStatus } from "@/services/shop-appointments-api";
 import {
-  fetchBookingVerification,
-  getVerificationErrorMessage,
-  issueServiceStartQr,
-  type BookingVerification,
-  type ServiceStartQrResponse,
+    fetchBookingVerification,
+    getVerificationErrorMessage,
+    issueServiceStartQr,
+    type BookingVerification,
+    type ServiceStartQrResponse,
 } from "@/services/verification-api";
-import {
-  fetchPublicSettings,
-  formatPaymentLabel,
-  type PublicAppSettings,
-} from "@/services/public-settings-api";
 import { showAppAlert } from "@/utils/app-alert";
 import QRCode from "react-native-qrcode-svg";
 
@@ -101,9 +101,9 @@ function statusMeta(status: AppointmentStatus, mutedColor: string) {
       return {
         label: "Approved",
         color: "#60A5FA",
-        bannerTitle: "Appointment confirmed",
+        bannerTitle: "Request approved",
         bannerBody:
-          "Your request was accepted. Please arrive on time for your booking.",
+          "Your request was approved. Please pay first to confirm your booking.",
       };
     case "IN_PROGRESS":
       return {
@@ -132,7 +132,7 @@ function statusMeta(status: AppointmentStatus, mutedColor: string) {
         color: "#F87171",
         bannerTitle: "Request declined",
         bannerBody:
-          "The shop declined this request. You can book another time from Home.",
+          "The shop declined this request. Please raise a new request for another time or barber.",
       };
     default:
       return {

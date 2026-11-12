@@ -44,15 +44,15 @@ export function BookingRejectedCard({
 
   const bodyCopy =
     paymentMode === "ONLINE_FEE_REST_AT_SHOP"
-      ? `But don't worry, you can still get a great cut. Book another barber for that same slot with a small deposit of ₹${fee}, or find another time.`
+      ? `Your request was not accepted. Please raise a new request for another time or barber. You can try another slot with a small deposit of ₹${fee}, or choose a different barber.`
       : paymentMode === "PERCENTAGE_ONLINE_REST_AT_SHOP"
-        ? `But don't worry, you can still get a great cut. Book another barber for that same slot and pay ${fee}% upfront, or find another time that works for you.`
-        : "But don't worry, you can still get a great cut. Book another barber for that same slot, or find another time that works for you.";
+        ? `Your request was not accepted. Please raise a new request for another time or barber. You can try another slot and pay ${fee}% upfront, or choose a different barber.`
+        : "Your request was not accepted. Please raise a new request for another time or barber, or try a different slot.";
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.heading}>Advance Payment</Text>
-      <Text style={styles.subheading}>Booking is out</Text>
+      <Text style={styles.heading}>Request declined</Text>
+      <Text style={styles.subheading}>Please raise a new request.</Text>
 
       <LinearGradient
         colors={["#B45309", "#EAB308", "#FDE047"]}
@@ -80,9 +80,9 @@ export function BookingRejectedCard({
       </LinearGradient>
 
       <TouchableOpacity
-        onPress={onViewOtherBarbers}
+        onPress={onViewOtherSlots}
         accessibilityRole="button"
-        accessibilityLabel="View other barbers"
+        accessibilityLabel="Try another slot or barber"
         activeOpacity={0.9}
       >
         <LinearGradient
@@ -91,25 +91,8 @@ export function BookingRejectedCard({
           end={{ x: 1, y: 1 }}
           style={styles.actionButton}
         >
-          <Ionicons name="people-outline" size={18} color="#F8FAFC" />
-          <Text style={styles.actionButtonText}>View Other Barbers</Text>
-        </LinearGradient>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        onPress={onViewOtherSlots}
-        accessibilityRole="button"
-        accessibilityLabel="View other slots"
-        activeOpacity={0.9}
-      >
-        <LinearGradient
-          colors={["#4ADE80", "#16A34A"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.actionButton}
-        >
-          <Ionicons name="calendar-outline" size={18} color="#F8FAFC" />
-          <Text style={styles.actionButtonText}>View Other Slots</Text>
+          <Ionicons name="home-outline" size={18} color="#F8FAFC" />
+          <Text style={styles.actionButtonText}>Try another slot or barber</Text>
         </LinearGradient>
       </TouchableOpacity>
     </View>

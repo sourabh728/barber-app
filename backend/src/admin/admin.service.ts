@@ -214,6 +214,8 @@ export class AdminService implements OnModuleInit {
       scoredAgg,
       recentBookings,
       shops,
+      detailedShops,
+      customerRows,
     ] = await Promise.all([
       this.prisma.shop.count(),
       this.prisma.user.count({ where: { role: UserRole.CUSTOMER } }),
@@ -253,8 +255,71 @@ export class AdminService implements OnModuleInit {
           city: true,
           state: true,
           address: true,
-          owner: { select: { name: true, email: true, phone: true } },
+          pincode: true,
+          phone: true,
+          email: true,
+          openTime: true,
+          closeTime: true,
+          lunchStart: true,
+          lunchEnd: true,
+          barberCount: true,
+          owner: { select: { id: true, name: true, email: true, phone: true } },
+          createdAt: true,
+          updatedAt: true,
+          holidays: { select: { date: true }, orderBy: { date: 'asc' } },
+          staff: {
+            select: {
+              id: true,
+              name: true,
+              title: true,
+              phone: true,
+              status: true,
+              leaveReturnDate: true,
+              awayUntil: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+            orderBy: { name: 'asc' },
+          },
+          services: {
+            select: {
+              id: true,
+              name: true,
+              priceInr: true,
+              durationMin: true,
+              active: true,
+              sortOrder: true,
+            },
+            orderBy: { sortOrder: 'asc' },
+          },
           _count: { select: { appointments: true, staff: true } },
+        },
+      }),
+      this.prisma.user.findMany({
+        where: { role: UserRole.CUSTOMER },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          createdAt: true,
+          updatedAt: true,
+          _count: { select: { appointments: true } },
+          appointments: {
+            orderBy: { createdAt: 'desc' },
+            take: 6,
+            select: {
+              id: true,
+              status: true,
+              serviceName: true,
+              priceInr: true,
+              date: true,
+              startTime: true,
+              createdAt: true,
+              shop: { select: { id: true, name: true } },
+            },
+          },
         },
       }),
     ]);
@@ -292,7 +357,7 @@ export class AdminService implements OnModuleInit {
     }
 
     const shopList = shops.map((s) => {
-      const pts = pointsByShop.get(s.id) ?? {
+      const points = pointsByShop.get(s.id) ?? {
         totalPoints: 0,
         basePoints: 0,
         punctualityPoints: 0,
@@ -309,12 +374,96 @@ export class AdminService implements OnModuleInit {
         ownerPhone: s.owner.phone,
         bookings: s._count.appointments,
         staff: s._count.staff,
-        totalPoints: pts.totalPoints,
-        basePoints: pts.basePoints,
-        punctualityPoints: pts.punctualityPoints,
-        scoredBookings: pts.scoredBookings,
+        totalPoints: points.totalPoints,
+        basePoints: points.basePoints,
+        punctualityPoints: points.punctualityPoints,
+        scoredBookings: points.scoredBookings,
       };
     });
+
+    const shopDirectory = detailedShops.map((shop) => {
+      const points = pointsByShop.get(shop.id) ?? {
+        totalPoints: 0,
+        basePoints: 0,
+        punctualityPoints: 0,
+        scoredBookings: 0,
+      };
+
+      return {
+        id: shop.id,
+        name: shop.name,
+        city: shop.city,
+        state: shop.state,
+        address: shop.address,
+        pincode: shop.pincode,
+        phone: shop.phone,
+        email: shop.email,
+        owner: shop.owner
+          ? {
+              id: shop.owner.id,
+              name: shop.owner.name,
+              email: shop.owner.email,
+              phone: shop.owner.phone,
+            }
+          : null,
+        openTime: shop.openTime,
+        closeTime: shop.closeTime,
+        lunchStart: shop.lunchStart,
+        lunchEnd: shop.lunchEnd,
+        barberCount: shop.barberCount,
+        holidayDates: shop.holidays.map((holiday) => holiday.date.toISOString().slice(0, 10)),
+        staff: shop.staff.map((member) => ({
+          id: member.id,
+          name: member.name,
+          title: member.title,
+          phone: member.phone,
+          status: member.status,
+          leaveReturnDate: member.leaveReturnDate?.toISOString().slice(0, 10) ?? null,
+          awayUntil: member.awayUntil?.toISOString() ?? null,
+          createdAt: member.createdAt.toISOString(),
+          updatedAt: member.updatedAt.toISOString(),
+        })),
+        services: shop.services.map((service) => ({
+          id: service.id,
+          name: service.name,
+          priceInr: service.priceInr,
+          durationMin: service.durationMin,
+          active: service.active,
+          sortOrder: service.sortOrder,
+        })),
+        bookings: shop._count.appointments,
+        totalPoints: points.totalPoints,
+        basePoints: points.basePoints,
+        punctualityPoints: points.punctualityPoints,
+        scoredBookings: points.scoredBookings,
+        createdAt: shop.createdAt.toISOString(),
+        updatedAt: shop.updatedAt.toISOString(),
+      };
+    });
+
+    const customerDirectory = customerRows.map((customer) => ({
+      id: customer.id,
+      name: customer.name,
+      email: customer.email,
+      phone: customer.phone,
+      address: null,
+      createdAt: customer.createdAt.toISOString(),
+      updatedAt: customer.updatedAt.toISOString(),
+      bookingCount: customer._count.appointments,
+      lastBookingAt:
+        customer.appointments[0]?.createdAt?.toISOString() ?? null,
+      bookings: customer.appointments.map((booking) => ({
+        id: booking.id,
+        status: booking.status,
+        serviceName: booking.serviceName,
+        priceInr: booking.priceInr,
+        date: booking.date.toISOString().slice(0, 10),
+        startTime: booking.startTime,
+        createdAt: booking.createdAt.toISOString(),
+        shopName: booking.shop.name,
+        shopId: booking.shop.id,
+      })),
+    }));
 
     return {
       shops: shopCount,
@@ -333,6 +482,8 @@ export class AdminService implements OnModuleInit {
         averagePunctuality: pts(scoredAgg._avg.punctualityPoints),
       },
       shopList,
+      shopDirectory,
+      customerDirectory,
       shopPointsLeaderboard: [...shopList]
         .sort((a, b) => b.totalPoints - a.totalPoints)
         .map((s, index) => ({

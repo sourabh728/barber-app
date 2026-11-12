@@ -1,38 +1,38 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  Vibration,
-  View,
+    ActivityIndicator,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    Vibration,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-  createMyShopAppointment,
-  getAppointmentErrorMessage,
+    createMyShopAppointment,
+    getAppointmentErrorMessage,
 } from "@/services/shop-appointments-api";
 import {
-  fetchMyShopServices,
-  getShopServiceErrorMessage,
-  type ShopServiceItem,
+    fetchMyShopServices,
+    getShopServiceErrorMessage,
+    type ShopServiceItem,
 } from "@/services/shop-services-api";
 import {
-  fetchMyShopStaff,
-  getStaffErrorMessage,
-  type ShopStaff,
+    fetchMyShopStaff,
+    getStaffErrorMessage,
+    type ShopStaff,
 } from "@/services/shop-staff-api";
 import {
-  phoneValidationError,
-  sanitizePhoneInput,
+    phoneValidationError,
+    sanitizePhoneInput,
 } from "@/utils/phone";
 
 type WalkInBookingDialogProps = {
@@ -40,6 +40,7 @@ type WalkInBookingDialogProps = {
   date: string;
   startTime: string;
   endTime: string;
+  occupiedStaffIds?: string[];
   onClose: () => void;
   onCreated: () => void;
 };
@@ -60,6 +61,7 @@ export function WalkInBookingDialog({
   date,
   startTime,
   endTime,
+  occupiedStaffIds = [],
   onClose,
   onCreated,
 }: WalkInBookingDialogProps) {
@@ -74,6 +76,14 @@ export function WalkInBookingDialog({
   const [staffId, setStaffId] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+
+  const availableStaff = useMemo(
+    () =>
+      staff.filter(
+        (member) => !occupiedStaffIds.includes(member.id),
+      ),
+    [occupiedStaffIds, staff],
+  );
 
   useEffect(() => {
     if (!visible) return;
@@ -99,8 +109,11 @@ export function WalkInBookingDialog({
         );
         setServices(activeServices);
         setStaff(activeStaff);
-        if (activeStaff.length === 1) {
-          setStaffId(activeStaff[0].id);
+        const firstAvailable = activeStaff.find(
+          (member) => !occupiedStaffIds.includes(member.id),
+        );
+        if (firstAvailable) {
+          setStaffId(firstAvailable.id);
         }
       })
       .catch((err) => {
@@ -117,7 +130,7 @@ export function WalkInBookingDialog({
     return () => {
       cancelled = true;
     };
-  }, [visible]);
+  }, [occupiedStaffIds, visible]);
 
   const selectedServices = useMemo(
     () => services.filter((service) => selectedServiceIds.includes(service.id)),
@@ -138,8 +151,9 @@ export function WalkInBookingDialog({
   };
 
   const submit = async () => {
-    if (!staffId) {
-      setError("Choose a service provider.");
+    const selectedStaff = staff.find((member) => member.id === staffId);
+    if (!selectedStaff || occupiedStaffIds.includes(selectedStaff.id)) {
+      setError("Choose a barber that is still available for this slot.");
       return;
     }
     if (selectedServices.length === 0) {
@@ -216,20 +230,36 @@ export function WalkInBookingDialog({
                     <Text style={styles.linkButtonText}>Manage Staff</Text>
                   </TouchableOpacity>
                 </View>
+              ) : availableStaff.length === 0 ? (
+                <View style={styles.emptyBox}>
+                  <Text style={styles.empty}>
+                    All active barbers are already booked for this time. Remove or reschedule one to add another walk-in.
+                  </Text>
+                </View>
               ) : (
                 <View style={styles.chipRow}>
                   {staff.map((member) => {
                     const selected = staffId === member.id;
+                    const unavailable = occupiedStaffIds.includes(member.id);
                     return (
                       <TouchableOpacity
                         key={member.id}
-                        style={[styles.chip, selected && styles.chipSelected]}
-                        onPress={() => setStaffId(member.id)}
+                        style={[
+                          styles.chip,
+                          selected && styles.chipSelected,
+                          unavailable && styles.chipDisabled,
+                        ]}
+                        onPress={() => {
+                          if (unavailable) return;
+                          setStaffId(member.id);
+                        }}
+                        disabled={unavailable || saving}
                       >
                         <Text
                           style={[
                             styles.chipText,
                             selected && styles.chipTextSelected,
+                            unavailable && styles.chipTextDisabled,
                           ]}
                         >
                           {member.name.split(/\s+/)[0]}
@@ -314,8 +344,11 @@ export function WalkInBookingDialog({
               {error ? <Text style={styles.error}>{error}</Text> : null}
 
               <TouchableOpacity
-                style={[styles.saveButton, saving && { opacity: 0.65 }]}
-                disabled={saving}
+                style={[
+                  styles.saveButton,
+                  (saving || availableStaff.length === 0) && { opacity: 0.65 },
+                ]}
+                disabled={saving || availableStaff.length === 0}
                 onPress={() => void submit()}
               >
                 {saving ? (
@@ -411,8 +444,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#0B5A47",
     borderColor: "#0B5A47",
   },
+  chipDisabled: {
+    backgroundColor: "#E2E8F0",
+    borderColor: "#CBD5E1",
+    opacity: 0.7,
+  },
   chipText: { fontWeight: "700", color: "#334155" },
   chipTextSelected: { color: "#FFFFFF" },
+  chipTextDisabled: { color: "#94A3B8" },
   serviceRow: {
     flexDirection: "row",
     alignItems: "center",

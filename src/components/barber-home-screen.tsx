@@ -59,6 +59,8 @@ type SlotBlock =
       endTime: string;
       status: "available" | "booked" | "pending" | "walkin";
       appointment: ShopAppointment | null;
+      bookedStaffIds: string[];
+      totalBarbers: number;
     };
 
 function toDateKey(date: Date) {
@@ -166,6 +168,7 @@ function buildDaySlotBlocks(
   schedule: ShopSchedule,
   dateKey: string,
   appointments: ShopAppointment[],
+  activeStaff: ShopStaff[],
 ): SlotBlock[] {
   const open = toMinutes(schedule.openTime);
   const close = toMinutes(schedule.closeTime);
@@ -178,6 +181,9 @@ function buildDaySlotBlocks(
   const now = new Date();
   const isToday = dateKey === toDateKey(now);
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const activeBarbers = activeStaff.filter(
+    (staff) => staff.status === "ACTIVE" || staff.status === "AWAY",
+  );
 
   for (
     let start = open;
@@ -215,11 +221,17 @@ function buildDaySlotBlocks(
       continue;
     }
 
-    const appointment = findOverlappingAppointment(
-      appointments,
-      startTime,
-      endTime,
+    const overlapping = appointments.filter(
+      (item) =>
+        isActiveAppointment(item) &&
+        intervalsOverlap(startTime, endTime, item.startTime, item.endTime),
     );
+    const bookedStaffIds = [...new Set(
+      overlapping
+        .map((item) => item.staffId)
+        .filter((staffId): staffId is string => Boolean(staffId)),
+    )];
+    const appointment = overlapping[0] ?? null;
 
     let status: "available" | "booked" | "pending" | "walkin" = "available";
     if (appointment) {
@@ -238,6 +250,8 @@ function buildDaySlotBlocks(
       endTime,
       status,
       appointment,
+      bookedStaffIds,
+      totalBarbers: activeBarbers.length,
     });
   }
 
@@ -330,6 +344,7 @@ export function BarberHomeScreen() {
   const [walkInSlot, setWalkInSlot] = useState<{
     startTime: string;
     endTime: string;
+    occupiedStaffIds: string[];
   } | null>(null);
   const [setupProgress, setSetupProgress] = useState<ShopSetupProgress | null>(
     null,
@@ -349,16 +364,22 @@ export function BarberHomeScreen() {
     setError(null);
 
     try {
-      const [scheduleData, upcoming, pending, setup] = await Promise.all([
+      const [scheduleData, upcoming, pending, setup, staffList] = await Promise.all([
         fetchMyShopSchedule(),
         fetchMyShopAppointments({ date: todayKey, tab: "upcoming" }),
         fetchMyPendingShopAppointments(),
         fetchMyShopSetupProgress().catch(() => null),
+        fetchMyShopStaff(),
       ]);
       setSchedule(scheduleData);
       setAppointments(upcoming);
       setPendingAll(pending);
       setSetupProgress(setup);
+      setActiveStaff(
+        staffList.filter(
+          (member) => member.status === "ACTIVE" || member.status === "AWAY",
+        ),
+      );
     } catch (err) {
       setError(
         getScheduleErrorMessage(err) || getAppointmentErrorMessage(err),
@@ -400,8 +421,8 @@ export function BarberHomeScreen() {
 
   const slotBlocks = useMemo(() => {
     if (!schedule) return [];
-    return buildDaySlotBlocks(schedule, todayKey, appointments);
-  }, [appointments, schedule, todayKey]);
+    return buildDaySlotBlocks(schedule, todayKey, appointments, activeStaff);
+  }, [activeStaff, appointments, schedule, todayKey]);
 
   const patchStatus = async (
     appointment: ShopAppointment,
@@ -546,12 +567,18 @@ export function BarberHomeScreen() {
     }
 
     const labelTime = `${formatTime12h(block.startTime)} – ${formatTime12h(block.endTime)}`;
-    let subtitle = "Available";
+    const availableBarbers = block.totalBarbers - block.bookedStaffIds.length;
+    const canLongPress = block.totalBarbers > 0 && availableBarbers > 0;
+    let subtitle = block.totalBarbers > 0 && block.bookedStaffIds.length > 0
+      ? `${Math.min(block.bookedStaffIds.length, block.totalBarbers)}/${block.totalBarbers} barbers booked`
+      : "Available";
     let slotStyle: ViewStyle = styles.slotAvailable;
     let textStyle: TextStyle = styles.slotTextAvailable;
 
     if (block.status === "booked" && block.appointment) {
-      subtitle = `Booked – ${customerShortName(block.appointment.customerName)}`;
+      subtitle = block.totalBarbers > 0
+        ? `${Math.min(block.bookedStaffIds.length, block.totalBarbers)}/${block.totalBarbers} barbers booked · ${customerShortName(block.appointment.customerName)}`
+        : `Booked – ${customerShortName(block.appointment.customerName)}`;
       slotStyle = styles.slotBooked;
       textStyle = styles.slotTextBooked;
     } else if (block.status === "pending" && block.appointment) {
@@ -564,27 +591,37 @@ export function BarberHomeScreen() {
       textStyle = styles.slotTextWalkIn;
     }
 
+    if (block.totalBarbers > 0 && block.bookedStaffIds.length >= block.totalBarbers) {
+      subtitle = "All barbers booked";
+    }
+
     return (
       <Pressable
         key={`${block.startTime}-${index}`}
         style={[styles.slotBlock, slotStyle]}
-        disabled={block.status !== "available"}
+        disabled={false}
         delayLongPress={1000}
+        onPress={() => {
+          if (block.appointment && !canLongPress) {
+            router.push("/barber/appointments");
+          }
+        }}
         onLongPress={() => {
-          if (block.status !== "available") return;
+          if (!canLongPress) return;
           if (Platform.OS !== "web") {
             Vibration.vibrate([0, 30, 40, 30]);
           }
           setWalkInSlot({
             startTime: block.startTime,
             endTime: block.endTime,
+            occupiedStaffIds: block.bookedStaffIds,
           });
         }}
       >
         <Text style={[styles.slotTime, textStyle]}>{labelTime}</Text>
         <Text style={[styles.slotSubtitle, textStyle]} numberOfLines={2}>
           {subtitle}
-          {block.status === "available" ? " · hold 1s" : ""}
+          {canLongPress ? " · hold 1s" : ""}
         </Text>
       </Pressable>
     );
@@ -860,6 +897,7 @@ export function BarberHomeScreen() {
         date={todayKey}
         startTime={walkInSlot?.startTime ?? "09:00"}
         endTime={walkInSlot?.endTime ?? "09:45"}
+        occupiedStaffIds={walkInSlot?.occupiedStaffIds ?? []}
         onClose={() => setWalkInSlot(null)}
         onCreated={() => {
           void loadDashboard(true);

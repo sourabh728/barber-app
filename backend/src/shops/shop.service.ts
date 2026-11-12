@@ -1,34 +1,48 @@
 import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import {
-  AppointmentStatus,
-  StaffStatus,
-  UserRole,
+    AppointmentStatus,
+    StaffStatus,
+    UserRole,
 } from '../../generated/prisma/enums';
 
-import { NotificationsService } from '../notifications/notifications.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { VerificationService } from '../verification/verification.service';
-import { parseShopQrValue } from '../verification/qr-tokens';
 import {
-  BUSINESS_TIMEZONE,
-  formatDateKeyInTimeZone,
-  pointsToNumber,
-  roundPoints,
-} from '../verification/scoring';
-import {
-  uniqueLocationNames,
-  withNormalizedLocation,
+    uniqueLocationNames,
+    withNormalizedLocation,
 } from '../common/location';
 import {
-  publicUploadPath,
-  tryDeleteUpload,
+    publicUploadPath,
+    tryDeleteUpload,
 } from '../common/upload';
+import { NotificationsService } from '../notifications/notifications.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { parseShopQrValue } from '../verification/qr-tokens';
+import {
+    BUSINESS_TIMEZONE,
+    formatDateKeyInTimeZone,
+    pointsToNumber,
+    roundPoints,
+} from '../verification/scoring';
+import { VerificationService } from '../verification/verification.service';
+import { CreateAppointmentDto } from './dto/create-appointment.dto';
+import { CreateCustomerAppointmentDto } from './dto/create-customer-appointment.dto';
+import { CreateShopServiceDto } from './dto/create-shop-service.dto';
+import { CreateShopStaffDto } from './dto/create-shop-staff.dto';
+import { CreateShopDto } from './dto/create-shop.dto';
+import {
+    AppointmentTabValue,
+} from './dto/list-appointments.query.dto';
+import { ListShopsQueryDto } from './dto/list-shops.query.dto';
+import { UpdateAppointmentDto } from './dto/update-appointment.dto';
+import { UpdateShopScheduleDto } from './dto/update-shop-schedule.dto';
+import { UpdateShopServiceDto } from './dto/update-shop-service.dto';
+import { UpdateShopStaffDto } from './dto/update-shop-staff.dto';
+import { UpdateShopDto } from './dto/update-shop.dto';
 
 function appointmentStatusLabel(status: AppointmentStatus): string {
   switch (status) {
@@ -46,20 +60,6 @@ function appointmentStatusLabel(status: AppointmentStatus): string {
       return 'rejected';
   }
 }
-import { CreateAppointmentDto } from './dto/create-appointment.dto';
-import { CreateCustomerAppointmentDto } from './dto/create-customer-appointment.dto';
-import { CreateShopDto } from './dto/create-shop.dto';
-import { CreateShopStaffDto } from './dto/create-shop-staff.dto';
-import { CreateShopServiceDto } from './dto/create-shop-service.dto';
-import {
-  AppointmentTabValue,
-} from './dto/list-appointments.query.dto';
-import { ListShopsQueryDto } from './dto/list-shops.query.dto';
-import { UpdateAppointmentDto } from './dto/update-appointment.dto';
-import { UpdateShopDto } from './dto/update-shop.dto';
-import { UpdateShopScheduleDto } from './dto/update-shop-schedule.dto';
-import { UpdateShopServiceDto } from './dto/update-shop-service.dto';
-import { UpdateShopStaffDto } from './dto/update-shop-staff.dto';
 
 function toDateOnlyUtc(isoDate: string): Date {
   // Parse YYYY-MM-DD as UTC midnight so @db.Date stays stable across TZ.
@@ -2307,14 +2307,23 @@ export class ShopService {
 
       if (changes.length > 0) {
         const suggestedNewTime = scheduleChanged && !statusChanged;
-        const title = suggestedNewTime
-          ? 'New time suggested'
-          : statusChanged
-            ? `Booking ${appointmentStatusLabel(appointment.status)}`
-            : 'Booking updated';
-        const body = `Your booking at ${existing.shop.name} for ${appointment.serviceName} ${changes.join(' and ')}.${
+        let title = 'Booking updated';
+        let body = `Your booking at ${existing.shop.name} for ${appointment.serviceName} ${changes.join(' and ')}.${
           suggestedNewTime ? ' Open History to review.' : ''
         }`;
+
+        if (statusChanged && appointment.status === AppointmentStatus.CONFIRMED) {
+          title = 'Booking approved';
+          body = `Your request for ${appointment.serviceName} at ${existing.shop.name} has been approved. Please pay first to confirm your booking.`;
+        } else if (statusChanged && appointment.status === AppointmentStatus.REJECTED) {
+          title = 'Request declined';
+          body = `Your request for ${appointment.serviceName} at ${existing.shop.name} was not accepted. Please raise a new request for another time or barber.`;
+        } else if (suggestedNewTime) {
+          title = 'New time suggested';
+          body = `Your booking at ${existing.shop.name} for ${appointment.serviceName} ${changes.join(' and ')}. Open History to review.`;
+        } else if (statusChanged) {
+          title = `Booking ${appointmentStatusLabel(appointment.status)}`;
+        }
 
         await this.notificationsService.create({
           userId: existing.customerId,

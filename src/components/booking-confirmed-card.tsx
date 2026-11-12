@@ -86,8 +86,8 @@ export function BookingConfirmedCard({
   const paymentMode = paymentSettings?.paymentMode ?? "PAY_AT_SHOP";
 
   const statusLines = [
-    "Request accepted",
-    "Booking confirmed",
+    "Request approved",
+    "Please pay first to confirm booking",
     `Slot confirmed: ${formatTime12h(booking.startTime)} – ${formatTime12h(booking.endTime)}`,
     `Date: ${formatConfirmDate(booking.date)}`,
     `Payment: ${paymentLine}`,
@@ -101,8 +101,8 @@ export function BookingConfirmedCard({
       <Text style={styles.heading}>Booking Confirmation</Text>
       <Text style={styles.subheading}>
         {paymentMode === "ONLINE_FEE_REST_AT_SHOP"
-          ? "Your booking is confirmed"
-          : "Your booking is confirmed"}
+          ? "Your booking is approved. Please pay first to confirm it."
+          : "Your booking is approved. Please pay first to confirm it."}
       </Text>
 
       <View style={styles.profileBlock}>

@@ -1,14 +1,14 @@
 import { ShopLeaderboardView } from "@/components/shop-leaderboard";
 import { useSession } from "@/context/session-provider";
 import {
-  fetchAdminBookingsReport,
-  fetchAdminOverview,
-  fetchAdminSettings,
-  getAdminErrorMessage,
-  updateAdminSettings,
-  type AdminBookingsReport,
-  type AdminOverview,
-  type AdminSettings,
+    fetchAdminBookingsReport,
+    fetchAdminOverview,
+    fetchAdminSettings,
+    getAdminErrorMessage,
+    updateAdminSettings,
+    type AdminBookingsReport,
+    type AdminOverview,
+    type AdminSettings,
 } from "@/services/admin-api";
 import type { PaymentMode } from "@/services/public-settings-api";
 import { showAppAlert } from "@/utils/app-alert";
@@ -16,19 +16,19 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-type TabId = "report" | "shops" | "points" | "payments" | "takedown";
+type TabId = "report" | "shops" | "customers" | "points" | "payments" | "takedown";
 
 function todayKey() {
   const d = new Date();
@@ -90,6 +90,7 @@ export default function AdminDashboardScreen() {
   const [settings, setSettings] = useState<AdminSettings | null>(null);
   const [report, setReport] = useState<AdminBookingsReport | null>(null);
   const [shopQuery, setShopQuery] = useState("");
+  const [customerQuery, setCustomerQuery] = useState("");
   const [fromDate, setFromDate] = useState(daysAgoKey(7));
   const [toDate, setToDate] = useState(todayKey());
 
@@ -171,15 +172,44 @@ export default function AdminDashboardScreen() {
   const filteredShops = useMemo(() => {
     const q = shopQuery.trim().toLowerCase();
     if (!overview) return [];
-    if (!q) return overview.shopList;
-    return overview.shopList.filter(
-      (s) =>
-        s.name.toLowerCase().includes(q) ||
-        (s.city ?? "").toLowerCase().includes(q) ||
-        s.ownerName.toLowerCase().includes(q) ||
-        s.ownerEmail.toLowerCase().includes(q),
-    );
+    const shops = overview.shopDirectory?.length ? overview.shopDirectory : overview.shopList;
+    if (!q) return shops;
+    return shops.filter((s) => {
+      const name = s.name;
+      const city = s.city ?? "";
+      const ownerName =
+        "ownerName" in s
+          ? s.ownerName
+          : "owner" in s && s.owner
+            ? s.owner.name
+            : "";
+      const ownerEmail =
+        "ownerEmail" in s
+          ? s.ownerEmail
+          : "owner" in s && s.owner
+            ? s.owner.email
+            : "";
+      return (
+        name.toLowerCase().includes(q) ||
+        city.toLowerCase().includes(q) ||
+        ownerName.toLowerCase().includes(q) ||
+        ownerEmail.toLowerCase().includes(q)
+      );
+    });
   }, [overview, shopQuery]);
+
+  const filteredCustomers = useMemo(() => {
+    const q = customerQuery.trim().toLowerCase();
+    if (!overview) return [];
+    const customers = overview.customerDirectory ?? [];
+    if (!q) return customers;
+    return customers.filter(
+      (customer) =>
+        customer.name.toLowerCase().includes(q) ||
+        customer.email.toLowerCase().includes(q) ||
+        (customer.phone ?? "").toLowerCase().includes(q),
+    );
+  }, [customerQuery, overview]);
 
   async function saveMaintenance() {
     if (maintenanceEnabled && !maintenanceMessage.trim()) {
@@ -279,6 +309,7 @@ export default function AdminDashboardScreen() {
   const tabs: { id: TabId; label: string }[] = [
     { id: "report", label: "Report" },
     { id: "shops", label: "Shops" },
+    { id: "customers", label: "Customers" },
     { id: "points", label: "Points" },
     { id: "payments", label: "Pay" },
     { id: "takedown", label: "Down" },
@@ -565,29 +596,106 @@ export default function AdminDashboardScreen() {
             {filteredShops.length === 0 ? (
               <Text style={styles.muted}>No shops match.</Text>
             ) : (
-              filteredShops.map((shop) => (
-                <View key={shop.id} style={styles.shopRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.shopName}>{shop.name}</Text>
-                    <Text style={styles.shopMeta}>
-                      {[shop.city, shop.state].filter(Boolean).join(", ") ||
-                        "Location n/a"}
-                    </Text>
-                    {shop.address ? (
-                      <Text style={styles.shopMeta}>{shop.address}</Text>
-                    ) : null}
-                    <Text style={styles.shopMeta}>
-                      {shop.ownerName} · {shop.ownerEmail}
-                    </Text>
+              filteredShops.map((shop) => {
+                const shopInfo = "ownerName" in shop ? shop : null;
+                const richShop = "holidayDates" in shop ? shop : null;
+                const location = [shop.city, shop.state].filter(Boolean).join(", ") || "Location n/a";
+                const ownerName =
+                  shopInfo?.ownerName ??
+                  ("owner" in shop && shop.owner ? shop.owner.name : undefined) ??
+                  "Unknown owner";
+                const ownerEmail =
+                  shopInfo?.ownerEmail ??
+                  ("owner" in shop && shop.owner ? shop.owner.email : undefined) ??
+                  "—";
+                const holidayText = richShop?.holidayDates?.length
+                  ? richShop.holidayDates.slice(0, 3).join(", ")
+                  : "No holiday dates";
+                const staffCount = typeof shop.staff === "number" ? shop.staff : shop.staff.length;
+
+                return (
+                  <View key={shop.id} style={[styles.shopRow, styles.shopDetailCard]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.shopName}>{shop.name}</Text>
+                      <Text style={styles.shopMeta}>{location}</Text>
+                      {shop.address ? (
+                        <Text style={styles.shopMeta}>{shop.address}</Text>
+                      ) : null}
+                      <Text style={styles.shopMeta}>{ownerName} · {ownerEmail}</Text>
+                      {richShop ? (
+                        <>
+                          <Text style={styles.shopMeta}>
+                            Hours: {richShop.openTime}–{richShop.closeTime} · Lunch {richShop.lunchStart}–{richShop.lunchEnd}
+                          </Text>
+                          <Text style={styles.shopMeta}>
+                            Barbers: {richShop.barberCount} · Holidays: {holidayText}
+                          </Text>
+                        </>
+                      ) : null}
+                    </View>
+                    <View style={styles.shopStats}>
+                      <Text style={styles.shopStatNum}>{shop.bookings}</Text>
+                      <Text style={styles.shopStatLabel}>bookings</Text>
+                      <Text style={styles.shopStatNum}>{staffCount}</Text>
+                      <Text style={styles.shopStatLabel}>staff</Text>
+                      <Text style={styles.shopStatNum}>{shop.totalPoints}</Text>
+                      <Text style={styles.shopStatLabel}>points</Text>
+                    </View>
                   </View>
-                  <View style={styles.shopStats}>
-                    <Text style={styles.shopStatNum}>{shop.bookings}</Text>
-                    <Text style={styles.shopStatLabel}>bookings</Text>
-                    <Text style={styles.shopStatNum}>{shop.staff}</Text>
-                    <Text style={styles.shopStatLabel}>staff</Text>
-                    <Text style={styles.shopStatNum}>{shop.totalPoints}</Text>
-                    <Text style={styles.shopStatLabel}>points</Text>
+                );
+              })
+            )}
+          </>
+        ) : null}
+
+        {tab === "customers" && overview ? (
+          <>
+            <Text style={styles.sectionTitle}>Registered customers</Text>
+            <View style={styles.statGrid}>
+              <StatCard label="Total" value={overview.customers} />
+              <StatCard
+                label="Active"
+                value={overview.customerDirectory.filter((customer) => customer.bookingCount > 0).length}
+              />
+            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="Search customer, email, phone…"
+              placeholderTextColor="#94A3B8"
+              value={customerQuery}
+              onChangeText={setCustomerQuery}
+            />
+            {filteredCustomers.length === 0 ? (
+              <Text style={styles.muted}>No customers match.</Text>
+            ) : (
+              filteredCustomers.map((customer) => (
+                <View key={customer.id} style={[styles.shopRow, styles.shopDetailCard, { flexDirection: "column", alignItems: "stretch" }]}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.shopName}>{customer.name}</Text>
+                      <Text style={styles.shopMeta}>{customer.email}</Text>
+                      {customer.phone ? <Text style={styles.shopMeta}>{customer.phone}</Text> : null}
+                      <Text style={styles.shopMeta}>{customer.address ?? "Address not provided"}</Text>
+                    </View>
+                    <View style={styles.shopStats}>
+                      <Text style={styles.shopStatNum}>{customer.bookingCount}</Text>
+                      <Text style={styles.shopStatLabel}>bookings</Text>
+                    </View>
                   </View>
+                  <Text style={styles.shopMeta}>
+                    Joined {new Date(customer.createdAt).toLocaleDateString("en-IN")} • Last booking {customer.lastBookingAt ? new Date(customer.lastBookingAt).toLocaleDateString("en-IN") : "—"}
+                  </Text>
+                  {customer.bookings.length > 0 ? (
+                    <View style={styles.customerHistoryList}>
+                      {customer.bookings.slice(0, 4).map((booking) => (
+                        <Text key={booking.id} style={styles.customerHistoryItem}>
+                          {booking.date} · {booking.shopName} · {booking.serviceName} · {booking.status}
+                        </Text>
+                      ))}
+                    </View>
+                  ) : (
+                    <Text style={styles.muted}>No bookings yet.</Text>
+                  )}
                 </View>
               ))
             )}
@@ -1068,6 +1176,22 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: "#D1E7DD",
+  },
+  shopDetailCard: {
+    borderColor: "#CDE4DA",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  customerHistoryList: {
+    marginTop: 8,
+    gap: 6,
+  },
+  customerHistoryItem: {
+    fontSize: 12,
+    color: "#475569",
+    lineHeight: 18,
   },
   shopName: {
     fontSize: 15,

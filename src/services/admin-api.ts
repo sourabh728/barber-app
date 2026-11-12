@@ -35,6 +35,80 @@ export type AdminShopRow = {
   scoredBookings: number;
 };
 
+export type AdminShopDetail = {
+  id: string;
+  name: string;
+  city: string | null;
+  state: string | null;
+  address: string | null;
+  pincode: string | null;
+  phone: string | null;
+  email: string | null;
+  owner: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string | null;
+  } | null;
+  openTime: string;
+  closeTime: string;
+  lunchStart: string;
+  lunchEnd: string;
+  barberCount: number;
+  holidayDates: string[];
+  staff: {
+    id: string;
+    name: string;
+    title: string;
+    phone: string;
+    status: string;
+    leaveReturnDate: string | null;
+    awayUntil: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }[];
+  services: {
+    id: string;
+    name: string;
+    priceInr: number;
+    durationMin: number;
+    active: boolean;
+    sortOrder: number;
+  }[];
+  bookings: number;
+  totalPoints: number;
+  basePoints: number;
+  punctualityPoints: number;
+  scoredBookings: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminCustomerBooking = {
+  id: string;
+  status: string;
+  serviceName: string;
+  priceInr: number;
+  date: string;
+  startTime: string;
+  createdAt: string;
+  shopName: string;
+  shopId: string;
+};
+
+export type AdminCustomerDetail = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  address: string | null;
+  createdAt: string;
+  updatedAt: string;
+  bookingCount: number;
+  lastBookingAt: string | null;
+  bookings: AdminCustomerBooking[];
+};
+
 export type AdminOverview = {
   shops: number;
   customers: number;
@@ -52,6 +126,8 @@ export type AdminOverview = {
     averagePunctuality: number;
   };
   shopList: AdminShopRow[];
+  shopDirectory: AdminShopDetail[];
+  customerDirectory: AdminCustomerDetail[];
   shopPointsLeaderboard: {
     rank: number;
     id: string;

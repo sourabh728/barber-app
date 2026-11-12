@@ -1149,7 +1149,24 @@ export default function ShopBookAppointmentScreen() {
       <BookingSuccessDialog
         visible={successVisible}
         shopName={shop.name}
+        autoCloseAfterMs={45_000}
         onViewRequest={closeSuccessAndViewRequest}
+        onResendRequest={() => {
+          setSuccessVisible(false);
+          if (shop && selectedServices.length > 0 && selectedStaffId && selectedDate && selectedStartTime && endTime) {
+            void submitBooking();
+          } else {
+            router.replace("/(tabs)");
+          }
+        }}
+        onBrowseOtherBarbers={() => {
+          setSuccessVisible(false);
+          router.replace("/(tabs)");
+        }}
+        onBackHome={() => {
+          setSuccessVisible(false);
+          router.replace("/(tabs)");
+        }}
       />
     </View>
   );
