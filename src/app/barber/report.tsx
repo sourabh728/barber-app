@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -62,6 +63,7 @@ function initialsFromName(name: string) {
 }
 
 export default function DailyReportScreen() {
+  const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
   const [report, setReport] = useState<DailyReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -128,7 +130,15 @@ export default function DailyReportScreen() {
           style={styles.card}
         >
           <View style={styles.headerRow}>
-            <View style={styles.headerSpacer} />
+            <TouchableOpacity
+              style={styles.headerSpacer}
+              onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel="Back to profile"
+              hitSlop={12}
+            >
+              <Ionicons name="arrow-back" size={22} color="#fff" />
+            </TouchableOpacity>
             <Text style={styles.heading}>Daily Report</Text>
             <View style={styles.calendarBadge} accessibilityLabel="Calendar">
               <Ionicons name="calendar-outline" size={20} color="#F97316" />

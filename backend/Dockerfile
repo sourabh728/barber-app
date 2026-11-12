@@ -20,6 +20,7 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 COPY --from=build /app/generated ./generated
+COPY --from=build /app/public ./public
 RUN mkdir -p uploads && chown -R nest:nest /app
 USER nest
 # Render injects PORT (default 10000). EXPOSE is documentation only.

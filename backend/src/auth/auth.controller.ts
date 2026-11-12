@@ -90,6 +90,11 @@ export class AuthController {
     return this.authService.loginWithGoogle(googleLoginDto);
   }
 
+  @Post('google/sign-in')
+  signInWithGoogle(@Body() dto: GoogleIdTokenDto) {
+    return this.authService.signInWithGoogle(dto);
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   getMe(@Req() req: AuthenticatedRequest) {

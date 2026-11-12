@@ -33,7 +33,7 @@ export default function BarberLoginScreen() {
     googleRequestReady,
     handleEmailLogin,
     handleGoogleLogin,
-  } = useLoginActions({ role: "BARBER" });
+  } = useLoginActions();
 
   return (
     <SafeAreaView style={styles.container}>

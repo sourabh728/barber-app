@@ -1,0 +1,496 @@
+ <!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#12251e" />
+    <title>Trimshim Admin</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #17241e;
+        --muted: #718078;
+        --line: #e3e9e5;
+        --paper: #fff;
+        --canvas: #f3f6f3;
+        --green: #146b4a;
+        --green-dark: #0e4e36;
+        --red: #b42318;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--canvas); color: var(--ink); }
+      button, input, select, textarea { font: inherit; }
+      button { cursor: pointer; }
+      .hidden { display: none !important; }
+      .login-shell { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(ellipse at 50% 5%, #e0efe6, transparent 55%), var(--canvas); }
+      .login-card { width: min(100%, 410px); padding: 34px; background: var(--paper); border: 1px solid var(--line); border-radius: 20px; box-shadow: 0 20px 60px #10281b12; }
+      .brand-mark { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 13px; color: white; background: var(--green); font-weight: 800; }
+      h1 { margin: 20px 0 6px; font-size: 25px; letter-spacing: -.04em; }
+      .subtle { color: var(--muted); font-size: 14px; line-height: 1.55; }
+      label { display: block; margin: 15px 0 6px; color: #46564d; font-size: 12px; font-weight: 700; }
+      input, select, textarea { width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid #d6dfd9; border-radius: 9px; background: #fff; color: var(--ink); outline: none; }
+      textarea { min-height: 88px; resize: vertical; }
+      input:focus, select:focus, textarea:focus { border-color: var(--green); box-shadow: 0 0 0 3px #146b4a1a; }
+      .primary, .secondary, .danger { min-height: 40px; padding: 9px 14px; border: 0; border-radius: 9px; font-weight: 700; }
+      .primary { color: #fff; background: var(--green); }
+      .primary:hover { background: var(--green-dark); }
+      .secondary { color: var(--ink); background: #edf2ee; }
+      .danger { color: var(--red); background: #fff0ef; }
+      .wide { width: 100%; margin-top: 20px; }
+      .notice { margin-top: 14px; color: var(--red); font-size: 13px; line-height: 1.5; }
+      .app { min-height: 100vh; }
+      .topbar { position: sticky; z-index: 3; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 68px; padding: 12px clamp(16px, 4vw, 52px); background: #fff; border-bottom: 1px solid var(--line); }
+      .top-brand { display: flex; align-items: center; gap: 11px; font-weight: 800; letter-spacing: -.02em; }
+      .top-brand .brand-mark { width: 34px; height: 34px; border-radius: 10px; font-size: 13px; }
+      .top-actions { display: flex; align-items: center; gap: 10px; }
+      .user-email { max-width: 260px; overflow: hidden; color: var(--muted); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+      .layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); max-width: 1480px; margin: 0 auto; padding: 24px clamp(14px, 3vw, 42px); gap: 26px; }
+      .sidebar { align-self: start; position: sticky; top: 92px; display: grid; gap: 5px; padding: 9px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+      .nav-button { border: 0; border-radius: 8px; padding: 11px 12px; background: transparent; color: #526057; text-align: left; font-weight: 650; }
+      .nav-button:hover, .nav-button.active { color: var(--green-dark); background: #eaf3ed; }
+      main { min-width: 0; }
+      .page-head { display: flex; justify-content: space-between; align-items: start; gap: 18px; margin: 3px 0 22px; }
+      .page-head h1 { margin: 0 0 4px; font-size: clamp(22px, 3vw, 30px); }
+      .section { display: none; }
+      .section.active { display: block; }
+      .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+      .card { min-width: 0; padding: 17px; border: 1px solid var(--line); border-radius: 13px; background: var(--paper); }
+      .metric-label { color: var(--muted); font-size: 12px; font-weight: 700; }
+      .metric-value { margin-top: 8px; font-size: 25px; font-weight: 800; letter-spacing: -.04em; overflow-wrap: anywhere; }
+      .panel { margin-top: 18px; padding: 19px; border: 1px solid var(--line); border-radius: 13px; background: var(--paper); }
+      .panel h2 { margin: 0 0 14px; font-size: 17px; letter-spacing: -.02em; }
+      .panel h3 { margin: 20px 0 10px; font-size: 14px; }
+      .toolbar, .form-row { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; }
+      .toolbar input, .form-row input, .form-row select { flex: 1 1 160px; }
+      .toolbar label, .form-row label { flex: 1 1 160px; margin: 0; }
+      .preset { display: flex; gap: 7px; }
+      .preset button { min-height: 34px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; color: #47564d; background: #fff; font-size: 12px; font-weight: 700; }
+      .table-wrap { width: 100%; overflow-x: auto; }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th, td { padding: 11px 9px; border-bottom: 1px solid #edf1ee; text-align: left; vertical-align: top; }
+      th { color: var(--muted); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
+      td strong { display: block; }
+      .pill { display: inline-block; padding: 4px 8px; border-radius: 99px; background: #edf2ee; color: #46564d; font-size: 11px; font-weight: 700; }
+      .empty { padding: 18px 4px; color: var(--muted); font-size: 13px; }
+      .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
+      .check-row { display: flex; align-items: center; gap: 9px; margin: 14px 0; color: #46564d; font-size: 13px; font-weight: 650; }
+      .check-row input { width: 18px; min-height: 18px; }
+      .error-banner { margin: 12px 0; padding: 11px 13px; border: 1px solid #f4c7c3; border-radius: 9px; background: #fff4f3; color: var(--red); font-size: 13px; }
+      .success-banner { margin: 12px 0; padding: 11px 13px; border: 1px solid #b9ddc9; border-radius: 9px; background: #f1faf4; color: var(--green-dark); font-size: 13px; }
+      .help { margin: 10px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+      .qr-payload { display: block; max-width: 250px; overflow: hidden; color: var(--muted); font-family: ui-monospace, monospace; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+      .qr-preview { width: 92px; height: 92px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--muted); font-size: 10px; }
+      .qr-preview img { width: 88px; height: 88px; }
+      .loading { color: var(--muted); padding: 20px 0; font-size: 14px; }
+      @media (max-width: 900px) { .layout { grid-template-columns: 1fr; gap: 14px; padding-top: 14px; } .sidebar { position: static; display: flex; overflow-x: auto; } .nav-button { flex: 0 0 auto; } .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+      @media (max-width: 560px) { .topbar { min-height: 58px; } .user-email { display: none; } .page-head { align-items: center; } .grid { gap: 8px; } .card { padding: 13px; } .metric-value { font-size: 21px; } .panel { padding: 14px; } .field-grid { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <div id="login" class="login-shell">
+      <form id="login-form" class="login-card">
+        <div class="brand-mark">T</div>
+        <h1>Admin sign in</h1>
+        <div class="subtle">Sign in with your existing platform administrator account. This dashboard does not change the app’s login flow.</div>
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="username" required />
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+        <button id="login-submit" class="primary wide" type="submit">Sign in</button>
+        <div id="login-message" class="notice" role="alert"></div>
+      </form>
+    </div>
+
+    <div id="dashboard" class="app hidden">
+      <header class="topbar">
+        <div class="top-brand"><div class="brand-mark">T</div><span>Trimshim Admin</span></div>
+        <div class="top-actions"><span id="user-email" class="user-email"></span><button id="refresh" class="secondary" type="button">Refresh</button><button id="sign-out" class="secondary" type="button">Sign out</button></div>
+      </header>
+      <div class="layout">
+        <nav class="sidebar" aria-label="Admin sections">
+          <button class="nav-button active" data-section="overview">Overview & reports</button>
+          <button class="nav-button" data-section="shops">Shops</button>
+          <button class="nav-button" data-section="points">Points</button>
+          <button class="nav-button" data-section="payments">Payments</button>
+          <button class="nav-button" data-section="maintenance">Maintenance</button>
+          <button class="nav-button" data-section="qr-codes">Shop QR codes</button>
+        </nav>
+        <main>
+          <div id="global-message" aria-live="polite"></div>
+          <section id="section-overview" class="section active">
+            <div class="page-head"><div><h1>Overview & reports</h1><div class="subtle">Bookings, payments, and network activity.</div></div></div>
+            <div id="overview-metrics" class="grid"><div class="loading">Loading dashboard…</div></div>
+            <div class="panel">
+              <h2>Date-wise booking report</h2>
+              <div class="toolbar">
+                <label>From<input id="report-from" type="date" /></label>
+                <label>To<input id="report-to" type="date" /></label>
+                <div class="preset"><button type="button" data-days="7">7 days</button><button type="button" data-days="30">30 days</button><button type="button" data-days="0">Today</button></div>
+                <button id="run-report" class="primary" type="button">Run report</button>
+              </div>
+              <div id="report-content" class="loading">Loading report…</div>
+            </div>
+            <div class="panel"><h2>Recent activity</h2><div id="recent-content" class="loading">Loading…</div></div>
+          </section>
+          <section id="section-shops" class="section">
+            <div class="page-head"><div><h1>Shops</h1><div class="subtle">Listed shops, owners, bookings, staff, and points.</div></div></div>
+            <div class="panel"><div class="toolbar"><input id="shop-search" type="search" placeholder="Search shops, city, or owner…" aria-label="Search shops" /></div><div id="shops-content" class="loading">Loading shops…</div></div>
+          </section>
+          <section id="section-points" class="section">
+            <div class="page-head"><div><h1>Points</h1><div class="subtle">Network score and shop leaderboard.</div></div></div>
+            <div id="points-metrics" class="grid"></div>
+            <div class="panel"><h2>Shop points leaderboard</h2><div id="leaderboard-content" class="loading">Loading leaderboard…</div></div>
+          </section>
+          <section id="section-payments" class="section">
+            <div class="page-head"><div><h1>Payment settings</h1><div class="subtle">Changes apply to new bookings throughout the app.</div></div></div>
+            <form id="payments-form" class="panel">
+              <div class="field-grid">
+                <label>Payment mode<select id="payment-mode"><option value="PAY_AT_SHOP">Pay at shop</option><option value="ONLINE_FEE_REST_AT_SHOP">Fixed online fee + rest at shop</option><option value="PERCENTAGE_ONLINE_REST_AT_SHOP">Percentage online + rest at shop</option></select></label>
+                <label id="fee-label">Booking fee (₹)<input id="booking-fee" type="number" min="1" step="1" /></label>
+                <label>Payout account name<input id="payout-name" maxlength="120" /></label>
+                <label>UPI ID<input id="payout-upi" maxlength="120" /></label>
+                <label>Bank name<input id="payout-bank" maxlength="120" /></label>
+                <label>Account number<input id="payout-account" inputmode="numeric" maxlength="34" /></label>
+                <label>IFSC<input id="payout-ifsc" maxlength="20" autocapitalize="characters" /></label>
+              </div>
+              <p class="help">Payout information is only visible here to an authenticated administrator. The public settings API only exposes its limited public slice.</p>
+              <button class="primary" type="submit">Save payment settings</button>
+            </form>
+          </section>
+          <section id="section-maintenance" class="section">
+            <div class="page-head"><div><h1>Maintenance</h1><div class="subtle">Control the app-wide maintenance banner.</div></div></div>
+            <form id="maintenance-form" class="panel">
+              <label class="check-row"><input id="maintenance-enabled" type="checkbox" /> Enable maintenance mode</label>
+              <label>Message shown in the app<textarea id="maintenance-message" maxlength="500" placeholder="Tell users what is happening"></textarea></label>
+              <label>Maintenance until (optional)<input id="maintenance-until" type="datetime-local" /></label>
+              <button class="primary" type="submit">Save maintenance settings</button>
+            </form>
+          </section>
+          <section id="section-qr-codes" class="section">
+            <div class="page-head"><div><h1>Shop QR codes</h1><div class="subtle">Generate and manage onboarding QR codes.</div></div></div>
+            <form id="qr-form" class="panel">
+              <div class="form-row"><label>QR code name<input id="qr-name" maxlength="80" placeholder="e.g. Raju Hair Salon" required /></label><button class="primary" type="submit">Generate QR code</button></div>
+              <p class="help">New codes can be linked to a shop during barber onboarding. Scan or print codes directly from this dashboard.</p>
+            </form>
+            <div class="panel"><div class="toolbar"><input id="qr-search" type="search" placeholder="Search by name or linked shop…" aria-label="Search QR codes" /><button id="print-qr" class="secondary" type="button">Print visible</button></div><div id="qr-content" class="loading">Loading QR codes…</div></div>
+          </section>
+        </main>
+      </div>
+    </div>
+    <script>
+      (() => {
+        const tokenKey = "trimshim-admin-token";
+        const $ = (id) => document.getElementById(id);
+        const state = { token: sessionStorage.getItem(tokenKey), overview: null, settings: null, qrCodes: [], qrSvgs: new Map(), qrSvgPending: new Set(), report: null };
+        const money = (value) => `₹${Number(value || 0).toLocaleString("en-IN")}`;
+        const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+        const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+        const dateAgo = (days) => { const date = new Date(); date.setDate(date.getDate() - days); return dateKey(date); };
+        const errorMessage = (data, fallback) => typeof data?.message === "string" ? data.message : Array.isArray(data?.message) ? data.message.join(" ") : fallback;
+
+        async function api(path, options = {}) {
+          const response = await fetch(path, {
+            ...options,
+            headers: { "Content-Type": "application/json", ...(state.token ? { Authorization: `Bearer ${state.token}` } : {}), ...options.headers },
+          });
+          const data = response.status === 204 ? null : await response.json().catch(() => null);
+          if (response.status === 401) {
+            signOut();
+            throw new Error("Your session expired. Please sign in again.");
+          }
+          if (!response.ok) throw new Error(errorMessage(data, `Request failed (${response.status}).`));
+          return data;
+        }
+
+        function showMessage(message, success = false) {
+          $("global-message").innerHTML = message ? `<div class="${success ? "success-banner" : "error-banner"}">${escapeHtml(message)}</div>` : "";
+        }
+
+        function showLogin(message = "") {
+          $("login").classList.remove("hidden");
+          $("dashboard").classList.add("hidden");
+          $("login-message").textContent = message;
+        }
+
+        function signOut() {
+          state.token = null;
+          sessionStorage.removeItem(tokenKey);
+          showLogin();
+        }
+
+        function showDashboard(user) {
+          $("login").classList.add("hidden");
+          $("dashboard").classList.remove("hidden");
+          $("user-email").textContent = user.email || "";
+        }
+
+        async function verifySession() {
+          if (!state.token) return showLogin();
+          try {
+            const user = await api("/auth/me");
+            if (user.role !== "ADMIN") {
+              signOut();
+              return showLogin("This account does not have administrator access.");
+            }
+            showDashboard(user);
+            await loadDashboard();
+          } catch (error) {
+            signOut();
+            showLogin(error.message || "Please sign in with an administrator account.");
+          }
+        }
+
+        $("login-form").addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const button = $("login-submit");
+          button.disabled = true;
+          button.textContent = "Signing in…";
+          $("login-message").textContent = "";
+          try {
+            const response = await fetch("/auth/login", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: $("email").value.trim(), password: $("password").value }),
+            });
+            const result = await response.json().catch(() => null);
+            if (!response.ok) throw new Error(errorMessage(result, "Sign in failed."));
+            if (!result?.accessToken) throw new Error("The server did not return an access token.");
+            state.token = result.accessToken;
+            sessionStorage.setItem(tokenKey, state.token);
+            const user = await api("/auth/me");
+            if (user.role !== "ADMIN") {
+              signOut();
+              throw new Error("This account does not have administrator access.");
+            }
+            showDashboard(user);
+            await loadDashboard();
+          } catch (error) {
+            signOut();
+            $("login-message").textContent = error.message || "Could not sign in.";
+          } finally {
+            button.disabled = false;
+            button.textContent = "Sign in";
+          }
+        });
+
+        document.querySelectorAll(".nav-button").forEach((button) => button.addEventListener("click", () => {
+          document.querySelectorAll(".nav-button").forEach((item) => item.classList.toggle("active", item === button));
+          document.querySelectorAll(".section").forEach((section) => section.classList.toggle("active", section.id === `section-${button.dataset.section}`));
+        }));
+        $("sign-out").addEventListener("click", signOut);
+        $("refresh").addEventListener("click", () => loadDashboard().catch((error) => showMessage(error.message)));
+
+        function renderMetrics() {
+          if (!state.overview) return;
+          const o = state.overview;
+          $("overview-metrics").innerHTML = [
+            ["Shops", o.shops], ["Customers", o.customers], ["Barbers", o.barbers], ["Bookings", o.bookings.total],
+          ].map(([label, value]) => `<div class="card"><div class="metric-label">${label}</div><div class="metric-value">${value}</div></div>`).join("");
+          $("points-metrics").innerHTML = [
+            ["Total points", o.points.totalPoints], ["Average score", o.points.averageBookingScore], ["Punctuality average", o.points.averagePunctuality], ["Scored bookings", o.points.scoredBookings],
+          ].map(([label, value]) => `<div class="card"><div class="metric-label">${label}</div><div class="metric-value">${value}</div></div>`).join("");
+          const shops = o.shopList || [];
+          $("shops-content").innerHTML = shops.length ? `<div class="table-wrap"><table><thead><tr><th>Shop</th><th>Owner</th><th>Bookings</th><th>Staff</th><th>Points</th></tr></thead><tbody>${shops.map((s) => `<tr data-shop-search="${escapeHtml([s.name, s.city, s.state, s.ownerName, s.ownerEmail].join(" ").toLowerCase())}"><td><strong>${escapeHtml(s.name)}</strong><span class="subtle">${escapeHtml([s.city, s.state].filter(Boolean).join(", ") || "Location n/a")}</span>${s.address ? `<span class="subtle">${escapeHtml(s.address)}</span>` : ""}</td><td>${escapeHtml(s.ownerName)}<span class="subtle">${escapeHtml(s.ownerEmail)}</span></td><td>${s.bookings}</td><td>${s.staff}</td><td>${s.totalPoints}</td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">No listed shops.</div>';
+          const leaderboard = o.shopPointsLeaderboard || [];
+          $("leaderboard-content").innerHTML = leaderboard.length ? `<div class="table-wrap"><table><thead><tr><th>Rank</th><th>Shop</th><th>Points</th><th>Scored bookings</th><th>Bookings</th></tr></thead><tbody>${leaderboard.map((s) => `<tr><td>#${s.rank}</td><td><strong>${escapeHtml(s.name)}</strong><span class="subtle">${escapeHtml(s.city || "—")}</span></td><td>${s.totalPoints}</td><td>${s.scoredBookings}</td><td>${s.bookings}</td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">No leaderboard data.</div>';
+          renderRecentActivity();
+        }
+
+        function renderRecentActivity() {
+          const rows = state.overview?.recentActivity || [];
+          $("recent-content").innerHTML = rows.length ? `<div class="table-wrap"><table><thead><tr><th>Customer</th><th>Shop / service</th><th>Date</th><th>Status</th><th>Score</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${escapeHtml(r.customerName)}</td><td><strong>${escapeHtml(r.shopName)}</strong><span class="subtle">${escapeHtml(r.serviceName)}</span></td><td>${escapeHtml(r.date)} ${escapeHtml(r.startTime)}</td><td><span class="pill">${escapeHtml(r.status)}</span></td><td>${r.bookingScore ?? "—"}</td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">No recent activity.</div>';
+        }
+
+        function renderReport() {
+          const report = state.report;
+          if (!report) return;
+          const t = report.totals;
+          const mode = report.paymentMode === "PAY_AT_SHOP" ? "Pay at shop" : report.paymentMode === "ONLINE_FEE_REST_AT_SHOP" ? `${money(report.bookingFeeInr)} online + rest at shop` : `${report.bookingFeeInr}% online + rest at shop`;
+          const rows = report.shops || [];
+          $("report-content").innerHTML = `<p class="help">${escapeHtml(report.from)} → ${escapeHtml(report.to)} · Payment mode: ${escapeHtml(mode)}</p><div class="grid" style="margin-top:12px">${[
+            ["Bookings", t.bookings], ["Shops active", t.shopsWithBookings], ["Payment total", money(t.paymentTotalInr)], ["Online fees (est.)", money(t.estimatedOnlineFeesInr)], ["Points", t.points], ["Confirmed", t.byStatus.CONFIRMED || 0], ["Rejected", t.byStatus.REJECTED || 0], ["Pending", t.byStatus.PENDING || 0],
+          ].map(([label, value]) => `<div class="card"><div class="metric-label">${label}</div><div class="metric-value">${value}</div></div>`).join("")}</div><h3>By shop</h3>${rows.length ? `<div class="table-wrap"><table><thead><tr><th>Shop</th><th>Bookings</th><th>Confirmed</th><th>Rejected</th><th>Pending</th><th>Payment</th><th>Points</th></tr></thead><tbody>${rows.map((s) => `<tr><td><strong>${escapeHtml(s.shopName)}</strong><span class="subtle">${escapeHtml([s.city, s.state].filter(Boolean).join(", ") || "—")}</span></td><td>${s.bookings}</td><td>${s.byStatus.CONFIRMED || 0}</td><td>${s.byStatus.REJECTED || 0}</td><td>${s.byStatus.PENDING || 0}</td><td>${money(s.paymentTotalInr)}</td><td>${s.points}</td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">No bookings in this range.</div>'}`;
+        }
+
+        async function loadReport(from, to) {
+          if (!from || !to) throw new Error("Choose both a start and end date.");
+          $("report-content").textContent = "Loading report…";
+          state.report = await api(`/admin/bookings-report?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+          renderReport();
+        }
+
+        function setSettings(s) {
+          state.settings = s;
+          $("payment-mode").value = s.paymentMode;
+          $("booking-fee").value = s.bookingFeeInr;
+          $("fee-label").firstChild.textContent = s.paymentMode === "PERCENTAGE_ONLINE_REST_AT_SHOP" ? "Upfront percentage (%)" : "Booking fee (₹)";
+          $("payout-name").value = s.payoutAccountName || "";
+          $("payout-upi").value = s.payoutUpiId || "";
+          $("payout-bank").value = s.payoutBankName || "";
+          $("payout-account").value = s.payoutAccountNumber || "";
+          $("payout-ifsc").value = s.payoutIfsc || "";
+          $("maintenance-enabled").checked = s.maintenanceEnabled;
+          $("maintenance-message").value = s.maintenanceMessage || "";
+          $("maintenance-until").value = s.maintenanceUntil ? new Date(s.maintenanceUntil).toISOString().slice(0, 16) : "";
+        }
+
+        function renderQrCodes() {
+          const query = $("qr-search").value.trim().toLowerCase();
+          const codes = state.qrCodes.filter((code) => !query || `${code.name} ${code.shopName || ""}`.toLowerCase().includes(query));
+          $("qr-content").innerHTML = codes.length ? `<div class="table-wrap"><table><thead><tr><th>Name</th><th>QR code</th><th>Status</th><th>QR payload</th><th>Created</th><th></th></tr></thead><tbody>${codes.map((code) => `<tr><td><strong>${escapeHtml(code.name)}</strong>${code.shopName ? `<span class="subtle">${escapeHtml(code.shopName)}</span>` : ""}</td><td><div id="qr-preview-${escapeHtml(code.id)}" class="qr-preview">${state.qrSvgs.has(code.id) ? `<img alt="QR code for ${escapeHtml(code.name)}" src="${svgDataUri(state.qrSvgs.get(code.id))}" />` : "Loading…"}</div></td><td><span class="pill">${code.claimed ? "Claimed" : "Unclaimed"}</span></td><td><span class="qr-payload" title="${escapeHtml(code.qrPayload)}">${escapeHtml(code.qrPayload)}</span><button class="secondary copy-qr" type="button" data-payload="${escapeHtml(code.qrPayload)}">Copy payload</button></td><td>${new Date(code.createdAt).toLocaleDateString()}</td><td>${code.claimed ? "" : `<button class="danger delete-qr" type="button" data-id="${escapeHtml(code.id)}">Delete</button>`}</td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">No matching QR codes.</div>';
+          for (const code of codes) {
+            if (state.qrSvgs.has(code.id) || state.qrSvgPending.has(code.id)) continue;
+            state.qrSvgPending.add(code.id);
+            api(`/admin/qr-codes/${encodeURIComponent(code.id)}/svg`)
+              .then(({ svg }) => {
+                state.qrSvgs.set(code.id, svg);
+                const preview = $(`qr-preview-${code.id}`);
+                if (preview) preview.innerHTML = `<img alt="QR code for ${escapeHtml(code.name)}" src="${svgDataUri(svg)}" />`;
+              })
+              .catch((error) => {
+                const preview = $(`qr-preview-${code.id}`);
+                if (preview) preview.textContent = "QR unavailable";
+                showMessage(error.message);
+              })
+              .finally(() => state.qrSvgPending.delete(code.id));
+          }
+          document.querySelectorAll(".copy-qr").forEach((button) => button.addEventListener("click", async () => {
+            try { await navigator.clipboard.writeText(button.dataset.payload); showMessage("QR payload copied.", true); }
+            catch { showMessage("Could not copy the QR payload. Select and copy it manually."); }
+          }));
+          document.querySelectorAll(".delete-qr").forEach((button) => button.addEventListener("click", async () => {
+            if (!window.confirm("Delete this unclaimed QR code?")) return;
+            try {
+              await api(`/admin/qr-codes/${encodeURIComponent(button.dataset.id)}`, { method: "DELETE" });
+              state.qrCodes = state.qrCodes.filter((code) => code.id !== button.dataset.id);
+              renderQrCodes();
+              showMessage("QR code deleted.", true);
+            } catch (error) { showMessage(error.message); }
+          }));
+        }
+
+        function svgDataUri(svg) {
+          return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+        }
+
+        async function printQrCodes(codes) {
+          if (!codes.length) return showMessage("There are no QR codes to print.");
+          const printWindow = window.open("", "_blank");
+          if (!printWindow) return showMessage("Allow pop-ups to print QR codes.");
+          const button = $("print-qr");
+          button.disabled = true;
+          try {
+            const items = await Promise.all(codes.map(async (code) => ({
+              code,
+              svg: state.qrSvgs.get(code.id) || (await api(`/admin/qr-codes/${encodeURIComponent(code.id)}/svg`)).svg,
+            })));
+            items.forEach(({ code, svg }) => state.qrSvgs.set(code.id, svg));
+            const pages = items.map(({ code, svg }) => `<article class="page"><div class="brand">Trimshim</div><img src="${escapeHtml(svgDataUri(svg))}" alt="QR code for ${escapeHtml(code.name)}"><div class="name">${escapeHtml(code.name)}</div><div class="hint">Scan to register / check in</div></article>`).join("");
+            printWindow.document.write(`<!doctype html><html><head><title>Shop QR codes</title><style>body{font-family:Arial,sans-serif;margin:0}.page{page-break-after:always;text-align:center;padding:50px 20px}.brand{font-size:28px;font-weight:700;margin-bottom:24px}img{width:300px;height:300px}.name{font-size:30px;font-weight:700;margin-top:22px}.hint{font-size:15px;color:#555;margin-top:8px}</style></head><body>${pages}</body></html>`);
+            printWindow.document.close();
+            setTimeout(() => { printWindow.focus(); printWindow.print(); printWindow.close(); }, 300);
+          } catch (error) {
+            printWindow.close();
+            showMessage(error.message);
+          } finally {
+            button.disabled = false;
+          }
+        }
+
+        async function loadDashboard() {
+          showMessage("");
+          const [overview, settings, report, qrCodes] = await Promise.all([
+            api("/admin/overview"),
+            api("/admin/settings"),
+            api(`/admin/bookings-report?from=${dateAgo(7)}&to=${dateKey(new Date())}`),
+            api("/admin/qr-codes"),
+          ]);
+          state.overview = overview;
+          state.qrCodes = qrCodes;
+          setSettings(settings);
+          $("report-from").value = report.from;
+          $("report-to").value = report.to;
+          state.report = report;
+          renderMetrics();
+          renderReport();
+          renderQrCodes();
+        }
+
+        $("run-report").addEventListener("click", () => loadReport($("report-from").value, $("report-to").value).catch((error) => showMessage(error.message)));
+        document.querySelectorAll("[data-days]").forEach((button) => button.addEventListener("click", () => {
+          const days = Number(button.dataset.days);
+          const to = dateKey(new Date());
+          const from = days === 0 ? to : dateAgo(days);
+          $("report-from").value = from;
+          $("report-to").value = to;
+          loadReport(from, to).catch((error) => showMessage(error.message));
+        }));
+        $("shop-search").addEventListener("input", () => {
+          const query = $("shop-search").value.trim().toLowerCase();
+          document.querySelectorAll("[data-shop-search]").forEach((row) => row.classList.toggle("hidden", !row.dataset.shopSearch.includes(query)));
+        });
+        $("qr-search").addEventListener("input", renderQrCodes);
+        $("print-qr").addEventListener("click", () => {
+          const query = $("qr-search").value.trim().toLowerCase();
+          const codes = state.qrCodes.filter((code) => !query || `${code.name} ${code.shopName || ""}`.toLowerCase().includes(query));
+          printQrCodes(codes);
+        });
+        $("payment-mode").addEventListener("change", () => {
+          $("fee-label").firstChild.textContent = $("payment-mode").value === "PERCENTAGE_ONLINE_REST_AT_SHOP" ? "Upfront percentage (%)" : "Booking fee (₹)";
+        });
+        $("payments-form").addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const paymentMode = $("payment-mode").value;
+          const fee = Number($("booking-fee").value);
+          if (paymentMode !== "PAY_AT_SHOP" && (!Number.isFinite(fee) || fee < 1 || (paymentMode === "PERCENTAGE_ONLINE_REST_AT_SHOP" && fee > 100))) {
+            return showMessage(paymentMode === "PERCENTAGE_ONLINE_REST_AT_SHOP" ? "Enter a percentage from 1 to 100." : "Enter an online fee of at least ₹1.");
+          }
+          if (paymentMode !== "PAY_AT_SHOP" && !$("payout-upi").value.trim() && !$("payout-account").value.trim()) return showMessage("Add a UPI ID or bank account for online payments.");
+          try {
+            const settings = await api("/admin/settings", { method: "PATCH", body: JSON.stringify({
+              paymentMode, bookingFeeInr: Math.round(fee || 1),
+              payoutAccountName: $("payout-name").value.trim() || null,
+              payoutUpiId: $("payout-upi").value.trim() || null,
+              payoutBankName: $("payout-bank").value.trim() || null,
+              payoutAccountNumber: $("payout-account").value.trim() || null,
+              payoutIfsc: $("payout-ifsc").value.trim() || null,
+            }) });
+            setSettings(settings);
+            showMessage("Payment settings saved.", true);
+          } catch (error) { showMessage(error.message); }
+        });
+        $("maintenance-form").addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const maintenanceEnabled = $("maintenance-enabled").checked;
+          const maintenanceMessage = $("maintenance-message").value.trim();
+          if (maintenanceEnabled && !maintenanceMessage) return showMessage("Enter a reason that users will see while the app is down.");
+          try {
+            const settings = await api("/admin/settings", { method: "PATCH", body: JSON.stringify({
+              maintenanceEnabled, maintenanceMessage,
+              maintenanceUntil: $("maintenance-until").value ? new Date($("maintenance-until").value).toISOString() : null,
+            }) });
+            setSettings(settings);
+            showMessage(maintenanceEnabled ? "Maintenance mode enabled." : "Maintenance mode disabled.", true);
+          } catch (error) { showMessage(error.message); }
+        });
+        $("qr-form").addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const name = $("qr-name").value.trim();
+          if (!name) return showMessage("Enter a name for this QR code.");
+          try {
+            const created = await api("/admin/qr-codes", { method: "POST", body: JSON.stringify({ name }) });
+            state.qrCodes.unshift(created);
+            $("qr-name").value = "";
+            renderQrCodes();
+            showMessage("QR code created.", true);
+          } catch (error) { showMessage(error.message); }
+        });
+
+        $("report-from").value = dateAgo(7);
+        $("report-to").value = dateKey(new Date());
+        verifySession();
+      })();
+    </script>
+  </body>
+</html>

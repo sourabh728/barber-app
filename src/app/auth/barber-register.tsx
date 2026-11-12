@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -18,6 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LegalAgreementText } from "@/components/legal-agreement-text";
 import { StateCityPicker } from "@/components/state-city-picker";
 import { BarberCountPicker } from "@/components/barber-count-picker";
+import { usePendingGoogleIdentity } from "@/context/pending-google-identity";
 import { useGoogleIdentity } from "@/hooks/use-google-identity";
 import { registerBarber } from "@/services/auth-api";
 import { getRegisterErrorMessage } from "@/services/auth-errors";
@@ -26,6 +27,7 @@ import { phoneValidationError, sanitizePhoneInput } from "@/utils/phone";
 export default function BarberRegisterScreen() {
   const router = useRouter();
   const isSubmitting = useRef(false);
+  const { pendingIdentity, setPendingIdentity } = usePendingGoogleIdentity();
 
   const {
     identity,
@@ -34,7 +36,7 @@ export default function BarberRegisterScreen() {
     setErrorMessage,
     googleRequestReady,
     continueWithGoogle,
-  } = useGoogleIdentity();
+  } = useGoogleIdentity(pendingIdentity);
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -50,6 +52,10 @@ export default function BarberRegisterScreen() {
 
   const googleVerified = Boolean(identity?.email);
   const isBusy = isLoading || isGoogleLoading;
+
+  useEffect(() => {
+    setPendingIdentity(null);
+  }, [setPendingIdentity]);
 
   async function handleRegister() {
     if (isSubmitting.current || isBusy) {

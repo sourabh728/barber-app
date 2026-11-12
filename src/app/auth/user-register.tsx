@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { LegalAgreementText } from "@/components/legal-agreement-text";
+import { usePendingGoogleIdentity } from "@/context/pending-google-identity";
 import { useGoogleIdentity } from "@/hooks/use-google-identity";
 import { registerWithEmail } from "@/services/auth-api";
 import { getRegisterErrorMessage } from "@/services/auth-errors";
@@ -24,6 +25,7 @@ import { phoneValidationError, sanitizePhoneInput } from "@/utils/phone";
 export default function UserRegisterScreen() {
   const router = useRouter();
   const isSubmitting = useRef(false);
+  const { pendingIdentity, setPendingIdentity } = usePendingGoogleIdentity();
 
   const {
     identity,
@@ -32,9 +34,9 @@ export default function UserRegisterScreen() {
     setErrorMessage,
     googleRequestReady,
     continueWithGoogle,
-  } = useGoogleIdentity();
+  } = useGoogleIdentity(pendingIdentity);
 
-  const [name, setName] = useState("");
+  const [name, setName] = useState(pendingIdentity?.name ?? "");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [hidePassword, setHidePassword] = useState(true);
@@ -42,6 +44,10 @@ export default function UserRegisterScreen() {
 
   const googleVerified = Boolean(identity?.email);
   const isBusy = isLoading || isGoogleLoading;
+
+  useEffect(() => {
+    setPendingIdentity(null);
+  }, [setPendingIdentity]);
 
   async function handleContinueWithGoogle() {
     const nextIdentity = await continueWithGoogle();

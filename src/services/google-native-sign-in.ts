@@ -63,6 +63,8 @@ export function getNativeGoogleSignInErrorMessage(error: unknown): string | null
       return null;
     case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
       return "Google Play services is missing or outdated on this device.";
+    case "10":
+      return "Google sign-in is not configured for this app. Please contact support.";
     default:
       return error.message || "Google sign-in failed. Please try again.";
   }

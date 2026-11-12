@@ -14,7 +14,6 @@ import { ThemedView } from './themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { isPlatformAdminUser } from '@/constants/platform-admin';
 import { useSession } from '@/context/session-provider';
-import { useTheme } from '@/hooks/use-theme';
 
 export default function AppTabs() {
   const { user } = useSession();
@@ -39,8 +38,8 @@ export default function AppTabs() {
             </TabTrigger>
           ) : null}
           {isBarber ? (
-            <TabTrigger name="report" href="/report" asChild>
-              <TabButton>Report</TabButton>
+            <TabTrigger name="leaderboard" href="/leaderboard" asChild>
+              <TabButton>Leaderboard</TabButton>
             </TabTrigger>
           ) : null}
           <TabTrigger name="profile" href="/profile" asChild>

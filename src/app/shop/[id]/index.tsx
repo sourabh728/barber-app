@@ -547,7 +547,7 @@ export default function ShopBookAppointmentScreen() {
     }
   };
 
-  const closeSuccessAndViewRequest = () => {
+  const closeSuccessAndViewRequest = useCallback(() => {
     setSuccessVisible(false);
     if (createdBookingId) {
       router.replace({
@@ -557,7 +557,7 @@ export default function ShopBookAppointmentScreen() {
       return;
     }
     router.replace("/history");
-  };
+  }, [createdBookingId, router]);
 
   if (isPlatformAdminUser(user)) {
     return <Redirect href="/admin" />;
@@ -1149,11 +1149,19 @@ export default function ShopBookAppointmentScreen() {
       <BookingSuccessDialog
         visible={successVisible}
         shopName={shop.name}
+        bookingId={createdBookingId}
         autoCloseAfterMs={45_000}
         onViewRequest={closeSuccessAndViewRequest}
         onResendRequest={() => {
           setSuccessVisible(false);
-          if (shop && selectedServices.length > 0 && selectedStaffId && selectedDate && selectedStartTime && endTime) {
+          if (
+            shop &&
+            selectedServices.length > 0 &&
+            selectedStaffId &&
+            selectedDate &&
+            selectedStartTime &&
+            endTime
+          ) {
             void submitBooking();
           } else {
             router.replace("/(tabs)");
@@ -1687,4 +1695,3 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
-

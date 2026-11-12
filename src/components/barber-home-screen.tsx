@@ -19,6 +19,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { NewBookingRequestCard } from "@/components/new-booking-request-card";
+import { SuggestBookingSlotModal } from "@/components/suggest-booking-slot-modal";
 import { WalkInBookingDialog } from "@/components/walk-in-booking-dialog";
 import { useSession } from "@/context/session-provider";
 import {
@@ -45,7 +46,6 @@ import {
 import { showAppAlert } from "@/utils/app-alert";
 
 const SLOT_BLOCK_MINUTES = 45;
-const SLOT_STEP_MINUTES = 30;
 
 type SlotBlock =
   | {
@@ -135,15 +135,6 @@ function isActiveAppointment(appointment: ShopAppointment) {
   return (
     appointment.status !== "CANCELLED" && appointment.status !== "REJECTED"
   );
-}
-
-function appointmentDurationMinutes(appointment: ShopAppointment) {
-  const start = toMinutes(appointment.startTime);
-  const end = toMinutes(appointment.endTime);
-  if (start === null || end === null || end <= start) {
-    return SLOT_STEP_MINUTES;
-  }
-  return Math.max(SLOT_STEP_MINUTES, end - start);
 }
 
 function findOverlappingAppointment(
@@ -272,57 +263,6 @@ function buildDaySlotBlocks(
   return blocks;
 }
 
-function buildAvailableRescheduleSlots(
-  schedule: ShopSchedule,
-  dateKey: string,
-  durationMinutes: number,
-  appointments: ShopAppointment[],
-  excludeAppointmentId: string,
-  staffId: string | null,
-) {
-  const open = toMinutes(schedule.openTime);
-  const close = toMinutes(schedule.closeTime);
-  const lunchStart = toMinutes(schedule.lunchStart);
-  const lunchEnd = toMinutes(schedule.lunchEnd);
-  if (open === null || close === null || durationMinutes <= 0) return [];
-
-  const slots: string[] = [];
-  const now = new Date();
-  const isToday = dateKey === toDateKey(now);
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
-
-  for (
-    let start = open;
-    start + durationMinutes <= close;
-    start += SLOT_STEP_MINUTES
-  ) {
-    const end = start + durationMinutes;
-    const startTime = fromMinutes(start);
-    const endTime = fromMinutes(end);
-
-    const overlapsLunch =
-      lunchStart !== null &&
-      lunchEnd !== null &&
-      start < lunchEnd &&
-      end > lunchStart;
-    if (overlapsLunch) continue;
-    if (isToday && start < nowMinutes + 15) continue;
-
-    const clash = findOverlappingAppointment(
-      appointments,
-      startTime,
-      endTime,
-      excludeAppointmentId,
-      staffId,
-    );
-    if (clash) continue;
-
-    slots.push(startTime);
-  }
-
-  return slots;
-}
-
 export function BarberHomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -340,7 +280,6 @@ export function BarberHomeScreen() {
   const [suggestTarget, setSuggestTarget] = useState<ShopAppointment | null>(
     null,
   );
-  const [suggestSlots, setSuggestSlots] = useState<string[]>([]);
   const [walkInSlot, setWalkInSlot] = useState<{
     startTime: string;
     endTime: string;
@@ -496,62 +435,6 @@ export function BarberHomeScreen() {
         },
       ],
     );
-  };
-
-  const openSuggestModal = (appointment: ShopAppointment) => {
-    if (!schedule) {
-      showAppAlert("Schedule unavailable", "Set your shop hours first.");
-      return;
-    }
-
-    const duration = appointmentDurationMinutes(appointment);
-    const slots = buildAvailableRescheduleSlots(
-      schedule,
-      appointment.date,
-      duration,
-      appointments,
-      appointment.id,
-      appointment.staffId,
-    );
-
-    if (slots.length === 0) {
-      showAppAlert(
-        "No open slots",
-        "There are no other available times for this barber today. Try declining or ask the customer to pick another day.",
-      );
-      return;
-    }
-
-    setSuggestTarget(appointment);
-    setSuggestSlots(slots);
-  };
-
-  const applySuggestedSlot = async (startTime: string) => {
-    if (!suggestTarget) return;
-    const duration = appointmentDurationMinutes(suggestTarget);
-    const start = toMinutes(startTime);
-    if (start === null) return;
-    const endTime = fromMinutes(start + duration);
-
-    setActionId(suggestTarget.id);
-    try {
-      await updateMyShopAppointment(suggestTarget.id, {
-        startTime,
-        endTime,
-        proposeSlot: true,
-      });
-      setSuggestTarget(null);
-      setSuggestSlots([]);
-      showAppAlert(
-        "Time suggested",
-        `The customer was notified about ${formatTime12h(startTime)}–${formatTime12h(endTime)} and can accept or decline.`,
-      );
-      await loadDashboard(true);
-    } catch (err) {
-      showAppAlert("Could not suggest time", getAppointmentErrorMessage(err));
-    } finally {
-      setActionId(null);
-    }
   };
 
   const renderSlotBlock = (block: SlotBlock, index: number) => {
@@ -725,7 +608,7 @@ export function BarberHomeScreen() {
                 busy={actionId === appointment.id}
                 onAccept={() => void openAccept(appointment)}
                 onReject={() => confirmDecline(appointment)}
-                onSuggestSlot={() => openSuggestModal(appointment)}
+                onSuggestSlot={() => setSuggestTarget(appointment)}
               />
             ))
           )}
@@ -736,7 +619,7 @@ export function BarberHomeScreen() {
           <Text style={styles.slotStatusLabel}>Slot Status</Text>
         </View>
         <Text style={styles.walkInHint}>
-          Long-press an Available slot (1 second) to add a walk-in booking.
+          Long-press an Available slot (0.5 seconds) to add a walk-in booking.
         </Text>
 
         {!schedule ? (
@@ -771,59 +654,14 @@ export function BarberHomeScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      <Modal
-        visible={Boolean(suggestTarget)}
-        transparent
-        animationType="slide"
-        onRequestClose={() => {
+      <SuggestBookingSlotModal
+        appointment={suggestTarget}
+        onClose={() => setSuggestTarget(null)}
+        onSuggested={() => {
           setSuggestTarget(null);
-          setSuggestSlots([]);
+          void loadDashboard(true);
         }}
-      >
-        <Pressable
-          style={styles.modalBackdrop}
-          onPress={() => {
-            setSuggestTarget(null);
-            setSuggestSlots([]);
-          }}
-        >
-          <Pressable
-            style={[styles.modalSheet, { paddingBottom: insets.bottom + 16 }]}
-            onPress={(event) => event.stopPropagation()}
-          >
-            <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Suggest next slot</Text>
-            <Text style={styles.modalHint}>
-              Pick an open time for{" "}
-              {suggestTarget
-                ? customerShortName(suggestTarget.customerName)
-                : "this customer"}
-              . They will get a notification.
-            </Text>
-            <ScrollView contentContainerStyle={styles.suggestList}>
-              {suggestSlots.map((slot) => {
-                const duration = suggestTarget
-                  ? appointmentDurationMinutes(suggestTarget)
-                  : SLOT_STEP_MINUTES;
-                const start = toMinutes(slot);
-                const endTime =
-                  start !== null ? fromMinutes(start + duration) : slot;
-                return (
-                  <TouchableOpacity
-                    key={slot}
-                    style={styles.suggestOption}
-                    onPress={() => void applySuggestedSlot(slot)}
-                  >
-                    <Text style={styles.suggestOptionText}>
-                      {formatTime12h(slot)} – {formatTime12h(endTime)}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      />
 
       <Modal
         visible={Boolean(acceptTarget)}
@@ -1281,23 +1119,4 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  suggestList: {
-    gap: 8,
-    paddingBottom: 8,
-  },
-
-  suggestOption: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    backgroundColor: "#F8FAFC",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
-
-  suggestOptionText: {
-    fontWeight: "700",
-    color: "#0F172A",
-    fontSize: 15,
-  },
 });

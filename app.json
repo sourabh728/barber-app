@@ -2,7 +2,7 @@
   "expo": {
     "name": "Trimshim",
     "slug": "barber-app1",
-    "version": "1.0.1",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/images/logo-glow.png",
     "scheme": [
@@ -24,7 +24,7 @@
     },
     "android": {
       "package": "com.barberapp1.app",
-      "versionCode": 2,
+      "versionCode": 8,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

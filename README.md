@@ -23,6 +23,25 @@ In the output, you'll find options to open the app in a
 - [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
 - [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
 
+## Google sign-in and Android release builds
+
+Google sign-in requires an Android OAuth client in Google Cloud with the app
+package `com.barberapp1.app` and the SHA-1 fingerprint of the certificate that
+signed the installed APK. The release APK built on this machine on 9 November
+2026 has SHA-1 `44:D2:32:1B:49:02:41:FD:E4:88:CC:7B:E2:AC:C5:8C:0E:83:82:5B`.
+Verify the fingerprint again if the signing key or distribution method changes.
+Debug, Play Store, and other signing keys require their own Android OAuth
+clients. A `DEVELOPER_ERROR` means the Google Cloud configuration must be
+checked; rebuilding the app alone does not configure Google Cloud.
+
+Set `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` to the **web** OAuth client ID before
+building the app. The backend must accept the same ID through
+`GOOGLE_WEB_CLIENT_ID` or `GOOGLE_CLIENT_IDS`. Deploy the backend before
+distributing an app using the `/auth/google/sign-in` endpoint. Existing users
+sign in with their saved role; unknown accounts are directed to registration.
+The older `/auth/google` endpoint remains available for older app versions.
+See the [Google sign-in troubleshooting guide](https://react-native-google-signin.github.io/docs/troubleshooting).
+
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
 ## Get a fresh project

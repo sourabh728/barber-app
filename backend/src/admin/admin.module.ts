@@ -4,12 +4,13 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
+import { AdminWebController } from './admin-web.controller';
 import { MaintenanceInterceptor } from './maintenance.interceptor';
 import { PublicSettingsController } from './public-settings.controller';
 
 @Module({
   imports: [PrismaModule],
-  controllers: [AdminController, PublicSettingsController],
+  controllers: [AdminController, AdminWebController, PublicSettingsController],
   providers: [
     AdminService,
     {
