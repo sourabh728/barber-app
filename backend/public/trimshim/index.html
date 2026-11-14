@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TRIMSHIM | Premium Grooming & Barber Booking</title>
+    <meta
+      name="description"
+      content="TRIMSHIM brings modern grooming, smart barber booking, and trusted barber services to customers across Khandwa and beyond."
+    />
+    <style>
+      :root {
+        --bg: #f5f0e9;
+        --card: rgba(255, 255, 255, 0.72);
+        --card-strong: #ffffff;
+        --primary: #0f766e;
+        --primary-dark: #0b4f4a;
+        --accent: #d97706;
+        --text: #1f2937;
+        --muted: #52606d;
+        --line: rgba(15, 118, 110, 0.16);
+        --shadow: 0 20px 45px rgba(15, 118, 110, 0.12);
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(15, 118, 110, 0.12), transparent 20%),
+          linear-gradient(135deg, #f8f5f1, #eef7f5 40%, #f5efe9);
+        color: var(--text);
+      }
+
+      .container {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 24px 20px 64px;
+      }
+
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 18px;
+        padding: 18px 0 30px;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 14px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        color: var(--primary-dark);
+      }
+
+      .brand-mark {
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        color: white;
+        display: grid;
+        place-items: center;
+        font-size: 1.2rem;
+        box-shadow: var(--shadow);
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 10px 18px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255,255,255,0.5);
+        color: var(--primary-dark);
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 28px;
+        align-items: center;
+        padding: 30px 0 20px;
+      }
+
+      .hero-copy {
+        background: var(--card);
+        border: 1px solid rgba(15, 118, 110, 0.08);
+        backdrop-filter: blur(8px);
+        border-radius: 28px;
+        padding: 32px 28px;
+        box-shadow: var(--shadow);
+      }
+
+      .eyebrow {
+        color: var(--primary);
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-size: 0.76rem;
+        margin-bottom: 16px;
+      }
+
+      h1 {
+        margin: 0 0 18px;
+        font-size: clamp(2.6rem, 5vw, 5rem);
+        line-height: 0.98;
+        letter-spacing: -0.05em;
+        color: var(--primary-dark);
+      }
+
+      .lead {
+        margin: 0;
+        font-size: 1.08rem;
+        line-height: 1.7;
+        color: var(--muted);
+        max-width: 640px;
+      }
+
+      .cta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-top: 28px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        border-radius: 999px;
+        padding: 15px 22px;
+        font-weight: 700;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .button:hover {
+        transform: translateY(-1px);
+      }
+
+      .button.primary {
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        color: #fff;
+        box-shadow: 0 12px 28px rgba(15, 118, 110, 0.28);
+      }
+
+      .button.secondary {
+        border: 1px solid var(--line);
+        background: rgba(255,255,255,0.9);
+        color: var(--primary-dark);
+      }
+
+      .hero-panel {
+        background: linear-gradient(180deg, rgba(15, 118, 110, 0.98), rgba(7, 66, 64, 0.96));
+        border-radius: 28px;
+        box-shadow: var(--shadow);
+        padding: 24px;
+        color: #fff;
+      }
+
+      .logo-card {
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 22px;
+        padding: 20px;
+      }
+
+      .logo-box {
+        width: 92px;
+        height: 92px;
+        border-radius: 28px;
+        display: grid;
+        place-items: center;
+        background: rgba(255,255,255,0.12);
+        font-size: 2rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        color: white;
+        margin-bottom: 16px;
+      }
+
+      .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 18px;
+      }
+
+      .stat {
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.14);
+        border-radius: 16px;
+        padding: 16px;
+      }
+
+      .stat strong {
+        display: block;
+        font-size: 1.5rem;
+        margin-bottom: 6px;
+      }
+
+      .info-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+        margin-top: 36px;
+      }
+
+      .info-card {
+        background: var(--card-strong);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 22px 20px;
+        box-shadow: 0 12px 24px rgba(15, 118, 110, 0.04);
+      }
+
+      .info-card h3 {
+        margin: 0 0 10px;
+        font-size: 1.15rem;
+        color: var(--primary-dark);
+      }
+
+      .info-card p,
+      .info-card a {
+        margin: 0;
+        color: var(--muted);
+        text-decoration: none;
+        line-height: 1.6;
+      }
+
+      footer {
+        margin-top: 44px;
+        text-align: center;
+        padding-top: 18px;
+        color: var(--muted);
+        border-top: 1px solid var(--line);
+        font-size: 0.95rem;
+      }
+
+      @media (max-width: 840px) {
+        .hero {
+          grid-template-columns: 1fr;
+        }
+
+        .info-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .topbar {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark">T</div>
+          <span>TRIMSHIM</span>
+        </div>
+        <div class="pill">Premium Grooming • Barber Booking</div>
+      </header>
+
+      <main class="hero">
+        <section class="hero-copy">
+          <div class="eyebrow">Modern grooming experiences</div>
+          <h1>Book smarter. Groom better.</h1>
+          <p class="lead">
+            TRIMSHIM is a modern barber and grooming brand focused on premium services,
+            easy appointment booking, and a polished customer experience. We help people discover
+            trusted barbers and book quality grooming services with confidence.
+          </p>
+          <div class="cta-row">
+            <a class="button primary" href="mailto:nybook.app@gmail.com">Book via Email</a>
+            <a class="button secondary" href="tel:+917748993567">Call Now</a>
+          </div>
+        </section>
+
+        <aside class="hero-panel">
+          <div class="logo-card">
+            <div class="logo-box">TS</div>
+            <div style="font-size: 1.65rem; font-weight: 800; margin-bottom: 6px;">TRIMSHIM</div>
+            <div style="color: rgba(255,255,255,0.8);">Style. Precision. Confidence.</div>
+          </div>
+
+          <div class="stat-grid">
+            <div class="stat">
+              <strong>24/7</strong>
+              <span>Booking support</span>
+            </div>
+            <div class="stat">
+              <strong>Branded</strong>
+              <span>Professional service</span>
+            </div>
+          </div>
+        </aside>
+      </main>
+
+      <section class="info-grid">
+        <div class="info-card">
+          <h3>Business</h3>
+          <p>TRIMSHIM</p>
+        </div>
+
+        <div class="info-card">
+          <h3>Contact</h3>
+          <p><a href="mailto:nybook.app@gmail.com">nybook.app@gmail.com</a></p>
+          <p><a href="tel:+917748993567">+91 7748993567</a></p>
+        </div>
+
+        <div class="info-card">
+          <h3>Location</h3>
+          <p>DIGARISH, Makan No 86/03 Ward No 01, KHANDWA, MADHYA PRADESH</p>
+        </div>
+      </section>
+
+      <footer>
+        TRIMSHIM • Premium grooming and barber booking experience
+      </footer>
+    </div>
+  </body>
+</html>
