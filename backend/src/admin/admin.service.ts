@@ -12,6 +12,49 @@ import {
     UserRole,
 } from '../../generated/prisma/enums';
 
+export type AdminAlertSummary = {
+  id: string;
+  type: string;
+  level: string;
+  source: string;
+  title: string;
+  message: string;
+  route: string | null;
+  userId: string | null;
+  active: boolean;
+  createdAt: string;
+  acknowledgedAt: string | null;
+};
+
+export function buildAlertSummary(alert: {
+  id: string;
+  type: string;
+  level: string;
+  source: string;
+  title: string;
+  message: string;
+  route: string | null;
+  userId: string | null;
+  createdAt: Date | string;
+  acknowledgedAt: Date | string | null;
+}): AdminAlertSummary {
+  return {
+    id: alert.id,
+    type: alert.type,
+    level: alert.level,
+    source: alert.source,
+    title: alert.title,
+    message: alert.message,
+    route: alert.route ?? null,
+    userId: alert.userId ?? null,
+    active: !alert.acknowledgedAt,
+    createdAt: new Date(alert.createdAt).toISOString(),
+    acknowledgedAt: alert.acknowledgedAt
+      ? new Date(alert.acknowledgedAt).toISOString()
+      : null,
+  };
+}
+
 import { PrismaService } from '../prisma/prisma.service';
 import { buildShopQrValue } from '../verification/qr-tokens';
 import { pointsToNumber, roundPoints } from '../verification/scoring';
@@ -144,6 +187,52 @@ export class AdminService implements OnModuleInit {
         emailVerified: true,
       },
     });
+  }
+
+  async getAlerts() {
+    const alerts = await this.prisma.systemAlert.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    return alerts.map((alert) => buildAlertSummary(alert));
+  }
+
+  async reportAlert(input: {
+    type?: 'HEALTH_CHECK' | 'API_ERROR' | 'PAYMENT_ERROR' | 'BOOKING_ERROR' | 'AUTH_ERROR' | 'SYSTEM_ERROR';
+    level?: 'INFO' | 'WARNING' | 'CRITICAL';
+    source?: 'CUSTOMER' | 'BARBER' | 'ADMIN' | 'SYSTEM';
+    title?: string;
+    message?: string;
+    route?: string | null;
+    userId?: string | null;
+  }) {
+    const payload = {
+      type: input.type ?? 'API_ERROR',
+      level: input.level ?? 'WARNING',
+      source: input.source ?? 'SYSTEM',
+      title: input.title ?? 'System alert',
+      message: input.message ?? 'No details provided.',
+      route: input.route ?? null,
+      userId: input.userId ?? null,
+    };
+
+    const alert = await this.prisma.systemAlert.create({ data: payload });
+    return buildAlertSummary(alert);
+  }
+
+  async acknowledgeAlert(id: string) {
+    const existing = await this.prisma.systemAlert.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('Alert not found.');
+    }
+
+    const updated = await this.prisma.systemAlert.update({
+      where: { id },
+      data: { acknowledgedAt: new Date() },
+    });
+
+    return buildAlertSummary(updated);
   }
 
   async getSettings() {

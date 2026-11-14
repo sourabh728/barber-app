@@ -1,11 +1,13 @@
 import { ShopLeaderboardView } from "@/components/shop-leaderboard";
 import { useSession } from "@/context/session-provider";
 import {
+    fetchAdminAlerts,
     fetchAdminBookingsReport,
     fetchAdminOverview,
     fetchAdminSettings,
     getAdminErrorMessage,
     updateAdminSettings,
+    type AdminAlert,
     type AdminBookingsReport,
     type AdminOverview,
     type AdminSettings,
@@ -28,7 +30,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-type TabId = "report" | "shops" | "customers" | "points" | "payments" | "takedown";
+type TabId = "report" | "shops" | "customers" | "points" | "payments" | "alerts" | "takedown";
 
 function todayKey() {
   const d = new Date();
@@ -87,6 +89,7 @@ export default function AdminDashboardScreen() {
   const [reportLoading, setReportLoading] = useState(false);
   const [error, setError] = useState("");
   const [overview, setOverview] = useState<AdminOverview | null>(null);
+  const [alerts, setAlerts] = useState<AdminAlert[]>([]);
   const [settings, setSettings] = useState<AdminSettings | null>(null);
   const [report, setReport] = useState<AdminBookingsReport | null>(null);
   const [shopQuery, setShopQuery] = useState("");
@@ -144,11 +147,13 @@ export default function AdminDashboardScreen() {
       }
       setError("");
       try {
-        const [ov, st] = await Promise.all([
+        const [ov, st, al] = await Promise.all([
           fetchAdminOverview(),
           fetchAdminSettings(),
+          fetchAdminAlerts(),
         ]);
         setOverview(ov);
+        setAlerts(al);
         applySettings(st);
         await loadReport(fromDate, toDate);
       } catch (err) {
@@ -312,6 +317,7 @@ export default function AdminDashboardScreen() {
     { id: "customers", label: "Customers" },
     { id: "points", label: "Points" },
     { id: "payments", label: "Pay" },
+    { id: "alerts", label: "Alerts" },
     { id: "takedown", label: "Down" },
   ];
 
@@ -726,6 +732,33 @@ export default function AdminDashboardScreen() {
 
             <Text style={styles.sectionTitle}>Shop points leaderboard</Text>
             <ShopLeaderboardView />
+          </>
+        ) : null}
+
+        {tab === "alerts" ? (
+          <>
+            <Text style={styles.sectionTitle}>App and service alerts</Text>
+            <View style={styles.statGrid}>
+              <StatCard label="Active" value={alerts.filter((alert) => alert.active).length} tone="warn" />
+              <StatCard label="Total" value={alerts.length} />
+            </View>
+
+            {alerts.length === 0 ? (
+              <Text style={styles.muted}>No issues reported yet.</Text>
+            ) : (
+              alerts.map((alert) => (
+                <View key={alert.id} style={[styles.shopRow, styles.shopDetailCard, { flexDirection: 'column', alignItems: 'stretch' }]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                    <Text style={styles.shopName}>{alert.title}</Text>
+                    <Text style={[styles.shopMeta, { color: alert.level === 'CRITICAL' ? '#B91C1C' : alert.level === 'WARNING' ? '#B45309' : '#0B5A47' }]}>{alert.level}</Text>
+                  </View>
+                  <Text style={styles.shopMeta}>{alert.message}</Text>
+                  <Text style={styles.shopMeta}>{alert.source} • {alert.type}</Text>
+                  {alert.route ? <Text style={styles.shopMeta}>Route: {alert.route}</Text> : null}
+                  <Text style={styles.shopMeta}>Created: {new Date(alert.createdAt).toLocaleString('en-IN')}</Text>
+                </View>
+              ))
+            )}
           </>
         ) : null}
 

@@ -327,3 +327,42 @@ model AppSettings {
   updatedAt             DateTime    @updatedAt
   createdAt             DateTime    @default(now())
 }
+
+enum AlertType {
+  HEALTH_CHECK
+  API_ERROR
+  PAYMENT_ERROR
+  BOOKING_ERROR
+  AUTH_ERROR
+  SYSTEM_ERROR
+}
+
+enum AlertLevel {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertSource {
+  CUSTOMER
+  BARBER
+  ADMIN
+  SYSTEM
+}
+
+model SystemAlert {
+  id            String      @id @default(uuid())
+  type          AlertType   @default(API_ERROR)
+  level         AlertLevel  @default(WARNING)
+  source        AlertSource @default(SYSTEM)
+  title         String
+  message       String
+  route         String?
+  userId        String?
+  acknowledgedAt DateTime?
+  createdAt     DateTime    @default(now())
+
+  @@index([createdAt])
+  @@index([level, createdAt])
+  @@index([source, createdAt])
+}

@@ -1,13 +1,13 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Param,
+    Patch,
+    Post,
+    Query,
+    UseGuards,
 } from '@nestjs/common';
 import { UserRole } from '../../generated/prisma/enums';
 
@@ -28,6 +28,30 @@ export class AdminController {
   @Get('overview')
   overview() {
     return this.adminService.getOverview();
+  }
+
+  @Get('alerts')
+  alerts() {
+    return this.adminService.getAlerts();
+  }
+
+  @Post('alerts')
+  @Roles(UserRole.ADMIN, UserRole.CUSTOMER, UserRole.BARBER)
+  createAlert(@Body() dto: { type?: string; level?: string; source?: string; title?: string; message?: string; route?: string | null; userId?: string | null }) {
+    return this.adminService.reportAlert({
+      type: dto.type as any,
+      level: dto.level as any,
+      source: dto.source as any,
+      title: dto.title ?? 'System alert',
+      message: dto.message ?? 'No details provided.',
+      route: dto.route ?? null,
+      userId: dto.userId ?? null,
+    });
+  }
+
+  @Patch('alerts/:id/acknowledge')
+  acknowledgeAlert(@Param('id') id: string) {
+    return this.adminService.acknowledgeAlert(id);
   }
 
   @Get('bookings-report')

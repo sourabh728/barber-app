@@ -55,6 +55,45 @@ export type LoginResponse = {
   };
 };
 
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const config = error?.config;
+    if (!config || config.__reported) {
+      return Promise.reject(error);
+    }
+
+    const url = typeof config.url === "string" ? config.url : "";
+    const shouldSkip =
+      url.includes("/health") ||
+      url.includes("/admin/alerts") ||
+      url.includes("/admin/settings") ||
+      url.includes("/admin/overview");
+
+    if (!shouldSkip && error && error.response && error.response.status >= 400) {
+      try {
+        await create({
+          baseURL: apiBaseUrl,
+          timeout: isRemoteApi ? 60_000 : 15_000,
+          headers: { "Content-Type": "application/json" },
+        }).post("/admin/alerts", {
+          type: "API_ERROR",
+          level: "WARNING",
+          source: "SYSTEM",
+          title: "Client-side API error",
+          message: error?.response?.data?.message ?? error.message ?? "Unknown client-side API error.",
+          route: url,
+        });
+      } catch {
+        // Swallow background reporting failures so the user still sees the original error.
+      }
+    }
+
+    config.__reported = true;
+    return Promise.reject(error);
+  },
+);
+
 export function setApiAccessToken(accessToken: string) {
   api.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 }

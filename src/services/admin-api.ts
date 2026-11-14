@@ -155,6 +155,20 @@ export type AdminOverview = {
   statuses: string[];
 };
 
+export type AdminAlert = {
+  id: string;
+  type: string;
+  level: string;
+  source: string;
+  title: string;
+  message: string;
+  route: string | null;
+  userId: string | null;
+  active: boolean;
+  createdAt: string;
+  acknowledgedAt: string | null;
+};
+
 export type AdminBookingsReport = {
   from: string;
   to: string;
@@ -196,6 +210,29 @@ export type UpdateAdminSettingsInput = {
 
 export async function fetchAdminOverview() {
   const response = await api.get<AdminOverview>("/admin/overview");
+  return response.data;
+}
+
+export async function fetchAdminAlerts() {
+  const response = await api.get<AdminAlert[]>("/admin/alerts");
+  return response.data;
+}
+
+export async function acknowledgeAdminAlert(id: string) {
+  const response = await api.patch<AdminAlert>(`/admin/alerts/${id}/acknowledge`);
+  return response.data;
+}
+
+export async function reportAdminAlert(input: {
+  type?: string;
+  level?: string;
+  source?: string;
+  title?: string;
+  message?: string;
+  route?: string | null;
+  userId?: string | null;
+}) {
+  const response = await api.post<AdminAlert>("/admin/alerts", input);
   return response.data;
 }
 
