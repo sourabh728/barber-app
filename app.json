@@ -2,7 +2,7 @@
   "expo": {
     "name": "Trimshim",
     "slug": "barber-app1",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/images/logo-glow.png",
     "scheme": [
@@ -14,9 +14,10 @@
       "policy": "appVersion"
     },
     "updates": {
-      "enabled": false,
-      "checkAutomatically": "NEVER",
-      "fallbackToCacheTimeout": 0
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/216152d9-e2d1-46ce-9697-3b49f7de3dca"
     },
     "ios": {
       "bundleIdentifier": "com.barberapp1.app",
@@ -24,7 +25,7 @@
     },
     "android": {
       "package": "com.barberapp1.app",
-      "versionCode": 8,
+      "versionCode": 9,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

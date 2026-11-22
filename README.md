@@ -42,6 +42,42 @@ sign in with their saved role; unknown accounts are directed to registration.
 The older `/auth/google` endpoint remains available for older app versions.
 See the [Google sign-in troubleshooting guide](https://react-native-google-signin.github.io/docs/troubleshooting).
 
+## Expo updates and Android releases
+
+The production EAS build profile creates an Android App Bundle and uses the
+`production` update channel. The `preview` profile builds an APK on a separate
+channel. Existing installations made before Expo Updates was enabled must be
+replaced with a new build before they can receive updates.
+
+```powershell
+eas build --platform android --profile production
+```
+
+Upload the resulting AAB to the intended Google Play testing track. Verify the
+upload key and that the version code is greater than all previous Play uploads.
+The EAS production profile manages the version code remotely.
+
+To publish a JavaScript or asset change to compatible production builds, first
+configure the same `EXPO_PUBLIC_*` values used by the build in the EAS
+`production` environment, then run:
+
+```powershell
+eas update --channel production --environment production --message "Describe the update"
+```
+
+Changes are not published automatically when files change. Builds check for
+updates on launch; a downloaded update normally appears on the next launch.
+Native code, dependencies, permissions, and native configuration changes require
+a new build. This project uses the app version as its runtime version: bump
+`expo.version` whenever native compatibility changes, and publish updates only
+to builds with a matching runtime version.
+
+The generated `android` directory is ignored by Git and EAS uploads. Local
+Gradle builds use its own native update settings and production channel; when
+changing the app version, also synchronize its `versionName`, `versionCode`, and
+`expo_runtime_version`, or regenerate the native project while preserving its
+release signing setup.
+
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
 ## Get a fresh project
