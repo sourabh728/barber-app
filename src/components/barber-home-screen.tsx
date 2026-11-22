@@ -483,7 +483,7 @@ export function BarberHomeScreen() {
         key={`${block.startTime}-${index}`}
         style={[styles.slotBlock, slotStyle]}
         disabled={false}
-        delayLongPress={1000}
+        delayLongPress={500}
         onPress={() => {
           if (block.appointment && !canLongPress) {
             router.push("/barber/appointments");
@@ -504,7 +504,7 @@ export function BarberHomeScreen() {
         <Text style={[styles.slotTime, textStyle]}>{labelTime}</Text>
         <Text style={[styles.slotSubtitle, textStyle]} numberOfLines={2}>
           {subtitle}
-          {canLongPress ? " · hold 1s" : ""}
+          {canLongPress ? " · hold 0.5s" : ""}
         </Text>
       </Pressable>
     );
